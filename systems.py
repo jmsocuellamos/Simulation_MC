@@ -300,7 +300,7 @@ def kpis_temporales(df, num_servidores, t_window):
         total_sys_cycle = sys_times.sum()
         
         # Multiplicamos por 100 para porcentaje
-        sys_ratio_eff = (total_sys_wq / total_sys_cycle * 100) if total_sys_cycle > 0 else 0
+        sys_ratio_eff = (total_sys_wq / total_sys_cycle) if total_sys_cycle > 0 else 0
         sys_ratio_eff = round(sys_ratio_eff, 3)
         
         resultados.append({
@@ -312,7 +312,7 @@ def kpis_temporales(df, num_servidores, t_window):
             'Media_Cola': sys_mean_wq,
             'Std_Cola': sys_std_wq,
             'Intervalo_Cola (5-95%)': sys_wq_interval,
-            'Eficiencia_Flujo_Cola (%)': sys_ratio_eff
+            'Eficiencia_Flujo_Cola': sys_ratio_eff
         })
     else:
         # Caso sin datos en la ventana
@@ -322,7 +322,7 @@ def kpis_temporales(df, num_servidores, t_window):
             'Intervalo_Permanencia (5-95%)': '[0 - 0]',
             'Media_Cola': 0.0, 'Std_Cola': 0.0, 
             'Intervalo_Cola (5-95%)': '[0 - 0]',
-            'Eficiencia_Flujo_Cola (%)': 0.0
+            'Eficiencia_Flujo_Cola': 0.0
         })
 
     # ==============================================================================
@@ -336,7 +336,7 @@ def kpis_temporales(df, num_servidores, t_window):
         'Nivel', 'Tipo', 
         'Media_Permanencia', 'Std_Permanencia', 'Intervalo_Permanencia (5-95%)',
         'Media_Cola', 'Std_Cola', 'Intervalo_Cola (5-95%)',
-        'Eficiencia_Flujo_Cola (%)'
+        'Eficiencia_Flujo_Cola'
     ]
     df_kpis = df_kpis[cols]
     
