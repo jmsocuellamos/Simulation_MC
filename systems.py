@@ -349,61 +349,44 @@ import numpy as np
 def kpis_eficiencia(df, num_servidores, t_window):
     """
     Calcula KPIs de eficiencia (Throughput y Utilización) por estación
-    y detecta el cuello de botella del sistema.
-    
-    Parámetros:
-    -----------
-    df : pd.DataFrame
-        Dataframe con las columnas: Station, Tout, Tservicee, etc.
-    num_servidores : dict
-        Diccionario { 'Nombre_Estacion': cantidad_servidores }
-    t_window : tuple (tin, tfin)
-        Horizonte temporal de evaluación.
-        
-    Retorna:
-    --------
-    pd.DataFrame
-        Resumen de eficiencia por estación con detección de cuellos de botella.
+    y añade una fila de resumen GLOBAL del sistema.
     """
     
     tin, tfin = t_window
     
-    # PASO 1: Definición del Horizonte Temporal (T_obs)
-    # Se usa la ventana proporcionada como el tiempo de observación efectivo
+    # PASO 1: Horizonte Temporal
     T_obs = tfin - tin
     
     if T_obs <= 0:
         raise ValueError("El intervalo de tiempo (tfin - tin) debe ser mayor a 0")
 
-    # Filtramos los datos dentro de la ventana de observación (basado en salidas Tout)
-    # Esto define las entidades procesadas en este periodo.
+    # Filtramos datos dentro de la ventana
     df_window = df[(df['Tout'] >= tin) & (df['Tout'] <= tfin)].copy()
     
     estaciones = sorted(df['Station'].unique())
     resultados_temp = []
     
-    # Recorremos cada estación para PASOS 2 y 3
+    # Acumuladores para el cálculo global
+    global_work_sum = 0
+    global_capacity_sum = 0
+    
+    # Recorremos cada estación
     for estacion in estaciones:
         data_st = df_window[df_window['Station'] == estacion]
+        k_servidores = num_servidores.get(estacion, 1)
         
-        # Obtener número de servidores (k)
-        k_servidores = num_servidores.get(estacion, 1) # Default 1 si no se especifica
-        
-        # --- PASO 2: Cálculo del Throughput (TH) ---
-        # N_out: Cantidad de piezas que finalizaron (salieron) en esta estación en el periodo
+        # --- PASO 2 (Estación): Throughput ---
         N_out = len(data_st)
-        
-        # TH = N_out / T_obs
         th_val = N_out / T_obs
         
-        # --- PASO 3: Cálculo de la Utilización (Rho) ---
-        # 1. Carga de Trabajo Real (Work_s): Suma de Tservicee de las piezas procesadas
-        work_s = data_st['Tservice'].sum()
+        # --- PASO 3 (Estación): Utilización ---
+        work_s = data_st['Tservicee'].sum() # Trabajo total realizado
+        cap_s = T_obs * k_servidores        # Capacidad total disponible
         
-        # 2. Capacidad Disponible (Cap_s): T_obs * k_servidores
-        cap_s = T_obs * k_servidores
+        # Acumulamos para el global
+        global_work_sum += work_s
+        global_capacity_sum += cap_s
         
-        # 3. Ratio de Utilización (Rho)
         if cap_s > 0:
             rho_s = work_s / cap_s
         else:
@@ -413,47 +396,79 @@ def kpis_eficiencia(df, num_servidores, t_window):
             'Estación': estacion,
             'N_out': N_out,
             'Throughput': th_val,
-            'Utilización': rho_s
+            'Utilización': rho_s,
+            'Tipo': 'Estación' # Marcador para distinguir
         })
 
-    # --- PASO 4: Análisis de Cuellos de Botella ---
+    # --- CÁLCULOS GLOBALES ---
+    # 1. Throughput Global: Solo cuenta lo que sale de la última estación (06_Control_QC)
+    estacion_final = '06_Control_QC'
+    data_final_st = df_window[df_window['Station'] == estacion_final]
+    N_out_sys = len(data_final_st)
+    th_sys = N_out_sys / T_obs
     
-    # Convertimos a DataFrame temporal para facilitar cálculos
+    # 2. Utilización Global (Ponderada): Total Trabajo / Total Capacidad
+    if global_capacity_sum > 0:
+        rho_sys = global_work_sum / global_capacity_sum
+    else:
+        rho_sys = 0.0
+        
+    # Añadimos la fila global a la lista temporal (sin analizar cuello de botella aún)
+    resultados_temp.append({
+        'Estación': 'Global_Sistema',
+        'N_out': N_out_sys,
+        'Throughput': th_sys,
+        'Utilización': rho_sys,
+        'Tipo': 'Sistema'
+    })
+
+    # --- PASO 4: Análisis y Formato Final ---
+    
     df_res = pd.DataFrame(resultados_temp)
     
     if not df_res.empty:
-        # Identificar el máximo Rho
-        max_rho = df_res['Utilización'].max()
-        
+        # Identificar Bottleneck (SOLO entre estaciones, ignoramos la fila Global)
+        subset_estaciones = df_res[df_res['Tipo'] == 'Estación']
+        if not subset_estaciones.empty:
+            max_rho = subset_estaciones['Utilización'].max()
+        else:
+            max_rho = 0
+
         final_rows = []
         for index, row in df_res.iterrows():
             rho = row['Utilización']
             th = row['Throughput']
             estacion_nombre = row['Estación']
+            tipo = row['Tipo']
             
-            # 4.1 Identificación del Bottleneck
-            es_bottleneck = (rho == max_rho) and (max_rho > 0)
-            
-            # 4.2 Evaluación de Estabilidad
-            estado = "Estable"
-            if rho >= 1.0:
-                estado = "Inestable (Saturado)"
-            elif rho >= 0.85:
-                estado = "Alta Congestión"
-            
+            # Lógica de Bottleneck y Estabilidad
+            if tipo == 'Estación':
+                es_bottleneck = (rho == max_rho) and (max_rho > 0)
+                bottleneck_str = 'SÍ' if es_bottleneck else 'No'
+                
+                if rho >= 1.0:
+                    estado = "Inestable (Saturado)"
+                elif rho >= 0.85:
+                    estado = "Alta Congestión"
+                else:
+                    estado = "Estable"
+            else:
+                # Lógica para la fila Global
+                bottleneck_str = '-'
+                estado = "Promedio Sistema"
+
             final_rows.append({
                 'Estación': estacion_nombre,
                 'Unidades_Procesadas': int(row['N_out']),
                 'Throughput (Unid/tiempo)': round(th, 3),
                 'Utilización (Rho)': round(rho, 3),
-                'Es_Cuello_Botella': 'SÍ' if es_bottleneck else 'No',
+                'Es_Cuello_Botella': bottleneck_str,
                 'Estado_Estabilidad': estado
             })
             
         df_final = pd.DataFrame(final_rows)
         
     else:
-        # Caso dataframe vacío
         df_final = pd.DataFrame(columns=[
             'Estación', 'Unidades_Procesadas', 'Throughput (Unid/tiempo)', 
             'Utilización (Rho)', 'Es_Cuello_Botella', 'Estado_Estabilidad'
