@@ -237,7 +237,7 @@ def kpis_temporales(df, num_servidores, t_window):
         total_ts = ts_values.sum()
         
         # Multiplicamos por 100 para porcentaje
-        ratio_eff = (total_wq / total_ts * 100) if total_ts > 0 else 0
+        ratio_eff = (total_wq / total_ts) if total_ts > 0 else 0
         ratio_eff = round(ratio_eff, 3)
         
         resultados.append({
@@ -249,7 +249,7 @@ def kpis_temporales(df, num_servidores, t_window):
             'Media_Cola': mean_wq,
             'Std_Cola': std_wq,
             'Intervalo_Cola (5-95%)': wq_interval,
-            'Eficiencia_Flujo_Cola (%)': ratio_eff
+            'Eficiencia_Flujo_Cola': ratio_eff
         })
 
     # ==============================================================================
