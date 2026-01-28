@@ -380,7 +380,7 @@ def kpis_eficiencia(df, num_servidores, t_window):
         th_val = N_out / T_obs
         
         # --- PASO 3 (Estación): Utilización ---
-        work_s = data_st['Tservicee'].sum() # Trabajo total realizado
+        work_s = data_st['Tservice'].sum() # Trabajo total realizado
         cap_s = T_obs * k_servidores        # Capacidad total disponible
         
         # Acumulamos para el global
