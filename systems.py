@@ -185,8 +185,16 @@ def gof_distr(data):
 def kpis_temporales(df, num_servidores, t_window):
     """
     Calcula KPIs temporales con redondeo a 3 decimales.
-    Sustituye medianas por intervalos (5%-95%).
-    Expresa la eficiencia como porcentaje (0-100%).
+    
+    Parámetros de entrada:
+      - df: dataframe con columnas `Pieza_ID`, `Station`, `Tin`, `Tinit_service`, `Tout`, `Nsystem`, `Nqueue`, 
+      `Estado_QC`, `Tservice`, `Tstation`, `Tqueue`, `Ttras`.
+      - num_servidores: diccionario con el número de servidores por estación.
+      - t_window: intervalo de tiempo (tin, tfin) donde se evalua el sistema.
+
+    Devuelve:
+      Dataframe con los KPIs calculados por estación y para el sistema global. Los KPis incluyen el valor medio, 
+      desviación típica, e intervalo con los percentiles del 5% y del 95%
     """
     
     tin, tfin = t_window
