@@ -475,3 +475,150 @@ def kpis_eficiencia(df, num_servidores, t_window):
         ])
 
     return df_final
+
+import pandas as pd
+import numpy as np
+
+def kpis_inventario(df, num_servidores, t_window):
+    """
+    Calcula el WIP (Work In Process) aplicando la Ley de Little y lo compara
+    con el WIP observado (Time-Weighted) para validar la estabilidad del sistema.
+    """
+
+    tin, tfin = t_window
+
+    # ==============================================================================
+    # PASO 1: Definición de Variables Previas (Horizonte Temporal)
+    # ==============================================================================
+    T_obs = tfin - tin
+
+    if T_obs <= 0:
+        raise ValueError("El intervalo de tiempo debe ser positivo.")
+
+    resultados = []
+
+    # ==============================================================================
+    # PASO 2: Evaluación por Estación Individual (Nivel Micro)
+    # ==============================================================================
+
+    # Filtramos las piezas que FINALIZARON su paso por la estación en la ventana
+    df_window = df[(df['Tout'] >= tin) & (df['Tout'] <= tfin)].copy()
+    estaciones = sorted(df['Station'].unique())
+
+    for estacion in estaciones:
+        data_st = df_window[df_window['Station'] == estacion]
+
+        # Si no hay datos, rellenamos con 0
+        if data_st.empty:
+            resultados.append({
+                'Nivel': estacion,
+                'WIP_Teorico (Little)': 0.0,
+                'WIP_Observado (Time-Weighted)': 0.0,
+                'Discrepancia': 0.0,
+                'Estado_QA': 'Sin Datos'
+            })
+            continue
+
+        # 1. Cálculo de Tasa Local (Lambda_s)
+        # N_s: Cantidad de salidas en el periodo
+        N_s = len(data_st)
+        lambda_s = N_s / T_obs
+
+        # 2. Obtención del Tiempo en Estación (E[W_s])
+        # W_s incluye tiempo en cola + servicio (columna 'Tstation')
+        mean_w_s = data_st['Tstation'].mean()
+
+        # 3. Aplicación de la Ley (WIP Teórico)
+        # L = Lambda * W
+        wip_teorico = lambda_s * mean_w_s
+
+        # 4. Cálculo del WIP Observado (Time-Weighted)
+        # Matemáticamente equivale a la Suma de todos los tiempos de estancia / T_obs
+        # Esto representa la integral del inventario en el tiempo dividida por el periodo
+        total_time_spent = data_st['Tstation'].sum()
+        wip_observado = total_time_spent / T_obs
+
+        # Validación QA (Diferencia absoluta)
+        diff = abs(wip_teorico - wip_observado)
+
+        # Estado de consistencia (Tolerancia baja por precisión numérica)
+        qa_status = "Consistente" if diff < 0.001 else "Discrepancia Numérica"
+
+        resultados.append({
+            'Nivel': estacion,
+            'WIP_Teorico (Little)': round(wip_teorico, 3),
+            'WIP_Observado (Time-Weighted)': round(wip_observado, 3),
+            'Discrepancia': round(diff, 5), # Más decimales para ver errores finos
+            'Estado_QA': qa_status
+        })
+
+    # ==============================================================================
+    # PASO 3: Evaluación del Sistema Global (Nivel Macro)
+    # ==============================================================================
+
+    estacion_final = '06_Control_QC'
+
+    # Identificamos piezas que terminaron todo el proceso en la ventana
+    data_final_st = df_window[df_window['Station'] == estacion_final]
+    piezas_terminadas_ids = data_final_st['Pieza_ID'].unique()
+
+    if len(piezas_terminadas_ids) > 0:
+        # 1. Cálculo de Tasa Global (Lambda_sys)
+        N_sys = len(piezas_terminadas_ids)
+        lambda_sys = N_sys / T_obs
+
+        # Recuperamos la historia completa de estas piezas para calcular su Tiempo de Ciclo
+        df_system_full = df[df['Pieza_ID'].isin(piezas_terminadas_ids)].copy()
+
+        grouped = df_system_full.groupby('Pieza_ID').agg(
+            Sum_Tstation=('Tstation', 'sum'),
+            Sum_Ttras=('Ttras', 'sum')
+        )
+
+        # Tiempo de ciclo (T_sys) = Suma estancias + Suma traslados
+        grouped['T_sys_total'] = grouped['Sum_Tstation'] + grouped['Sum_Ttras']
+
+        # 2. Obtención del Tiempo de Ciclo Medio (E[W_sys])
+        mean_w_sys = grouped['T_sys_total'].mean()
+
+        # 3. Aplicación de la Ley (WIP Total Teórico)
+        wip_sys_teorico = lambda_sys * mean_w_sys
+
+        # 4. WIP Observado Global
+        # Suma de todos los tiempos invertidos por las piezas que salieron / T_obs
+        total_sys_time_spent = grouped['T_sys_total'].sum()
+        wip_sys_observado = total_sys_time_spent / T_obs
+
+        diff_sys = abs(wip_sys_teorico - wip_sys_observado)
+        qa_status_sys = "Consistente (Estable)" if diff_sys < 0.01 else "Posible Inestabilidad"
+
+        resultados.append({
+            'Nivel': 'Global_Sistema',
+            'WIP_Teorico (Little)': round(wip_sys_teorico, 3),
+            'WIP_Observado (Time-Weighted)': round(wip_sys_observado, 3),
+            'Discrepancia': round(diff_sys, 5),
+            'Estado_QA': qa_status_sys
+        })
+    else:
+        # Caso sin salidas globales
+        resultados.append({
+            'Nivel': 'Global_Sistema', 
+            'WIP_Teorico (Little)': 0, 'WIP_Observado (Time-Weighted)': 0,
+            'Discrepancia': 0, 'Estado_QA': 'Sin Salidas'
+        })
+
+    # ==============================================================================
+    # PASO 4: Formato Final
+    # ==============================================================================
+
+    df_little = pd.DataFrame(resultados)
+
+    # Reordenamos columnas
+    cols = [
+        'Nivel', 
+        'WIP_Teorico (Little)', 'WIP_Observado (Time-Weighted)',
+        'Discrepancia', 'Estado_QA'
+    ]
+    df_little = df_little[cols]
+
+    return df_little
