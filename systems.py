@@ -180,3 +180,156 @@ def gof_distr(data):
     df_results = df_results.sort_values(by='P-Value', ascending=False).reset_index(drop=True)
     
     return df_results
+
+
+def kpis_temporales(df, num_servidores, t_window):
+    """
+    Calcula KPIs temporales con redondeo a 3 decimales.
+    Sustituye medianas por intervalos (5%-95%).
+    Expresa la eficiencia como porcentaje (0-100%).
+    """
+    
+    tin, tfin = t_window
+    resultados = []
+    
+    # ==============================================================================
+    # 1. ANÁLISIS POR ESTACIÓN
+    # ==============================================================================
+    
+    # Filtramos salidas dentro de la ventana
+    df_period_station = df[(df['Tout'] >= tin) & (df['Tout'] <= tfin)].copy()
+    estaciones = sorted(df['Station'].unique())
+    
+    for estacion in estaciones:
+        data_st = df_period_station[df_period_station['Station'] == estacion]
+        
+        if data_st.empty:
+            continue
+            
+        # --- PERMANENCIA (Tstation) ---
+        ts_values = data_st['Tstation']
+        mean_ts = round(ts_values.mean(), 3)
+        std_ts = round(ts_values.std(), 3)
+        # Intervalo 5% - 95%
+        ts_p05 = round(ts_values.quantile(0.05), 3)
+        ts_p95 = round(ts_values.quantile(0.95), 3)
+        ts_interval = f"[{ts_p05} - {ts_p95}]"
+        
+        # --- COLA (Tqueue) ---
+        wq_values = data_st['Tqueue']
+        mean_wq = round(wq_values.mean(), 3)
+        std_wq = round(wq_values.std(), 3)
+        # Intervalo 5% - 95%
+        wq_p05 = round(wq_values.quantile(0.05), 3)
+        wq_p95 = round(wq_values.quantile(0.95), 3)
+        wq_interval = f"[{wq_p05} - {wq_p95}]"
+        
+        # --- EFICIENCIA (Ratio %) ---
+        total_wq = wq_values.sum()
+        total_ts = ts_values.sum()
+        
+        # Multiplicamos por 100 para porcentaje
+        ratio_eff = (total_wq / total_ts * 100) if total_ts > 0 else 0
+        ratio_eff = round(ratio_eff, 3)
+        
+        resultados.append({
+            'Nivel': estacion,
+            'Tipo': 'Estación',
+            'Media_Permanencia': mean_ts,
+            'Std_Permanencia': std_ts,
+            'Intervalo_Permanencia (5-95%)': ts_interval,
+            'Media_Cola': mean_wq,
+            'Std_Cola': std_wq,
+            'Intervalo_Cola (5-95%)': wq_interval,
+            'Eficiencia_Flujo_Cola (%)': ratio_eff
+        })
+
+    # ==============================================================================
+    # 2. ANÁLISIS DEL SISTEMA GLOBAL
+    # ==============================================================================
+    
+    estacion_final = '06_Control_QC'
+    
+    # Identificar piezas terminadas en la ventana
+    piezas_terminadas_ids = df[
+        (df['Station'] == estacion_final) & 
+        (df['Tout'] >= tin) & 
+        (df['Tout'] <= tfin)
+    ]['Pieza_ID'].unique()
+    
+    if len(piezas_terminadas_ids) > 0:
+        df_system_full = df[df['Pieza_ID'].isin(piezas_terminadas_ids)].copy()
+        
+        # Agregamos por Pieza para tener los totales del sistema
+        grouped = df_system_full.groupby('Pieza_ID').agg(
+            Sum_Tstation=('Tstation', 'sum'),
+            Sum_Ttras=('Ttras', 'sum'),
+            Sum_Tqueue=('Tqueue', 'sum')
+        )
+        
+        # Cálculo de tiempos totales por pieza
+        sys_times = grouped['Sum_Tstation'] + grouped['Sum_Ttras'] # T_sys
+        queue_times = grouped['Sum_Tqueue'] # W_q_sys
+        
+        # --- PERMANENCIA SISTEMA ---
+        sys_mean_ts = round(sys_times.mean(), 3)
+        sys_std_ts = round(sys_times.std(), 3)
+        # Intervalo
+        sys_p05 = round(sys_times.quantile(0.05), 3)
+        sys_p95 = round(sys_times.quantile(0.95), 3)
+        sys_interval = f"[{sys_p05} - {sys_p95}]"
+        
+        # --- COLA SISTEMA ---
+        sys_mean_wq = round(queue_times.mean(), 3)
+        sys_std_wq = round(queue_times.std(), 3)
+        # Intervalo
+        sys_wq_p05 = round(queue_times.quantile(0.05), 3)
+        sys_wq_p95 = round(queue_times.quantile(0.95), 3)
+        sys_wq_interval = f"[{sys_wq_p05} - {sys_wq_p95}]"
+        
+        # --- EFICIENCIA SISTEMA (%) ---
+        total_sys_wq = queue_times.sum()
+        total_sys_cycle = sys_times.sum()
+        
+        # Multiplicamos por 100 para porcentaje
+        sys_ratio_eff = (total_sys_wq / total_sys_cycle * 100) if total_sys_cycle > 0 else 0
+        sys_ratio_eff = round(sys_ratio_eff, 3)
+        
+        resultados.append({
+            'Nivel': 'Global_Sistema',
+            'Tipo': 'Sistema',
+            'Media_Permanencia': sys_mean_ts,
+            'Std_Permanencia': sys_std_ts,
+            'Intervalo_Permanencia (5-95%)': sys_interval,
+            'Media_Cola': sys_mean_wq,
+            'Std_Cola': sys_std_wq,
+            'Intervalo_Cola (5-95%)': sys_wq_interval,
+            'Eficiencia_Flujo_Cola (%)': sys_ratio_eff
+        })
+    else:
+        # Caso sin datos en la ventana
+        resultados.append({
+            'Nivel': 'Global_Sistema', 'Tipo': 'Sistema',
+            'Media_Permanencia': 0.0, 'Std_Permanencia': 0.0, 
+            'Intervalo_Permanencia (5-95%)': '[0 - 0]',
+            'Media_Cola': 0.0, 'Std_Cola': 0.0, 
+            'Intervalo_Cola (5-95%)': '[0 - 0]',
+            'Eficiencia_Flujo_Cola (%)': 0.0
+        })
+
+    # ==============================================================================
+    # 3. OUTPUT
+    # ==============================================================================
+    
+    df_kpis = pd.DataFrame(resultados)
+    
+    # Orden de columnas
+    cols = [
+        'Nivel', 'Tipo', 
+        'Media_Permanencia', 'Std_Permanencia', 'Intervalo_Permanencia (5-95%)',
+        'Media_Cola', 'Std_Cola', 'Intervalo_Cola (5-95%)',
+        'Eficiencia_Flujo_Cola (%)'
+    ]
+    df_kpis = df_kpis[cols]
+    
+    return df_kpis
