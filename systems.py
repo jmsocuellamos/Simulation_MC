@@ -622,3 +622,284 @@ def kpis_inventario(df, num_servidores, t_window):
     df_little = df_little[cols]
 
     return df_little
+
+def kpis_calidad(df, num_servidores, t_window, costes_input):
+    """
+    Calcula KPIs de calidad y financieros utilizando una estructura de costes detallada.
+    
+    Parámetros:
+    -----------
+    df : pd.DataFrame
+        Dataframe con las columnas del proceso.
+    num_servidores : dict
+        (Mantenido por consistencia de firma, no afecta cálculo financiero directo).
+    t_window : tuple (tin, tfin)
+        Ventana de observación.
+    costes_input : dict
+        Diccionario con claves: 'Materia_Prima', 'Coste_Rechazo' y 
+        'Costes_Estacion' (este último mapea cada estación a sus costes).
+        
+    Retorna:
+    --------
+    pd.DataFrame
+        KPIs de Calidad, Coste Hundido y CPU Real.
+    """
+    
+    tin, tfin = t_window
+    T_obs = tfin - tin
+    
+    # 1. Extracción de Parámetros de Coste
+    C_mat = costes_input.get('Materia_Prima', 0.0)
+    C_rechazo = costes_input.get('Coste_Rechazo', 0.0)
+    dict_estaciones = costes_input.get('Costes_Estacion', {})
+    
+    # Preparamos mapas de mapeo para aplicar costes rápidamente al dataframe
+    # Si una estación no está en el diccionario, asumimos coste 0 para evitar errores
+    mapa_coste_hora = {k: v.get('Coste', 0.0) for k, v in dict_estaciones.items()}
+    mapa_coste_proc = {k: v.get('Coste_Procesado', 0.0) for k, v in dict_estaciones.items()}
+    
+    # 2. Identificación de la producción en la ventana (Estación QC)
+    qc_station = '06_Control_QC'
+    df_qc = df[(df['Station'] == qc_station) & (df['Tout'] >= tin) & (df['Tout'] <= tfin)].copy()
+    
+    if df_qc.empty:
+        return pd.DataFrame(columns=['KPI', 'Valor', 'Unidad'])
+
+    # ==============================================================================
+    # PASO 1 y 2: Métricas de Calidad (Yield y Throughput)
+    # ==============================================================================
+    
+    N_total = len(df_qc)
+    
+    # Identificación de IDs
+    ids_nok = df_qc[df_qc['Estado_QC'] == 'Rechazada']['Pieza_ID'].unique()
+    ids_ok = df_qc[df_qc['Estado_QC'] != 'Rechazada']['Pieza_ID'].unique()
+    
+    N_nok = len(ids_nok)
+    N_ok = len(ids_ok)
+    
+    # Yield
+    yield_val = N_ok / N_total if N_total > 0 else 0.0
+    
+    # Throughput
+    th_nom = N_total / T_obs
+    th_eff = th_nom * yield_val
+    
+    # ==============================================================================
+    # CÁLCULOS FINANCIEROS (Preparación de Datos)
+    # ==============================================================================
+    
+    # Recuperamos el historial completo de TODAS las piezas que salieron en este periodo (OK y NOK)
+    # para calcular el coste real acumulado de cada una.
+    all_ids = np.concatenate([ids_ok, ids_nok])
+    df_history = df[df['Pieza_ID'].isin(all_ids)].copy()
+    
+    # Mapeamos los costes al dataframe histórico basándonos en la estación
+    # Coste Hora asignado a cada fila
+    df_history['Rate_Hora'] = df_history['Station'].map(mapa_coste_hora).fillna(0)
+    # Coste Fijo asignado a cada fila
+    df_history['Rate_Fijo'] = df_history['Station'].map(mapa_coste_proc).fillna(0)
+    
+    # Calculamos el coste operativo de CADA paso individual
+    # Coste_Paso = Coste_Fijo + (Tiempo_Servicio * Coste_Hora)
+    df_history['Coste_Paso'] = df_history['Rate_Fijo'] + (df_history['Tservice'] * df_history['Rate_Hora'])
+    
+    # Agrupamos por pieza para tener el Coste de Procesado Acumulado (CP_i)
+    costos_por_pieza = df_history.groupby('Pieza_ID')['Coste_Paso'].sum().reset_index()
+    
+    # Añadimos el Coste de Materia Prima a todas las piezas
+    costos_por_pieza['Coste_Total_Pieza'] = costos_por_pieza['Coste_Paso'] + C_mat
+    
+    # ==============================================================================
+    # PASO 3: Coste Hundido (Sunk Cost)
+    # ==============================================================================
+    
+    sunk_cost_total = 0.0
+    
+    if N_nok > 0:
+        # Filtramos solo los costes de las piezas NOK
+        costos_nok = costos_por_pieza[costos_por_pieza['Pieza_ID'].isin(ids_nok)]
+        
+        # Sumamos el coste de producción acumulado de las malas
+        valor_agregado_perdido = costos_nok['Coste_Total_Pieza'].sum()
+        
+        # Añadimos la gestión de residuos
+        coste_gestion_residuos = N_nok * C_rechazo
+        
+        sunk_cost_total = valor_agregado_perdido + coste_gestion_residuos
+
+    avg_sunk_cost = (sunk_cost_total / N_nok) if N_nok > 0 else 0.0
+
+    # ==============================================================================
+    # PASO 4: Coste Unitario Real (CPU)
+    # ==============================================================================
+    
+    # Coste Total del Sistema (C_sys)
+    # 1. Suma de costes de producción de TODAS las piezas (OK + NOK)
+    total_production_cost = costos_por_pieza['Coste_Total_Pieza'].sum()
+    
+    # 2. Costes extra de calidad (solo las rechazadas generan coste de residuo)
+    total_waste_cost = N_nok * C_rechazo
+    
+    c_sys = total_production_cost + total_waste_cost
+    
+    # CPU Real = Todo el dinero gastado / Solo las piezas que puedo vender
+    if N_ok > 0:
+        cpu_real = c_sys / N_ok
+    else:
+        cpu_real = c_sys # Infinito/Total pérdida
+    
+    # ==============================================================================
+    # RESULTADOS
+    # ==============================================================================
+    
+    resultados = [
+        {'KPI': 'Piezas Totales (Salidas)', 'Valor': N_total, 'Unidad': 'Unidades'},
+        {'KPI': 'Piezas aceptadas', 'Valor': N_ok, 'Unidad': 'Unidades'},
+        {'KPI': 'Piezas rechazadas', 'Valor': N_nok, 'Unidad': 'Unidades'},
+        {'KPI': 'Rendimiento (Yield)', 'Valor': round(yield_val * 100, 2), 'Unidad': '%'},
+        {'KPI': 'Throughput Efectivo', 'Valor': round(th_eff, 3), 'Unidad': 'Pieza/ud_tiempo'},
+        {'KPI': 'Coste Total', 'Valor': round(sunk_cost_total, 2), 'Unidad': 'Euros'},
+        {'KPI': 'Pérdida media por rechazo', 'Valor': round(avg_sunk_cost, 2), 'Unidad': 'Euros/pz'},
+        {'KPI': 'Coste Total Operativo', 'Valor': round(c_sys, 2), 'Unidad': 'Euros'},
+        {'KPI': 'Coste Unitario', 'Valor': round(cpu_real, 2), 'Unidad': 'Euros/pz'}
+    ]
+    
+    return pd.DataFrame(resultados)
+
+def kpis_financieros(df, num_servidores, t_window, costes_input):
+    """
+    Calcula el Coste Unitario Total (CT_u) desglosado en Coste Variable y 
+    Coste Fijo asignado por capacidad.
+    
+    Parámetros:
+    -----------
+    df : pd.DataFrame
+        Dataframe de la simulación (se usa para calcular N_prod).
+    num_servidores : dict
+        Diccionario con la cantidad de servidores por estación (k_i).
+    t_window : tuple (tin, tfin)
+        Horizonte temporal de la simulación.
+    costes_input : dict
+        Diccionario de costes con estructura:
+        {
+            'Materia_Prima': float,
+            'Costes_Estacion': {
+                'Nombre_Estacion': {'Coste_Hora': float, 'Coste_Procesado': float},
+                ...
+            }
+        }
+        
+    Retorna:
+    --------
+    pd.DataFrame
+        Desglose de costes unitarios (Variable, Fijo y Total).
+    """
+    
+    tin, tfin = t_window
+    
+    # PASO 1: Identificación de Parámetros
+    # -------------------------------------
+    
+    # T_total: Tiempo total de simulación
+    T_total = tfin - tin
+    if T_total <= 0:
+        raise ValueError("El tiempo de simulación debe ser mayor a 0")
+        
+    # Extracción de costes estáticos
+    C_mat = costes_input.get('Materia_Prima', 0.0)
+    dict_estaciones_costes = costes_input.get('Costes_Estacion', {})
+    
+    # N_prod: Cantidad total producida EXITOSA (Throughput vendible)
+    # Filtramos la última estación (Control_QC) y solo las piezas NO Rechazadas
+    qc_station = '06_Control_QC'
+    df_prod = df[
+        (df['Station'] == qc_station) & 
+        (df['Estado_QC'] != 'Rechazada') &
+        (df['Tout'] >= tin) & 
+        (df['Tout'] <= tfin)
+    ]
+    N_prod = len(df_prod)
+    
+    # PASO 2: Cálculo del Coste Variable Unitario (CV_u)
+    # --------------------------------------------------
+    # Este coste es teórico por pieza: Materia Prima + Suma de "peajes" de cada estación.
+    
+    sum_proc = 0.0
+    for est, costes in dict_estaciones_costes.items():
+        # Sumamos el coste fijo de procesado (Coste_Procesado) de todas las estaciones definidas
+        sum_proc += costes.get('Coste_Procesado', 0.0)
+        
+    CV_u = C_mat + sum_proc
+    
+    # PASO 3: Cálculo del Coste Fijo Asignado (CF_u)
+    # ----------------------------------------------
+    # Coste de mantener la fábrica abierta (Capacidad) dividido por producción.
+    
+    coste_total_operativo_capacidad = 0.0
+    
+    # Iteramos sobre las estaciones presentes en num_servidores (infraestructura real)
+    for estacion, k_i in num_servidores.items():
+        # Buscamos el coste hora en el diccionario de costes
+        info_coste = dict_estaciones_costes.get(estacion, {})
+        C_serv_i = info_coste.get('Coste_Hora', 0.0)
+        
+        # Coste Estación = Coste_Hora * Num_Servidores * Tiempo_Total
+        # (Se paga por tener el servidor disponible, trabaje o no)
+        coste_estacion_s = C_serv_i * k_i * T_total
+        
+        coste_total_operativo_capacidad += coste_estacion_s
+        
+    # Prorrateo Unitario
+    if N_prod > 0:
+        CF_u = coste_total_operativo_capacidad / N_prod
+    else:
+        # Si no se produce nada, el coste fijo unitario tiende a infinito 
+        # (o es todo el coste operativo)
+        CF_u = np.inf 
+        
+    # PASO 4: Consolidación (Coste Total Unitario)
+    # --------------------------------------------
+    
+    CT_u = CV_u + CF_u
+    
+    # Generación de la tabla de resultados
+    resultados = [
+        {
+            'Concepto': 'Producción Exitosa (pieza)',
+            'Valor': N_prod,
+            'Tipo': 'Volumen'
+        },
+        {
+            'Concepto': 'Coste Materia Prima Base',
+            'Valor': round(C_mat, 2),
+            'Tipo': 'Euros'
+        },
+        {
+            'Concepto': 'Suma Costes Procesado (Agregado)',
+            'Valor': round(sum_proc, 2),
+            'Tipo': 'Euros'
+        },
+        {
+            'Concepto': 'COSTE VARIABLE UNITARIO',
+            'Valor': round(CV_u, 2),
+            'Tipo': 'Euros'
+        },
+        {
+            'Concepto': 'Coste Operativo Capacidad Total',
+            'Valor': round(coste_total_operativo_capacidad, 2),
+            'Tipo': 'Euros'
+        },
+        {
+            'Concepto': 'COSTE FIJO ASIGNADO',
+            'Valor': round(CF_u, 2),
+            'Tipo': 'Euros'
+        },
+        {
+            'Concepto': 'COSTE TOTAL UNITARIO',
+            'Valor': round(CT_u, 2),
+            'Tipo': 'Euros'
+        }
+    ]
+    
+    return pd.DataFrame(resultados)
