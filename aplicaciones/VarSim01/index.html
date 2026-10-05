@@ -512,6 +512,7 @@ let rnd = mulberry32((Date.now() ^ (Math.random()*1e9)) >>> 0);
 function reseed(){ rnd = mulberry32((Date.now() ^ (Math.random()*1e9)) >>> 0); }
 
 /* ========================= STATS HELPERS ========================= */
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function mean(arr){ let s=0; for(let i=0;i<arr.length;i++) s+=arr[i]; return s/arr.length; }
 function variance(arr){ const m=mean(arr); let s=0; for(let i=0;i<arr.length;i++){ const d=arr[i]-m; s+=d*d; } return s/(arr.length-1); }
 function sd(arr){ return Math.sqrt(variance(arr)); }
