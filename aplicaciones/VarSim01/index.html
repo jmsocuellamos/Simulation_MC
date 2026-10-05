@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SOLE-QC Control de Calidad</title>
+<title>Control de calidad en una cadena de calzado</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -12,9 +12,10 @@
    DESIGN PLAN
    Layout: mission-control deck (same family as the cost-control deck this
    mirrors) — fixed instrument sidebar beside a scrolling telemetry main.
-   A static briefing card up top states the Ejemplo 1 problem once; two
-   tabs let the reader manipulate it: the mechanism (one box, one draw)
-   and the consequence (1500 boxes, a month of production).
+   Three tabs let the reader work the problem directly, no separate
+   briefing panel: the mechanism (one box, one draw), the consequence
+   (1500 boxes, a month of production), and the sensitivity of that
+   result to the simulation engine's own settings.
    Color: dark-first palette. --accent (steelblue) carries the "actual"
    policy and the primary data; --accent-2 (amber) = "mejora"; --accent-3
    (green) = "óptima" — a deliberate low→high progression, kept separate
@@ -79,7 +80,7 @@
 }
 
 *{box-sizing:border-box;}
-body{ background: var(--bg); color: var(--text); font-family: var(--font-body); margin:0; padding-inline:16px; }
+body{ background: var(--bg); color: var(--text); font-family: var(--font-body); font-size:17px; margin:0; padding-inline:16px; }
 h1,h2,h3,h4{ font-family: var(--font-display); font-weight:600; letter-spacing:.01em; margin:0; text-wrap:balance; }
 p{ margin:0; }
 .mono{ font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
@@ -91,7 +92,7 @@ input[type="number"]{
 }
 input[type="number"]:focus, input[type="range"]:focus{ outline:2px solid var(--accent); outline-offset:1px; }
 select{ font-family: var(--font-mono); background: var(--surface-2); color: var(--text); border:1px solid var(--border); border-radius:6px; padding:7px 8px; width:100%; }
-label{ font-size:12.5px; color: var(--text-2); }
+label{ font-size:15px; color: var(--text-2); }
 .app{ max-width:1400px; margin:0 auto; padding-block: calc(14px + env(safe-area-inset-top,0px)) 48px; }
 
 /* ---------- top bar ---------- */
@@ -105,37 +106,25 @@ label{ font-size:12.5px; color: var(--text-2); }
 .brand{ display:flex; align-items:baseline; gap:10px; margin-right:auto; }
 .brand-mark{
   display:inline-grid; place-items:center; width:34px; height:34px; border-radius:8px;
-  background: var(--accent); color:#fff; font-size:12px; font-family:var(--font-display); font-weight:700;
+  background: var(--accent); color:#fff; font-size:14px; font-family:var(--font-display); font-weight:700;
   flex-shrink:0;
 }
-.brand h1{ font-size: 19px; color:var(--text); }
-.brand .brand-sub{ font-size:12px; color:var(--text-muted); font-family:var(--font-body); margin-left:8px; }
+.brand h1{ font-size: 24px; color:var(--text); }
+.brand .brand-sub{ font-size:15px; color:var(--text-muted); font-family:var(--font-body); margin-left:8px; }
 .tabs{ display:flex; gap:6px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:3px; flex-wrap:wrap; }
 .tab-btn{
-  font-family: var(--font-display); font-size:12.5px; letter-spacing:.02em; text-transform:uppercase;
+  font-family: var(--font-display); font-size:15px; letter-spacing:.02em; text-transform:uppercase;
   background:transparent; border:none; color:var(--text-muted); padding:8px 13px; border-radius:6px;
 }
 .tab-btn.active{ background: var(--accent); color:#fff; }
 .icon-btn{
   width:34px; height:34px; border-radius:8px; border:1px solid var(--border); background:var(--surface-2);
-  color:var(--text); font-size:15px; display:grid; place-items:center;
+  color:var(--text); font-size:18px; display:grid; place-items:center;
 }
 .icon-btn:hover{ border-color: var(--border-strong); }
 
-/* ---------- briefing ---------- */
-.brief{
-  background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
-  padding:16px 18px; margin-bottom:16px; box-shadow: var(--shadow);
-  display:grid; grid-template-columns: 1.3fr 1fr; gap:18px; align-items:start;
-}
-@media (max-width:860px){ .brief{ grid-template-columns:1fr; } }
-.brief h2{ font-size:15px; margin-bottom:8px; }
-.brief p{ font-size:13px; color:var(--text-2); line-height:1.6; }
-.brief p + p{ margin-top:8px; }
-.brief .badge-row{ margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; }
-
 /* ---------- shell ---------- */
-.shell{ display:grid; grid-template-columns: 300px 1fr; gap:16px; align-items:start; }
+.shell{ display:grid; grid-template-columns: 320px 1fr; gap:16px; align-items:start; }
 @media (max-width: 860px){ .shell{ grid-template-columns: 1fr; } }
 
 .sidebar{
@@ -149,7 +138,7 @@ label{ font-size:12.5px; color: var(--text-2); }
 .acc{ border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface-2); }
 .acc > summary{
   list-style:none; cursor:pointer; padding:9px 11px; font-family:var(--font-display);
-  font-size:12.5px; letter-spacing:.03em; text-transform:uppercase; color:var(--text-2);
+  font-size:15px; letter-spacing:.03em; text-transform:uppercase; color:var(--text-2);
   display:flex; align-items:center; justify-content:space-between; gap:8px;
 }
 .acc > summary::-webkit-details-marker{ display:none; }
@@ -158,56 +147,56 @@ label{ font-size:12.5px; color: var(--text-2); }
 .acc-body{ padding:10px 11px 12px; display:flex; flex-direction:column; gap:10px; border-top:1px solid var(--border); }
 .field{ display:flex; flex-direction:column; gap:4px; }
 .field-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.field-row .val{ font-family:var(--font-mono); font-size:12px; color:var(--accent); font-variant-numeric:tabular-nums; min-width:40px; text-align:right; }
+.field-row .val{ font-family:var(--font-mono); font-size:15px; color:var(--accent); font-variant-numeric:tabular-nums; min-width:50px; text-align:right; }
 .subcard{ background:var(--surface-3); border:1px solid var(--border); border-radius:7px; padding:8px 9px; }
-.subcard h4{ font-size:12px; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.subcard h4{ font-size:15px; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
 .dot{ width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
 .grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
-.minitable{ width:100%; border-collapse:collapse; font-size:11px; }
-.minitable th{ font-family:var(--font-display); font-weight:600; color:var(--text-muted); text-align:center; padding:2px; font-size:9.5px; text-transform:uppercase; }
+.minitable{ width:100%; border-collapse:collapse; font-size:14px; }
+.minitable th{ font-family:var(--font-display); font-weight:600; color:var(--text-muted); text-align:center; padding:2px; font-size:12px; text-transform:uppercase; }
 .minitable td{ padding:2px; }
-.minitable input[type=number]{ padding:4px 3px; font-size:11px; text-align:center; }
-.minitable td:first-child{ color:var(--text-2); font-size:10.5px; padding-right:3px; white-space:nowrap; }
+.minitable input[type=number]{ padding:5px 3px; font-size:14px; text-align:center; }
+.minitable td:first-child{ color:var(--text-2); font-size:13.5px; padding-right:3px; white-space:nowrap; }
 
 .btn{
-  font-family:var(--font-display); font-size:13px; letter-spacing:.02em; text-transform:uppercase;
+  font-family:var(--font-display); font-size:15.5px; letter-spacing:.02em; text-transform:uppercase;
   border-radius:8px; border:1px solid var(--border-strong); padding:11px 14px; text-align:center;
   background:var(--surface-2); color:var(--text);
 }
-.btn.primary{ background: var(--accent); border-color:var(--accent); color:#fff; font-size:14px; padding:13px; }
+.btn.primary{ background: var(--accent); border-color:var(--accent); color:#fff; font-size:17px; padding:13px; }
 .btn.primary:hover{ filter:brightness(1.08); }
 .btn.ghost{ background:transparent; }
 .btn-row{ display:flex; gap:8px; }
 .btn-row .btn{ flex:1; }
-.hint{ font-size:11px; color:var(--text-muted); line-height:1.5; }
+.hint{ font-size:14px; color:var(--text-muted); line-height:1.5; }
 
 /* ---------- main deck ---------- */
 .deck{ display:flex; flex-direction:column; gap:16px; min-width:0; }
 .card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); min-width:0; }
-.card h3{ font-size:14.5px; margin-bottom:3px; }
-.card .sub{ font-size:12px; color:var(--text-muted); margin-bottom:12px; }
+.card h3{ font-size:18.5px; margin-bottom:3px; }
+.card .sub{ font-size:15px; color:var(--text-muted); margin-bottom:12px; }
 .section-title{ display:flex; align-items:baseline; gap:10px; margin: 6px 2px 0; }
-.section-title h2{ font-size:16px; }
-.section-title .n{ font-family:var(--font-mono); font-size:11px; color:var(--text-muted); border:1px solid var(--border); padding:2px 7px; border-radius:20px; }
+.section-title h2{ font-size:21px; }
+.section-title .n{ font-family:var(--font-mono); font-size:14px; color:var(--text-muted); border:1px solid var(--border); padding:2px 7px; border-radius:20px; }
 
-.kpi-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:10px; }
+.kpi-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(215px,1fr)); gap:10px; }
 .tile{ background:var(--surface); border:1px solid var(--border); border-radius: var(--radius); padding:14px 15px; box-shadow:var(--shadow); position:relative; overflow:hidden; min-width:0; }
 .tile::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); }
 .tile.good::before{ background:var(--good); }
 .tile.warn::before{ background:var(--warning); }
 .tile.crit::before{ background:var(--critical); }
-.tile .lbl{ font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; font-family:var(--font-display); }
-.tile .val{ font-family:var(--font-mono); font-size:24px; font-weight:600; margin-top:4px; letter-spacing:-.01em; }
-.tile .val small{ font-size:12.5px; color:var(--text-muted); font-weight:400; }
-.tile .ci{ font-size:11px; color:var(--text-muted); margin-top:3px; font-family:var(--font-mono); }
-.tile .note{ font-size:10.5px; color:var(--text-muted); margin-top:5px; line-height:1.4; }
+.tile .lbl{ font-size:13.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; font-family:var(--font-display); }
+.tile .val{ font-family:var(--font-mono); font-size:32px; font-weight:600; margin-top:4px; letter-spacing:-.01em; }
+.tile .val small{ font-size:16px; color:var(--text-muted); font-weight:400; }
+.tile .ci{ font-size:14px; color:var(--text-muted); margin-top:3px; font-family:var(--font-mono); }
+.tile .note{ font-size:13.5px; color:var(--text-muted); margin-top:5px; line-height:1.4; }
 
 .charts-row{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 @media (max-width:760px){ .charts-row{ grid-template-columns:1fr; } }
 canvas{ width:100%; display:block; }
 
-table.data{ width:100%; border-collapse:collapse; font-size:12.5px; }
-table.data th{ text-align:right; font-family:var(--font-display); font-size:11px; text-transform:uppercase; letter-spacing:.02em; color:var(--text-muted); padding:6px 7px; border-bottom:1px solid var(--border-strong); }
+table.data{ width:100%; border-collapse:collapse; font-size:16.5px; }
+table.data th{ text-align:right; font-family:var(--font-display); font-size:14px; text-transform:uppercase; letter-spacing:.02em; color:var(--text-muted); padding:8px 8px; border-bottom:1px solid var(--border-strong); }
 table.data th:first-child, table.data td:first-child{ text-align:left; }
 table.data td{ text-align:right; padding:8px 7px; border-bottom:1px solid var(--border); font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
 table.data tr:last-child td{ border-bottom:none; }
@@ -217,17 +206,17 @@ table.data tr:last-child td{ border-bottom:none; }
 .steps{ display:grid; grid-template-columns: repeat(3,1fr); gap:12px; }
 @media (max-width:760px){ .steps{ grid-template-columns:1fr; } }
 .step{ background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 13px; }
-.step .num{ font-family:var(--font-display); font-size:11px; color:var(--accent); letter-spacing:.03em; }
-.step p{ font-size:12.5px; color:var(--text-2); margin-top:5px; line-height:1.5; }
-.step .f{ font-family:var(--font-mono); color:var(--text); font-size:12.5px; }
+.step .num{ font-family:var(--font-display); font-size:14px; color:var(--accent); letter-spacing:.03em; }
+.step p{ font-size:16px; color:var(--text-2); margin-top:5px; line-height:1.5; }
+.step .f{ font-family:var(--font-mono); color:var(--text); font-size:16px; }
 
-footer{ margin-top:28px; padding:16px 2px 4px; border-top:1px solid var(--border); color:var(--text-muted); font-size:11.5px; line-height:1.7; }
+footer{ margin-top:28px; padding:16px 2px 4px; border-top:1px solid var(--border); color:var(--text-muted); font-size:14.5px; line-height:1.7; }
 footer b{ color:var(--text-2); }
 
-.badge{ display:inline-block; font-family:var(--font-mono); font-size:10.5px; padding:2px 7px; border-radius:20px; border:1px solid var(--border-strong); color:var(--text-2); }
+.badge{ display:inline-block; font-family:var(--font-mono); font-size:13.5px; padding:3px 8px; border-radius:20px; border:1px solid var(--border-strong); color:var(--text-2); }
 .loading-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; place-items:center; z-index:50; backdrop-filter: blur(2px); }
 .loading-overlay.show{ display:grid; }
-.loading-box{ background:var(--surface); border:1px solid var(--border-strong); border-radius:10px; padding:18px 26px; font-family:var(--font-display); font-size:13px; letter-spacing:.03em; text-transform:uppercase; display:flex; align-items:center; gap:10px; box-shadow:var(--shadow); }
+.loading-box{ background:var(--surface); border:1px solid var(--border-strong); border-radius:10px; padding:18px 26px; font-family:var(--font-display); font-size:16px; letter-spacing:.03em; text-transform:uppercase; display:flex; align-items:center; gap:10px; box-shadow:var(--shadow); }
 .spinner{ width:16px; height:16px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--accent); animation: spin 0.7s linear infinite; }
 @keyframes spin{ to{ transform: rotate(360deg); } }
 [hidden]{ display:none !important; }
@@ -243,8 +232,8 @@ footer b{ color:var(--text-2); }
   <header class="topbar">
     <div class="brand">
       <span class="brand-mark">QC</span>
-      <h1>SOLE-QC</h1>
-      <span class="brand-sub">Transformada inversa · beneficio de lotes de calzado</span>
+      <h1>Control de calidad en una cadena de calzado</h1>
+      <span class="brand-sub">Transformada inversa y simulación Monte Carlo</span>
     </div>
     <nav class="tabs" role="tablist">
       <button class="tab-btn active" data-tab="a" id="tabBtnA">Mecanismo · Transformada inversa</button>
@@ -253,23 +242,6 @@ footer b{ color:var(--text-2); }
     </nav>
     <button class="icon-btn" id="themeToggle" title="Cambiar tema claro/oscuro">◐</button>
   </header>
-
-  <section class="brief">
-    <div>
-      <h2>Ejemplo 1 · Control de calidad en una cadena de calzado</h2>
-      <p>Las piezas se venden en <b style="color:var(--text)">cajas de 2 unidades</b>. Una caja sin defectos deja <b style="color:var(--text)">300&nbsp;€</b> de beneficio. Si al servirla contiene piezas defectuosas, el cliente la devuelve: se pierden los 300&nbsp;€ de beneficio y, además, 50&nbsp;€ por cada pieza defectuosa.</p>
-      <p>Como las cajas no se inspeccionan al cerrarse, la empresa solo conoce la <b style="color:var(--text)">tasa de defectos observada en las devoluciones</b>: N = número de piezas defectuosas por caja, con Pr(N=0)=0.82, Pr(N=1)=0.15, Pr(N=2)=0.03. Quiere estimar el beneficio del próximo mes, en el que puede producir hasta 1500 cajas.</p>
-      <div class="badge-row">
-        <span class="badge">N=0 → +300€ · p=0.82</span>
-        <span class="badge">N=1 → −50€ · p=0.15</span>
-        <span class="badge">N=2 → −100€ · p=0.03</span>
-      </div>
-    </div>
-    <div class="subcard" style="padding:12px 14px;">
-      <h4>Por qué transformada inversa</h4>
-      <p class="hint" style="font-size:12px;line-height:1.6;">No existe fórmula cerrada para "el beneficio de 1500 cajas". Pero si sabemos simular <i>una</i> caja (transformada inversa sobre N), sabemos simular el lote entero: se repite y se suma. La pestaña izquierda muestra el mecanismo sobre una caja; la derecha, lo que ese mecanismo implica sobre 1500.</p>
-    </div>
-  </section>
 
   <div class="shell">
     <!-- ============ SIDEBAR A ============ -->
@@ -468,12 +440,12 @@ footer b{ color:var(--text-2); }
           <div class="card">
             <h3>Distribución del beneficio por lote</h3>
             <div class="sub">Histograma de los <span id="histN">10,000</span> lotes simulados de <span id="histNcajas">1,500</span> cajas, con la media en línea discontinua.</div>
-            <canvas id="histB" height="230"></canvas>
+            <canvas id="histB" height="250"></canvas>
           </div>
           <div class="card">
             <h3>Beneficio medio por lote, según política</h3>
             <div class="sub">Mismo ncajas y nsim para las tres políticas; solo cambia Pr(N=k).</div>
-            <canvas id="barPolicies" height="230"></canvas>
+            <canvas id="barPolicies" height="250"></canvas>
           </div>
         </div>
 
@@ -496,12 +468,12 @@ footer b{ color:var(--text-2); }
           <div class="card">
             <h3>Convergencia hacia el valor teórico</h3>
             <div class="sub">Puntos claros: media de cada réplica (semilla). Punto sólido: media combinada. Línea discontinua: beneficio teórico exacto.</div>
-            <canvas id="sensConverge" height="260"></canvas>
+            <canvas id="sensConverge" height="280"></canvas>
           </div>
           <div class="card">
             <h3>Variabilidad entre réplicas (σ entre semillas)</h3>
             <div class="sub">Cuánto cambia la media estimada solo por cambiar la semilla, para cada configuración del motor.</div>
-            <canvas id="sensVariability" height="260"></canvas>
+            <canvas id="sensVariability" height="280"></canvas>
           </div>
         </div>
 
@@ -803,7 +775,7 @@ function fmtSensLabel(x, paramLabel){ return (paramLabel==="nsim" ? "n=" : "c=")
 function drawSensitivityScatter(canvas, points, paramLabel){
   const { ctx, w, h } = setupCanvas(canvas);
   ctx.clearRect(0,0,w,h);
-  const pad = {l:60, r:16, t:16, b:36};
+  const pad = {l:66, r:18, t:18, b:40};
   const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
   const allVals = points.flatMap(pt=>pt.replicaMeans.concat([pt.teo]));
   const minV = Math.min(...allVals), maxV = Math.max(...allVals);
@@ -815,7 +787,7 @@ function drawSensitivityScatter(canvas, points, paramLabel){
 
   const muted = cssVar("--text-muted"), grid = cssVar("--grid"), accent = cssVar("--accent"), text = cssVar("--text");
 
-  ctx.strokeStyle = grid; ctx.lineWidth = 1; ctx.font = "10px " + cssVar("--font-mono"); ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  ctx.strokeStyle = grid; ctx.lineWidth = 1; ctx.font = "13px " + cssVar("--font-mono"); ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
   for(let i=0;i<=4;i++){
     const v = yMin + (yMax-yMin)*i/4;
     const py = yPix(v);
@@ -855,7 +827,7 @@ function drawSensitivityScatter(canvas, points, paramLabel){
   });
 
   // x labels
-  ctx.fillStyle = muted; ctx.font = "10px " + cssVar("--font-mono"); ctx.textAlign="center"; ctx.textBaseline="top";
+  ctx.fillStyle = muted; ctx.font = "13px " + cssVar("--font-mono"); ctx.textAlign="center"; ctx.textBaseline="top";
   points.forEach((pt,i)=> ctx.fillText(fmtSensLabel(pt.x, paramLabel), xPix(i), pad.t+plotH+8));
 }
 
@@ -884,7 +856,7 @@ function tile(label, valueHTML, ciText, cls, noteText){
 function drawHistogram(canvas, values, meanVal){
   const { ctx, w, h } = setupCanvas(canvas);
   ctx.clearRect(0,0,w,h);
-  const pad = {l:56, r:14, t:12, b:28};
+  const pad = {l:62, r:14, t:14, b:32};
   const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
   const minV = Math.min(...values), maxV = Math.max(...values);
   const bins = 40;
@@ -894,7 +866,7 @@ function drawHistogram(canvas, values, meanVal){
   const maxCount = Math.max(...counts);
   const gridColor = cssVar("--grid"), muted = cssVar("--text-muted"), accent = cssVar("--accent"), critical = cssVar("--critical");
   ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
-  ctx.font = "10px " + cssVar("--font-mono"); ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  ctx.font = "13px " + cssVar("--font-mono"); ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
   for(let i=0;i<=4;i++){
     const y = pad.t + plotH - (plotH*i/4);
     ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w-pad.r, y); ctx.stroke();
@@ -913,9 +885,9 @@ function drawHistogram(canvas, values, meanVal){
   ctx.strokeStyle = cssVar("--text"); ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
   ctx.beginPath(); ctx.moveTo(xMean, pad.t); ctx.lineTo(xMean, pad.t+plotH); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = cssVar("--text"); ctx.textAlign="center"; ctx.font="600 10.5px " + cssVar("--font-mono");
+  ctx.fillStyle = cssVar("--text"); ctx.textAlign="center"; ctx.font="600 13.5px " + cssVar("--font-mono");
   ctx.fillText(fmtEUR(meanVal), xMean, pad.t-2);
-  ctx.fillStyle = muted; ctx.textAlign="center"; ctx.textBaseline="top"; ctx.font="10px " + cssVar("--font-mono");
+  ctx.fillStyle = muted; ctx.textAlign="center"; ctx.textBaseline="top"; ctx.font="13px " + cssVar("--font-mono");
   for(let i=0;i<=4;i++){
     const x = pad.l + plotW*i/4;
     ctx.fillText(fmtEUR(minV + range*i/4), x, pad.t+plotH+6);
@@ -937,7 +909,7 @@ function drawBarChart(canvas, items, opts){
   opts = opts || {};
   const { ctx, w, h } = setupCanvas(canvas);
   ctx.clearRect(0,0,w,h);
-  const pad = {l:14, r:14, t:14, b:30};
+  const pad = {l:14, r:14, t:16, b:34};
   const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
   const vals = items.map(d=>d.value);
   const minVal = Math.min(0, ...vals), maxVal = Math.max(...vals, 1e-9);
@@ -956,9 +928,9 @@ function drawBarChart(canvas, items, opts){
     ctx.fillStyle = color;
     roundRectTop(ctx, x, Math.min(topY,zeroY), barW, bh, 4);
     ctx.fill();
-    ctx.fillStyle = text; ctx.textAlign="center"; ctx.font="600 12px " + cssVar("--font-mono");
+    ctx.fillStyle = text; ctx.textAlign="center"; ctx.font="600 15px " + cssVar("--font-mono");
     ctx.fillText(opts.fmt ? opts.fmt(it.value) : it.value, x+barW/2, Math.min(topY,zeroY)-8);
-    ctx.fillStyle = muted; ctx.font="11px " + cssVar("--font-body"); ctx.textBaseline="top";
+    ctx.fillStyle = muted; ctx.font="14px " + cssVar("--font-body"); ctx.textBaseline="top";
     ctx.fillText(String(it.label), x+barW/2, pad.t+plotH+6);
   });
 }
