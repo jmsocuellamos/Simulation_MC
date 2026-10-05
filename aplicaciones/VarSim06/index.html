@@ -1,0 +1,1033 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Potencia de un aerogenerador</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===================================================================
+   DESIGN PLAN
+   Layout: mission-control deck — same family as the other teaching tools
+   in this series (fixed instrument sidebar + scrolling telemetry main).
+   Three tabs: the mechanism (one draw: wind -> power by composition),
+   the consequence (mean power and probability the pumps run), and the
+   sensitivity of that estimate to the simulation engine's nsim.
+   Color: dark-first palette. --accent is wind/power (one continuous
+   quantity transformed, not categories), --good/--critical mark whether
+   the pumps are running (power at or above threshold).
+   Type: Chakra Petch (display) for headings/labels; IBM Plex Sans (body);
+   IBM Plex Mono (data) for every number.
+   =================================================================== */
+:root{
+  color-scheme: dark;
+  --bg: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232320;
+  --surface-3: #2a2a27;
+  --text: #ffffff;
+  --text-2: #c3c2b7;
+  --text-muted: #898781;
+  --border: rgba(255,255,255,0.12);
+  --border-strong: rgba(255,255,255,0.22);
+  --grid: #2c2c2a;
+  --accent: #3987e5;
+  --accent-ink: #eaf2ff;
+  --accent-2: #d9972a;
+  --accent-3: #199e70;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #e66767;
+  --shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35);
+  --radius: 10px;
+  --font-display: "Chakra Petch", "Rajdhani", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme: light;
+    --bg: #f1f0ea; --surface: #fcfcfb; --surface-2: #f2f1ec; --surface-3: #eae8e0;
+    --text: #0b0b0b; --text-2: #52514e; --text-muted: #706f6a;
+    --border: rgba(11,11,11,0.12); --border-strong: rgba(11,11,11,0.28);
+    --grid: #e1e0d9;
+    --accent: #2a78d6; --accent-ink: #0b2f5c; --accent-2: #a9700f; --accent-3: #137a53;
+    --good: #0b7a0b; --warning: #92650a; --critical: #b23232;
+  }
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg: #f1f0ea; --surface: #fcfcfb; --surface-2: #f2f1ec; --surface-3: #eae8e0;
+  --text: #0b0b0b; --text-2: #52514e; --text-muted: #706f6a;
+  --border: rgba(11,11,11,0.12); --border-strong: rgba(11,11,11,0.28);
+  --grid: #e1e0d9;
+  --accent: #2a78d6; --accent-ink: #0b2f5c; --accent-2: #a9700f; --accent-3: #137a53;
+  --good: #0b7a0b; --warning: #92650a; --critical: #b23232;
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232320; --surface-3: #2a2a27;
+  --text: #ffffff; --text-2: #c3c2b7; --text-muted: #898781;
+  --border: rgba(255,255,255,0.12); --border-strong: rgba(255,255,255,0.22);
+  --grid: #2c2c2a;
+  --accent: #3987e5; --accent-ink: #eaf2ff; --accent-2: #d9972a; --accent-3: #199e70;
+  --good: #0ca30c; --warning: #fab219; --critical: #e66767;
+}
+
+*{box-sizing:border-box;}
+body{ background: var(--bg); color: var(--text); font-family: var(--font-body); font-size:17px; margin:0; padding-inline:16px; }
+h1,h2,h3,h4{ font-family: var(--font-display); font-weight:600; letter-spacing:.01em; margin:0; text-wrap:balance; }
+p{ margin:0; }
+.mono{ font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+button{ font-family: var(--font-body); cursor:pointer; }
+input[type="range"]{ width:100%; accent-color: var(--accent); }
+input[type="number"]{
+  font-family: var(--font-mono); background: var(--surface); color: var(--text);
+  border:1px solid var(--border-strong); border-radius:6px; padding:5px 7px; width:100%;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.06) inset;
+}
+input[type="number"]:focus, input[type="range"]:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+select{ font-family: var(--font-mono); background: var(--surface); color: var(--text); border:1px solid var(--border-strong); border-radius:6px; padding:7px 8px; width:100%; appearance:auto; }
+.subcard input[type="number"]{ background: var(--surface-2); }
+.minitable input[type="number"]{ background: var(--surface-2); }
+label{ font-size:15px; color: var(--text-2); }
+.app{ max-width:1400px; margin:0 auto; padding-block: calc(14px + env(safe-area-inset-top,0px)) 48px; }
+
+/* ---------- top bar ---------- */
+.topbar{
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  padding:14px 18px; margin-bottom:16px;
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+  border:1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.brand{ display:flex; align-items:baseline; gap:10px; margin-right:auto; }
+.brand-mark{
+  display:inline-grid; place-items:center; width:34px; height:34px; border-radius:8px;
+  background: var(--accent); color:#fff; font-size:14px; font-family:var(--font-display); font-weight:700;
+  flex-shrink:0;
+}
+.brand h1{ font-size: 23px; color:var(--text); }
+.brand .brand-sub{ font-size:15px; color:var(--text-muted); font-family:var(--font-body); margin-left:8px; }
+.tabs{ display:flex; gap:6px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:3px; flex-wrap:wrap; }
+.tab-btn{
+  font-family: var(--font-display); font-size:15px; letter-spacing:.02em; text-transform:uppercase;
+  background:transparent; border:none; color:var(--text-muted); padding:8px 13px; border-radius:6px;
+}
+.tab-btn.active{ background: var(--accent); color:#fff; }
+.icon-btn{
+  width:34px; height:34px; border-radius:8px; border:1px solid var(--border); background:var(--surface-2);
+  color:var(--text); font-size:18px; display:grid; place-items:center;
+}
+.icon-btn:hover{ border-color: var(--border-strong); }
+
+/* ---------- shell ---------- */
+.shell{ display:grid; grid-template-columns: 320px 1fr; gap:16px; align-items:start; }
+@media (max-width: 860px){ .shell{ grid-template-columns: 1fr; } }
+
+.sidebar{
+  background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
+  padding:14px; display:flex; flex-direction:column; gap:10px; box-shadow: var(--shadow);
+  position: relative; isolation: isolate;
+}
+
+.acc{ border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface-2); position:relative; z-index:0; }
+.acc > summary{
+  list-style:none; cursor:pointer; padding:9px 11px; font-family:var(--font-display);
+  font-size:15px; letter-spacing:.03em; text-transform:uppercase; color:var(--text-2);
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+.acc > summary::-webkit-details-marker{ display:none; }
+.acc > summary::after{ content:"▸"; color:var(--text-muted); transition: transform .15s; }
+.acc[open] > summary::after{ transform: rotate(90deg); }
+.acc-body{ padding:10px 11px 12px; display:flex; flex-direction:column; gap:10px; border-top:1px solid var(--border); }
+.field{ display:flex; flex-direction:column; gap:4px; }
+.field-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.field-row .val{ font-family:var(--font-mono); font-size:15px; color:var(--accent); font-variant-numeric:tabular-nums; min-width:50px; text-align:right; }
+.subcard{ background:var(--surface-3); border:1px solid var(--border); border-radius:7px; padding:8px 9px; }
+.subcard h4{ font-size:15px; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.dot{ width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+.minitable{ width:100%; border-collapse:collapse; font-size:14px; }
+.minitable th{ font-family:var(--font-display); font-weight:600; color:var(--text-muted); text-align:center; padding:2px; font-size:12px; text-transform:uppercase; }
+.minitable td{ padding:2px; }
+.minitable input[type=number]{ padding:5px 3px; font-size:14px; text-align:center; }
+.minitable td:first-child{ color:var(--text-2); font-size:13.5px; padding-right:3px; white-space:nowrap; }
+
+.btn{
+  font-family:var(--font-display); font-size:15.5px; letter-spacing:.02em; text-transform:uppercase;
+  border-radius:8px; border:1px solid var(--border-strong); padding:11px 14px; text-align:center;
+  background:var(--surface-2); color:var(--text);
+}
+.btn.primary{ background: var(--accent); border-color:var(--accent); color:#fff; font-size:17px; padding:13px; }
+.btn.primary:hover{ filter:brightness(1.08); }
+.btn.ghost{ background:transparent; }
+.btn-row{ display:flex; gap:8px; }
+.btn-row .btn{ flex:1; }
+.hint{ font-size:14px; color:var(--text-muted); line-height:1.5; }
+
+/* ---------- main deck ---------- */
+.deck{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+.card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); min-width:0; }
+.card h3{ font-size:18.5px; margin-bottom:3px; }
+.card .sub{ font-size:15px; color:var(--text-muted); margin-bottom:12px; }
+.section-title{ display:flex; align-items:baseline; gap:10px; margin: 6px 2px 0; }
+.section-title h2{ font-size:21px; }
+.section-title .n{ font-family:var(--font-mono); font-size:14px; color:var(--text-muted); border:1px solid var(--border); padding:2px 7px; border-radius:20px; }
+
+.kpi-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(215px,1fr)); gap:10px; }
+.tile{ background:var(--surface); border:1px solid var(--border); border-radius: var(--radius); padding:14px 15px; box-shadow:var(--shadow); position:relative; overflow:hidden; min-width:0; }
+.tile::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); }
+.tile.good::before{ background:var(--good); }
+.tile.warn::before{ background:var(--warning); }
+.tile.crit::before{ background:var(--critical); }
+.tile .lbl{ font-size:13.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; font-family:var(--font-display); }
+.tile .val{ font-family:var(--font-mono); font-size:32px; font-weight:600; margin-top:4px; letter-spacing:-.01em; }
+.tile .val small{ font-size:16px; color:var(--text-muted); font-weight:400; }
+.tile .ci{ font-size:14px; color:var(--text-muted); margin-top:3px; font-family:var(--font-mono); }
+.tile .note{ font-size:13.5px; color:var(--text-muted); margin-top:5px; line-height:1.4; }
+
+.charts-row{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:760px){ .charts-row{ grid-template-columns:1fr; } }
+canvas{ width:100%; display:block; }
+
+table.data{ width:100%; border-collapse:collapse; font-size:16.5px; }
+table.data th{ text-align:right; font-family:var(--font-display); font-size:14px; text-transform:uppercase; letter-spacing:.02em; color:var(--text-muted); padding:8px 8px; border-bottom:1px solid var(--border-strong); }
+table.data th:first-child, table.data td:first-child{ text-align:left; }
+table.data td{ text-align:right; padding:8px 7px; border-bottom:1px solid var(--border); font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+table.data tr:last-child td{ border-bottom:none; }
+.overflow-x{ overflow-x:auto; }
+
+.steps{ display:grid; grid-template-columns: repeat(3,1fr); gap:12px; }
+@media (max-width:760px){ .steps{ grid-template-columns:1fr; } }
+.step{ background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 13px; }
+.step .num{ font-family:var(--font-display); font-size:14px; color:var(--accent); letter-spacing:.03em; }
+.step p{ font-size:16px; color:var(--text-2); margin-top:5px; line-height:1.5; }
+.step .f{ font-family:var(--font-mono); color:var(--text); font-size:16px; }
+
+footer{ margin-top:28px; padding:16px 2px 4px; border-top:1px solid var(--border); color:var(--text-muted); font-size:14.5px; line-height:1.7; }
+footer b{ color:var(--text-2); }
+
+.badge{ display:inline-block; font-family:var(--font-mono); font-size:13.5px; padding:3px 8px; border-radius:20px; border:1px solid var(--border-strong); color:var(--text-2); }
+.loading-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; place-items:center; z-index:50; backdrop-filter: blur(2px); }
+.loading-overlay.show{ display:grid; }
+.loading-box{ background:var(--surface); border:1px solid var(--border-strong); border-radius:10px; padding:18px 26px; font-family:var(--font-display); font-size:16px; letter-spacing:.03em; text-transform:uppercase; display:flex; align-items:center; gap:10px; box-shadow:var(--shadow); }
+.spinner{ width:16px; height:16px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--accent); animation: spin 0.7s linear infinite; }
+@keyframes spin{ to{ transform: rotate(360deg); } }
+[hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+
+
+<div class="loading-overlay" id="loadingOverlay"><div class="loading-box"><span class="spinner"></span> Simulando…</div></div>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">AG</span>
+      <h1>Potencia de un aerogenerador</h1>
+      <span class="brand-sub">Método de composición · viento → potencia</span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="a" id="tabBtnA">Mecanismo · Composición V→P</button>
+      <button class="tab-btn" data-tab="b" id="tabBtnB">Simulación · Potencia media</button>
+      <button class="tab-btn" data-tab="c" id="tabBtnC">Sensibilidad · Configuración</button>
+    </nav>
+    <button class="icon-btn" id="themeToggle" title="Cambiar tema claro/oscuro">◐</button>
+  </header>
+
+  <div class="shell">
+    <!-- ============ SIDEBAR A ============ -->
+    <aside class="sidebar" id="sidebarA">
+      <details class="acc" open>
+        <summary>Viento (U → V)</summary>
+        <div class="acc-body">
+          <div class="field">
+            <div class="field-row"><label>U ~ Unif(0,1)</label><span class="val mono" id="outU">0.55</span></div>
+            <input type="range" id="mecU" min="0" max="100" value="55" step="1">
+          </div>
+          <div class="hint" id="mecHint"></div>
+        </div>
+      </details>
+
+      <button class="btn" id="mecRandomU">🎲 U aleatorio</button>
+      <button class="btn ghost" id="resetA">Restablecer valores por defecto</button>
+    </aside>
+
+    <aside class="sidebar" id="sidebarB" hidden>
+      <details class="acc" open>
+        <summary>Simulación</summary>
+        <div class="acc-body">
+          <div class="field">
+            <div class="field-row"><label>Nº de horas simuladas (nsim)</label><span class="val mono" id="outNsimB">30,000</span></div>
+            <input type="range" id="nsimB" min="1000" max="100000" value="30000" step="1000">
+          </div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>Viento — Weibull(k, λ)</summary>
+        <div class="acc-body">
+          <div class="grid2">
+            <div class="field"><label>Forma k</label><input type="number" id="windK" value="2.2" min="0.5" max="5" step="0.1"></div>
+            <div class="field"><label>Escala λ (m/s)</label><input type="number" id="windLambda" value="10" min="1" max="30" step="0.5"></div>
+          </div>
+          <div class="hint" id="windHint"></div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>Turbina</summary>
+        <div class="acc-body">
+          <div class="field"><label>Radio de las aspas r (m)</label><input type="number" id="turRadio" value="40" min="5" max="100" step="1"></div>
+          <div class="grid2">
+            <div class="field"><label>Densidad aire ρ (kg/m³)</label><input type="number" id="turRho" value="1.225" min="1" max="1.5" step="0.005"></div>
+            <div class="field"><label>Eficiencia Cp</label><input type="number" id="turCp" value="0.45" min="0.1" max="0.59" step="0.01"></div>
+          </div>
+          <div class="hint" id="kHint"></div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>Umbral de bombeo</summary>
+        <div class="acc-body">
+          <div class="field"><label>Potencia mínima (W)</label><input type="number" id="umbralW" value="600" min="1" step="10"></div>
+          <div class="hint">Por debajo de esta potencia instantánea, las bombas de riego se detienen.</div>
+        </div>
+      </details>
+
+      <div class="btn-row">
+        <button class="btn primary" id="runB">▶ Simular</button>
+      </div>
+      <button class="btn ghost" id="resetB">Restablecer valores por defecto</button>
+    </aside>
+
+    <aside class="sidebar" id="sidebarC" hidden>
+      <details class="acc" open>
+        <summary>Qué variar</summary>
+        <div class="acc-body">
+          <div class="grid2">
+            <div class="field"><label>nsim mín.</label><input type="number" id="sensNsimMin" value="200" min="50" max="5000" step="50"></div>
+            <div class="field"><label>nsim máx.</label><input type="number" id="sensNsimMax" value="60000" min="500" max="150000" step="1000"></div>
+          </div>
+          <div class="field">
+            <div class="field-row"><label>Puntos a evaluar</label><span class="val mono" id="outSensPoints">6</span></div>
+            <input type="range" id="sensPoints" min="4" max="7" value="6" step="1">
+          </div>
+          <div class="hint">Los puntos se espacian logarítmicamente entre nsim mín. y máx.</div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>Réplicas y métrica</summary>
+        <div class="acc-body">
+          <div class="field">
+            <div class="field-row"><label>Réplicas por punto (semillas)</label><span class="val mono" id="outSensReplicas">5</span></div>
+            <input type="range" id="sensReplicas" min="1" max="8" value="5" step="1">
+          </div>
+          <div class="field">
+            <label>Métrica a analizar</label>
+            <select id="sensTarget">
+              <option value="potencia" selected>Potencia media</option>
+              <option value="proporcion">Pr(bombas en marcha)</option>
+            </select>
+          </div>
+          <div class="hint">Cada réplica relanza la simulación con una semilla distinta: su dispersión mide cuánto "tiembla" la estimación para ese nsim.</div>
+        </div>
+      </details>
+
+      <div class="btn-row">
+        <button class="btn primary" id="runC">▶ Analizar sensibilidad</button>
+      </div>
+      <button class="btn ghost" id="resetC">Restablecer valores por defecto</button>
+    </aside>
+
+    <!-- ============ MAIN DECK ============ -->
+    <main class="deck">
+
+      <section id="viewA">
+        <div class="section-title"><h2>Composición: viento → potencia</h2><span class="n mono" id="aLabel">V=F⁻¹(U), P=K·V³</span></div>
+        <div class="card" style="margin-top:10px;">
+          <h3>De un uniforme a una potencia</h3>
+          <div class="sub">Cambia U o lanza uno nuevo, y observa cómo el viento simulado se transforma en potencia eléctrica. Los parámetros del viento y de la turbina se editan en la pestaña Simulación.</div>
+          <div class="kpi-grid" id="kpiRowA"></div>
+        </div>
+
+        <div class="section-title" style="margin-top:22px;"><h2>Cómo funciona el método de composición</h2></div>
+        <div class="steps" style="margin-top:10px;">
+          <div class="step">
+            <div class="num">1 · GENERAR Y TRANSFORMAR</div>
+            <p>Se genera <span class="f">u ~ U(0,1)</span> y se aplica la inversa de la Weibull: <span class="f">v = λ·(−ln(1−u))^(1/k)</span>. Es la transformada inversa, pero para una variable continua.</p>
+          </div>
+          <div class="step">
+            <div class="num">2 · APLICAR LA FÍSICA</div>
+            <p>La potencia no crece linealmente con el viento, sino con su cubo: <span class="f">p = K·v³</span>, donde K depende del área de barrido, la densidad del aire y la eficiencia.</p>
+          </div>
+          <div class="step">
+            <div class="num">3 · COMPONER</div>
+            <p>El resultado es <span class="f">p = h(F⁻¹(u))</span>. Repetido muchas veces, su distribución es la de la potencia real — sin integrar nada.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="viewB" hidden>
+        <div class="section-title"><h2>Potencia media esperada</h2><span class="n mono" id="bLabel">n = 30,000 simulaciones</span></div>
+        <div class="kpi-grid" id="kpiRowB"></div>
+
+        <div class="charts-row" style="margin-top:14px;">
+          <div class="card">
+            <h3>Distribución de la potencia generada</h3>
+            <div class="sub">Histograma de las <span id="histN">30,000</span> horas simuladas, con la media y el umbral de bombeo marcados.</div>
+            <canvas id="histP" height="250"></canvas>
+          </div>
+          <div class="card">
+            <h3>Curva de composición P = K·V³</h3>
+            <div class="sub">Cada punto es una hora simulada. La curva muestra cómo el viento fuerte, aunque poco frecuente, domina la potencia.</div>
+            <canvas id="compCurve" height="250"></canvas>
+          </div>
+        </div>
+
+        <div class="section-title" style="margin-top:6px;"><h2>Comparación con la teoría</h2></div>
+        <div class="card" style="margin-top:10px;">
+          <h3>Simulación Monte Carlo frente al valor teórico</h3>
+          <div class="sub">E(P) = K·E(V³) = K·λ³·Γ(1+3/k). Pr(P≥umbral) = Pr(V≥v*) = exp(−(v*/λ)^k), con v*=(umbral/K)^(1/3).</div>
+          <div class="overflow-x">
+            <table class="data" id="tablePot"></table>
+          </div>
+          <div class="hint" id="potReadout" style="margin-top:10px;"></div>
+        </div>
+      </section>
+
+      <section id="viewC" hidden>
+        <div class="section-title"><h2>Sensibilidad del estimador Monte Carlo</h2><span class="n mono" id="cLabel">sin ejecutar</span></div>
+        <div class="kpi-grid" id="kpiRowC" style="margin-top:10px;"></div>
+
+        <div class="charts-row" style="margin-top:14px;">
+          <div class="card">
+            <h3>Convergencia hacia el valor teórico</h3>
+            <div class="sub">Puntos claros: media de cada réplica (semilla). Punto sólido: media combinada. Línea discontinua: valor teórico exacto.</div>
+            <canvas id="sensConverge" height="280"></canvas>
+          </div>
+          <div class="card">
+            <h3>Variabilidad entre réplicas (σ entre semillas)</h3>
+            <div class="sub">Cuánto cambia la estimación solo por cambiar la semilla, para cada nsim probado.</div>
+            <canvas id="sensVariability" height="280"></canvas>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <h3>Tabla de barrido</h3>
+          <div class="sub">Una fila por valor de nsim probado.</div>
+          <div class="overflow-x">
+            <table class="data" id="tableSens"></table>
+          </div>
+          <div class="hint" id="sensReadout" style="margin-top:10px;">Pulsa «Analizar sensibilidad» para ejecutar el barrido.</div>
+        </div>
+      </section>
+
+      <footer>
+        Simulación Monte Carlo 100% en el navegador (sin servidor): método de composición — se simula el viento V~Weibull(k,λ) por transformada inversa continua y se transforma en potencia P=K·V³. Los intervalos de confianza al 95% se estiman con el error estándar de la media sobre las nsim réplicas; los valores teóricos usan la función Gamma (para E(V³)) y la función de supervivencia exacta de la Weibull (para Pr(P≥umbral)). Basado en el Ejemplo 6 de «B-70. Distribuciones derivadas», Javier Morales y Asun Martínez Mayoral, equipo IA4LEGOS (CC BY-SA 4.0).
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ========================= RNG ========================= */
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let rnd = mulberry32((Date.now() ^ (Math.random()*1e9)) >>> 0);
+function reseed(){ rnd = mulberry32((Date.now() ^ (Math.random()*1e9)) >>> 0); }
+
+/* ========================= STATS HELPERS ========================= */
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function mean(arr){ let s=0; for(let i=0;i<arr.length;i++) s+=arr[i]; return s/arr.length; }
+function variance(arr){ const m=mean(arr); let s=0; for(let i=0;i<arr.length;i++){ const d=arr[i]-m; s+=d*d; } return s/(arr.length-1); }
+function sd(arr){ return Math.sqrt(variance(arr)); }
+function mcEstim(arr){
+  const m = mean(arr), s = sd(arr), se = s/Math.sqrt(arr.length);
+  return { point:m, lo:m-1.96*se, hi:m+1.96*se, se };
+}
+function proportionCI(p, n){
+  const se = Math.sqrt(Math.max(p*(1-p),1e-9)/n);
+  return { point:p, se, lo:Math.max(0,p-1.96*se), hi:Math.min(1,p+1.96*se) };
+}
+function fmtPower(w){
+  const a = Math.abs(w);
+  if(a < 1000) return w.toLocaleString("es-ES",{maximumFractionDigits:0}) + " W";
+  if(a < 1e6) return (w/1000).toLocaleString("es-ES",{maximumFractionDigits:1}) + " kW";
+  return (w/1e6).toLocaleString("es-ES",{maximumFractionDigits:2}) + " MW";
+}
+function fmtWind(v){ return v.toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2}) + " m/s"; }
+const fmtPct = (v,d=1)=> (v*100).toFixed(d) + "%";
+
+/* Gamma function (Lanczos approximation, g=7, n=9) */
+function gammaFn(z){
+  const p = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+    -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+  if(z < 0.5) return Math.PI / (Math.sin(Math.PI*z) * gammaFn(1-z));
+  z -= 1;
+  let x = p[0];
+  for(let i=1;i<9;i++) x += p[i]/(z+i);
+  const t = z + 7.5;
+  return Math.sqrt(2*Math.PI) * Math.pow(t, z+0.5) * Math.exp(-t) * x;
+}
+
+/* ========================= PROBLEM CORE (Weibull composition) ========================= */
+function weibullInverse(u, k, lambda){ return lambda * Math.pow(-Math.log(1-u), 1/k); }
+function weibullSF(v, k, lambda){ return Math.exp(-Math.pow(Math.max(0,v)/lambda, k)); }
+function weibullMomentR(r, k, lambda){ return Math.pow(lambda, r) * gammaFn(1 + r/k); }
+function computeK(radio, rho, cp){ return 0.5 * rho * Math.PI * radio * radio * cp; }
+
+function readWind(){
+  const g = id => document.getElementById(id);
+  return { k: parseFloat(g("windK").value), lambda: parseFloat(g("windLambda").value) };
+}
+function readTurbina(){
+  const g = id => document.getElementById(id);
+  return { radio: parseFloat(g("turRadio").value), rho: parseFloat(g("turRho").value), cp: parseFloat(g("turCp").value) };
+}
+function readUmbral(){ return parseFloat(document.getElementById("umbralW").value); }
+
+function simulaViento(wind, nsim){
+  const V = new Float64Array(nsim);
+  for(let i=0;i<nsim;i++) V[i] = weibullInverse(rnd(), wind.k, wind.lambda);
+  return V;
+}
+
+/* ========================= TAB A: MECANISMO ========================= */
+function renderTabA(){
+  const g = id => document.getElementById(id);
+  const wind = readWind();
+  const tur = readTurbina();
+  const K = computeK(tur.radio, tur.rho, tur.cp);
+  const umbral = readUmbral();
+  const u = parseFloat(g("mecU").value)/100;
+  const v = weibullInverse(u, wind.k, wind.lambda);
+  const p = K * v*v*v;
+  const bombean = p >= umbral;
+
+  g("mecHint").textContent = `v = λ·(−ln(1−u))^(1/k) = ${wind.lambda}·(−ln(1−${u.toFixed(2)}))^(1/${wind.k})`;
+
+  const kpiRow = document.getElementById("kpiRowA");
+  kpiRow.innerHTML = "";
+  kpiRow.appendChild(tile("U generado", u.toFixed(2), null, "", "altura uniforme en el eje de probabilidad"));
+  kpiRow.appendChild(tile("Viento simulado (V)", fmtWind(v), null, "", "Weibull(k="+wind.k+", λ="+wind.lambda+")"));
+  kpiRow.appendChild(tile("Potencia generada (P)", fmtPower(p), null, bombean?"good":"crit", "P = K·V³"));
+  kpiRow.appendChild(tile("¿Bombas en marcha?", bombean?"Sí":"No", null, bombean?"good":"crit", "umbral: "+fmtPower(umbral)));
+}
+
+/* ========================= TAB B: SIMULACIÓN ========================= */
+let lastB = null;
+
+function readConfigB(){
+  const nsim = Math.round(parseFloat(document.getElementById("nsimB").value));
+  const wind = readWind();
+  const tur = readTurbina();
+  const K = computeK(tur.radio, tur.rho, tur.cp);
+  const umbral = readUmbral();
+  return { nsim, wind, tur, K, umbral };
+}
+
+function runTabB(){
+  reseed();
+  const cfg = readConfigB();
+  const V = simulaViento(cfg.wind, cfg.nsim);
+  const P = new Float64Array(cfg.nsim);
+  const over = new Uint8Array(cfg.nsim);
+  for(let i=0;i<cfg.nsim;i++){
+    P[i] = cfg.K * V[i]*V[i]*V[i];
+    if(P[i] >= cfg.umbral) over[i] = 1;
+  }
+  const mcP = mcEstim(Array.from(P));
+  const mcV = mcEstim(Array.from(V));
+  let nOver=0; for(let i=0;i<over.length;i++) nOver+=over[i];
+  const propCI = proportionCI(nOver/cfg.nsim, cfg.nsim);
+
+  const teoV = weibullMomentR(1, cfg.wind.k, cfg.wind.lambda);
+  const teoP = cfg.K * weibullMomentR(3, cfg.wind.k, cfg.wind.lambda);
+  const vUmbral = Math.pow(cfg.umbral/cfg.K, 1/3);
+  const teoProp = weibullSF(vUmbral, cfg.wind.k, cfg.wind.lambda);
+
+  lastB = { cfg, V, P, mcP, mcV, propCI, teoV, teoP, teoProp, vUmbral };
+  renderTabB();
+}
+
+function renderTabB(){
+  const { cfg, V, P, mcP, mcV, propCI, teoV, teoP, teoProp, vUmbral } = lastB;
+
+  document.getElementById("bLabel").textContent = "n = " + cfg.nsim.toLocaleString("es-ES") + " simulaciones";
+  document.getElementById("histN").textContent = cfg.nsim.toLocaleString("es-ES");
+
+  const kpiRow = document.getElementById("kpiRowB");
+  kpiRow.innerHTML = "";
+  kpiRow.appendChild(tile("Potencia media (MC)", fmtPower(mcP.point), `IC95%: [${fmtPower(mcP.lo)}, ${fmtPower(mcP.hi)}]`, "", null));
+  kpiRow.appendChild(tile("Potencia media (teórico)", fmtPower(teoP), null, "", "K·λ³·Γ(1+3/k)"));
+  kpiRow.appendChild(tile("Viento medio (MC vs. teórico)", fmtWind(mcV.point), `teórico = ${fmtWind(teoV)}`, "", "λ·Γ(1+1/k)"));
+  kpiRow.appendChild(tile("Pr(bombas en marcha) — MC", fmtPct(propCI.point), `IC95%: [${fmtPct(propCI.lo)}, ${fmtPct(propCI.hi)}]`, propCI.point>0.9?"good":(propCI.point>0.5?"warn":"crit"), `teórico = ${fmtPct(teoProp)}`));
+
+  drawHistogramP(document.getElementById("histP"), Array.from(P), mcP.point, cfg.umbral);
+  drawComposicion(document.getElementById("compCurve"), V, P, cfg.K, cfg.umbral, vUmbral);
+
+  let rows = `<tr><th>Magnitud</th><th>MC</th><th>IC95%</th><th>Teórico</th></tr>`;
+  rows += `<tr><td>Potencia media</td><td>${fmtPower(mcP.point)}</td><td>[${fmtPower(mcP.lo)}, ${fmtPower(mcP.hi)}]</td><td>${fmtPower(teoP)}</td></tr>`;
+  rows += `<tr><td>Viento medio</td><td>${fmtWind(mcV.point)}</td><td>[${fmtWind(mcV.lo)}, ${fmtWind(mcV.hi)}]</td><td>${fmtWind(teoV)}</td></tr>`;
+  rows += `<tr><td>Pr(P ≥ umbral)</td><td>${fmtPct(propCI.point)}</td><td>[${fmtPct(propCI.lo)}, ${fmtPct(propCI.hi)}]</td><td>${fmtPct(teoProp)}</td></tr>`;
+  document.getElementById("tablePot").innerHTML = rows;
+
+  document.getElementById("potReadout").textContent =
+    `El viento medio es de solo ${fmtWind(teoV)}, pero la potencia media equivale a ${fmtPower(teoP)}: como P va con el cubo del viento, las horas de viento fuerte —aunque poco frecuentes— dominan la producción. Por eso la potencia media resulta mucho mayor de lo que sugeriría, de forma ingenua, la velocidad media del viento.`;
+}
+
+/* ========================= TAB C: SENSIBILIDAD ========================= */
+function logSpace(mn,mx,n){ const out=[]; for(let i=0;i<n;i++){ const v = n===1?mn: mn*Math.pow(mx/mn, i/(n-1)); out.push(Math.max(1,Math.round(v))); } return out; }
+
+function readConfigC(){
+  const g = id => document.getElementById(id);
+  const points = clamp(Math.round(parseFloat(g("sensPoints").value)), 4, 7);
+  const replicas = clamp(Math.round(parseFloat(g("sensReplicas").value)), 1, 8);
+  const target = g("sensTarget").value;
+  const wind = readWind();
+  const tur = readTurbina();
+  const K = computeK(tur.radio, tur.rho, tur.cp);
+  const umbral = readUmbral();
+  const mn = clamp(parseFloat(g("sensNsimMin").value), 50, 5000);
+  const mx = clamp(parseFloat(g("sensNsimMax").value), Math.max(mn+1,500), 150000);
+  const values = logSpace(mn, mx, points);
+  return { target, wind, K, umbral, values, replicas };
+}
+
+function metricTeo(target, cfg){
+  if(target==="proporcion"){
+    const vUmbral = Math.pow(cfg.umbral/cfg.K, 1/3);
+    return weibullSF(vUmbral, cfg.wind.k, cfg.wind.lambda);
+  }
+  return cfg.K * weibullMomentR(3, cfg.wind.k, cfg.wind.lambda);
+}
+function metricFmt(target){ return target==="proporcion" ? fmtPct : fmtPower; }
+function metricLabel(target){ return target==="proporcion" ? "Pr(bombas en marcha)" : "Potencia media"; }
+
+let lastC = null;
+
+function runSensitivity(){
+  const cfg = readConfigC();
+  const teo = metricTeo(cfg.target, cfg);
+  const points = cfg.values.map(nsim=>{
+    const replicaMeans = [];
+    let totalSum=0;
+    for(let r=0;r<cfg.replicas;r++){
+      reseed();
+      const V = simulaViento(cfg.wind, nsim);
+      let m;
+      if(cfg.target==="proporcion"){
+        let c=0;
+        for(let i=0;i<V.length;i++){ const p = cfg.K*V[i]*V[i]*V[i]; if(p>=cfg.umbral) c++; }
+        m = c/V.length;
+      } else {
+        let s=0;
+        for(let i=0;i<V.length;i++){ s += cfg.K*V[i]*V[i]*V[i]; }
+        m = s/V.length;
+      }
+      replicaMeans.push(m);
+      totalSum += m;
+    }
+    const pooledMean = totalSum/cfg.replicas;
+    const betweenSD = cfg.replicas>1 ? sd(replicaMeans) : 0;
+    const pooledSE = betweenSD/Math.sqrt(Math.max(1,cfg.replicas));
+    return { x:nsim, replicaMeans, pooledMean, lo:pooledMean-1.96*pooledSE, hi:pooledMean+1.96*pooledSE, betweenSD, teo };
+  });
+  lastC = { cfg, points, teo };
+  renderSensitivity();
+}
+
+function renderSensitivity(){
+  const { cfg, points } = lastC;
+  document.getElementById("cLabel").textContent = points.length + " configuraciones · " + cfg.replicas + " réplicas c/u · " + metricLabel(cfg.target);
+
+  const fmt = metricFmt(cfg.target);
+  const first = points[0].betweenSD, last = points[points.length-1].betweenSD;
+  const reduction = (first>0 && last>0) ? (first/last) : null;
+
+  const kpiRow = document.getElementById("kpiRowC");
+  kpiRow.innerHTML = "";
+  kpiRow.appendChild(tile("Métrica analizada", metricLabel(cfg.target), null, "", null));
+  kpiRow.appendChild(tile("Rango de nsim probado", `${points[0].x.toLocaleString("es-ES")} – ${points[points.length-1].x.toLocaleString("es-ES")}`, null, "", points.length+" puntos"));
+  kpiRow.appendChild(tile("Réplicas por punto", String(cfg.replicas), null, "", "semillas independientes"));
+  kpiRow.appendChild(tile("Reducción de variabilidad", reduction? ("×"+reduction.toFixed(1)) : "—", null, reduction?"good":"", reduction? "σ entre réplicas del primer punto frente al último" : "con 1 réplica no hay variabilidad que medir"));
+
+  drawSensitivityScatter(document.getElementById("sensConverge"), points, fmt);
+  drawBarChart(document.getElementById("sensVariability"), points.map(pt=>({
+    label: "n="+pt.x.toLocaleString("es-ES"), value: pt.betweenSD, color: "var(--accent)"
+  })), { fmt });
+
+  let rows = `<tr><th>nsim</th><th>Media combinada</th><th>IC95%</th><th>σ entre réplicas</th><th>Teórico</th></tr>`;
+  points.forEach(pt=>{
+    rows += `<tr><td>${pt.x.toLocaleString("es-ES")}</td><td>${fmt(pt.pooledMean)}</td>`+
+      `<td>[${fmt(pt.lo)}, ${fmt(pt.hi)}]</td><td>${fmt(pt.betweenSD)}</td><td>${fmt(pt.teo)}</td></tr>`;
+  });
+  document.getElementById("tableSens").innerHTML = rows;
+
+  document.getElementById("sensReadout").textContent =
+    `A medida que crece nsim, la media combinada converge al valor teórico y la dispersión entre semillas se reduce`+
+    (reduction? ` (${reduction.toFixed(1)} veces menor entre el primer y el último punto)` : "")+
+    `: así se ve, de forma directa, cuánto nsim hace falta para fiarse de la estimación.`;
+}
+
+/* ========================= CHARTS (canvas, no deps) ========================= */
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || name; }
+function resolveColor(c){ return c && c.startsWith("var(") ? cssVar(c.slice(4,-1)) : c; }
+
+function setupCanvas(canvas){
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || canvas.parentElement.clientWidth || 300;
+  const h = canvas.clientHeight || parseInt(canvas.getAttribute("height")) || 220;
+  canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return { ctx, w, h };
+}
+
+function tile(label, valueHTML, ciText, cls, noteText){
+  const d = document.createElement("div");
+  d.className = "tile" + (cls? " "+cls: "");
+  d.innerHTML = `<div class="lbl">${label}</div><div class="val">${valueHTML}</div>` +
+    (ciText? `<div class="ci">${ciText}</div>`:"") + (noteText? `<div class="note">${noteText}</div>`:"");
+  return d;
+}
+
+function drawHistogramP(canvas, values, meanVal, umbral){
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:66, r:14, t:14, b:32};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const minV = 0, maxV = Math.max(...values, umbral, 1);
+  const range = (maxV-minV) || 1;
+  const bins = 40;
+  const counts = new Array(bins).fill(0);
+  for(const v of values){ const bi = Math.min(bins-1, Math.max(0, Math.floor((v-minV)/range*bins))); counts[bi]++; }
+  const maxCount = Math.max(...counts);
+  const gridColor = cssVar("--grid"), muted = cssVar("--text-muted"), accent = cssVar("--accent"), critical = cssVar("--critical"), text = cssVar("--text");
+  ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
+  ctx.font = "13px " + cssVar("--font-mono"); ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let i=0;i<=4;i++){
+    const y = pad.t + plotH - (plotH*i/4);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w-pad.r, y); ctx.stroke();
+    ctx.fillText(Math.round(maxCount*i/4).toString(), pad.l-6, y);
+  }
+  const barW = plotW/bins;
+  for(let i=0;i<bins;i++){
+    const bh = plotH * (counts[i]/maxCount);
+    const x0 = minV + i*range/bins;
+    ctx.fillStyle = x0<umbral ? critical : accent;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(pad.l+i*barW+1, pad.t+plotH-bh, Math.max(1,barW-2), bh);
+  }
+  ctx.globalAlpha = 1;
+  const xMean = pad.l + plotW*((meanVal-minV)/range);
+  ctx.strokeStyle = text; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(xMean, pad.t); ctx.lineTo(xMean, pad.t+plotH); ctx.stroke();
+  const xUmbral = pad.l + plotW*((umbral-minV)/range);
+  ctx.strokeStyle = critical;
+  ctx.beginPath(); ctx.moveTo(xUmbral, pad.t); ctx.lineTo(xUmbral, pad.t+plotH); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = text; ctx.textAlign="center"; ctx.font="600 12.5px " + cssVar("--font-mono");
+  ctx.fillText(fmtPower(meanVal), xMean, pad.t-2);
+  ctx.fillStyle = critical; ctx.font="600 11px " + cssVar("--font-mono");
+  ctx.fillText("umbral="+fmtPower(umbral), xUmbral, pad.t+plotH+14);
+  ctx.fillStyle = muted; ctx.textAlign="center"; ctx.textBaseline="top"; ctx.font="12px " + cssVar("--font-mono");
+  for(let i=0;i<=4;i++){
+    const x = pad.l + plotW*i/4;
+    ctx.fillText(fmtPower(minV + range*i/4), x, pad.t+plotH+30);
+  }
+}
+
+function drawComposicion(canvas, V, P, K, umbralP, umbralV){
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:66, r:16, t:14, b:34};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const maxV = Math.max(...V, umbralV) * 1.05;
+  const maxP = Math.max(...P, umbralP) * 1.05;
+  const xPix = v => pad.l + plotW*(v/maxV);
+  const yPix = p => pad.t + plotH*(1-(p/maxP));
+
+  const muted = cssVar("--text-muted"), grid = cssVar("--grid"), accent = cssVar("--accent"), critical = cssVar("--critical"), text = cssVar("--text");
+
+  ctx.strokeStyle = grid; ctx.lineWidth = 1; ctx.font = "12px " + cssVar("--font-mono");
+  ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let i=0;i<=4;i++){
+    const p = maxP*i/4;
+    const py = yPix(p);
+    ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(w-pad.r, py); ctx.stroke();
+    ctx.fillText(fmtPower(p), pad.l-6, py);
+  }
+  ctx.textAlign="center"; ctx.textBaseline="top";
+  for(let i=0;i<=4;i++){
+    const v = maxV*i/4;
+    const px = xPix(v);
+    ctx.fillStyle = muted; ctx.fillText(v.toFixed(1)+" m/s", px, pad.t+plotH+8);
+  }
+
+  // sampled points (downsampled for clarity/perf)
+  const n = V.length;
+  const step = Math.max(1, Math.floor(n/500));
+  ctx.fillStyle = accent; ctx.globalAlpha = 0.28;
+  for(let i=0;i<n;i+=step){
+    ctx.beginPath(); ctx.arc(xPix(V[i]), yPix(P[i]), 2.2, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // theoretical curve p = K*v^3
+  ctx.strokeStyle = text; ctx.lineWidth = 2;
+  ctx.beginPath();
+  const steps = 80;
+  for(let i=0;i<=steps;i++){
+    const v = maxV*i/steps;
+    const p = K*v*v*v;
+    const x = xPix(v), y = yPix(Math.min(p,maxP));
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // threshold reference lines
+  ctx.strokeStyle = critical; ctx.setLineDash([4,3]); ctx.lineWidth=1.3;
+  ctx.beginPath(); ctx.moveTo(pad.l, yPix(umbralP)); ctx.lineTo(w-pad.r, yPix(umbralP)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(xPix(umbralV), pad.t); ctx.lineTo(xPix(umbralV), pad.t+plotH); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = critical; ctx.font="600 11px "+cssVar("--font-mono"); ctx.textAlign="left"; ctx.textBaseline="bottom";
+  ctx.fillText("umbral", xPix(umbralV)+4, pad.t+plotH-4);
+}
+
+function roundRectTop(ctx,x,y,width,height,r){
+  ctx.beginPath();
+  ctx.moveTo(x, y+height);
+  ctx.lineTo(x, y+r);
+  ctx.arcTo(x,y,x+r,y,r);
+  ctx.lineTo(x+width-r,y);
+  ctx.arcTo(x+width,y,x+width,y+r,r);
+  ctx.lineTo(x+width,y+height);
+  ctx.closePath();
+}
+
+function drawBarChart(canvas, items, opts){
+  opts = opts || {};
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:14, r:14, t:16, b:34};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const vals = items.map(d=>d.value);
+  const minVal = Math.min(0, ...vals), maxVal = Math.max(...vals, 1e-9);
+  const range = (maxVal-minVal) || 1;
+  const n = items.length;
+  const gap = 18;
+  const barW = (plotW - gap*(n-1)) / n;
+  const gridColor = cssVar("--grid"), muted = cssVar("--text-muted"), text = cssVar("--text");
+  const zeroY = pad.t + plotH*(1-(0-minVal)/range);
+  ctx.strokeStyle = gridColor; ctx.beginPath(); ctx.moveTo(pad.l, zeroY); ctx.lineTo(w-pad.r, zeroY); ctx.stroke();
+  items.forEach((it,i)=>{
+    const x = pad.l + i*(barW+gap);
+    const topY = pad.t + plotH*(1-(it.value-minVal)/range);
+    const bh = Math.max(2, zeroY-topY);
+    const color = resolveColor(it.color);
+    ctx.fillStyle = color;
+    roundRectTop(ctx, x, Math.min(topY,zeroY), barW, bh, 4);
+    ctx.fill();
+    ctx.fillStyle = text; ctx.textAlign="center"; ctx.font="600 13px " + cssVar("--font-mono");
+    ctx.fillText(opts.fmt ? opts.fmt(it.value) : it.value, x+barW/2, Math.min(topY,zeroY)-8);
+    ctx.fillStyle = muted; ctx.font="13px " + cssVar("--font-body"); ctx.textBaseline="top";
+    ctx.fillText(String(it.label), x+barW/2, pad.t+plotH+6);
+  });
+}
+
+function drawSensitivityScatter(canvas, points, fmt){
+  fmt = fmt || fmtPower;
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:70, r:18, t:18, b:40};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const allVals = points.flatMap(pt=>pt.replicaMeans.concat([pt.teo]));
+  const minV = Math.min(...allVals), maxV = Math.max(...allVals);
+  const span = (maxV-minV) || Math.max(1,Math.abs(minV)*0.1);
+  const yMin = minV - span*0.12, yMax = maxV + span*0.12;
+  const yPix = v => pad.t + plotH*(1-(v-yMin)/(yMax-yMin));
+  const n = points.length;
+  const xPix = i => pad.l + (n<=1 ? plotW/2 : plotW*i/(n-1));
+
+  const muted = cssVar("--text-muted"), grid = cssVar("--grid"), accent = cssVar("--accent");
+
+  ctx.strokeStyle = grid; ctx.lineWidth = 1; ctx.font = "12px " + cssVar("--font-mono"); ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let i=0;i<=4;i++){
+    const v = yMin + (yMax-yMin)*i/4;
+    const py = yPix(v);
+    ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(w-pad.r, py); ctx.stroke();
+    ctx.fillText(fmt(v), pad.l-6, py);
+  }
+
+  ctx.strokeStyle = muted; ctx.setLineDash([5,4]); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  points.forEach((pt,i)=>{ const x=xPix(i), y=yPix(pt.teo); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke(); ctx.setLineDash([]);
+
+  points.forEach((pt,i)=>{
+    const x = xPix(i);
+    const ys = pt.replicaMeans.map(yPix);
+    if(ys.length>1){
+      ctx.strokeStyle = muted; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, Math.min(...ys)); ctx.lineTo(x, Math.max(...ys)); ctx.stroke();
+    }
+    ctx.fillStyle = accent; ctx.globalAlpha = 0.45;
+    ys.forEach(y=>{ ctx.beginPath(); ctx.arc(x,y,2.6,0,Math.PI*2); ctx.fill(); });
+    ctx.globalAlpha = 1;
+  });
+
+  ctx.strokeStyle = accent; ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  points.forEach((pt,i)=>{ const x=xPix(i), y=yPix(pt.pooledMean); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+  points.forEach((pt,i)=>{
+    const x=xPix(i), y=yPix(pt.pooledMean);
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.arc(x,y,4.5,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = cssVar("--surface"); ctx.lineWidth=1.5; ctx.stroke();
+  });
+
+  ctx.fillStyle = muted; ctx.font = "12px " + cssVar("--font-mono"); ctx.textAlign="center"; ctx.textBaseline="top";
+  points.forEach((pt,i)=> ctx.fillText("n="+pt.x.toLocaleString("es-ES"), xPix(i), pad.t+plotH+8));
+}
+
+/* ========================= UI WIRING ========================= */
+function wireLiveReadout(rangeId, outId, suffix, fmt){
+  const el = document.getElementById(rangeId);
+  const out = document.getElementById(outId);
+  el.addEventListener("input", ()=>{ out.textContent = (fmt?fmt(el.value):Number(el.value).toLocaleString("es-ES")) + (suffix||""); });
+}
+
+function withLoading(fn){
+  const overlay = document.getElementById("loadingOverlay");
+  overlay.classList.add("show");
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{
+    try{ fn(); } finally { overlay.classList.remove("show"); }
+  }));
+}
+
+function redrawVisible(){
+  if(!document.getElementById("viewA").hidden) renderTabA();
+  if(!document.getElementById("viewB").hidden && lastB) renderTabB();
+  if(!document.getElementById("viewC").hidden && lastC) renderSensitivity();
+}
+
+function switchTab(which){
+  const tabs = { a:["tabBtnA","sidebarA","viewA"], b:["tabBtnB","sidebarB","viewB"], c:["tabBtnC","sidebarC","viewC"] };
+  Object.keys(tabs).forEach(k=>{
+    const [btnId, sideId, viewId] = tabs[k];
+    const active = k===which;
+    document.getElementById(btnId).classList.toggle("active", active);
+    document.getElementById(sideId).hidden = !active;
+    document.getElementById(viewId).hidden = !active;
+  });
+  if(which==="a") renderTabA();
+  if(which==="b" && !lastB) runTabB();
+  if(which==="c" && lastC) renderSensitivity();
+}
+
+document.getElementById("tabBtnA").addEventListener("click", ()=>switchTab("a"));
+document.getElementById("tabBtnB").addEventListener("click", ()=>switchTab("b"));
+document.getElementById("tabBtnC").addEventListener("click", ()=>switchTab("c"));
+
+document.getElementById("themeToggle").addEventListener("click", ()=>{
+  const root = document.documentElement;
+  const cur = root.getAttribute("data-theme");
+  const sysDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  let next;
+  if(!cur) next = sysDark ? "light" : "dark";
+  else if(cur==="dark") next = "light";
+  else next = "dark";
+  root.setAttribute("data-theme", next);
+  redrawVisible();
+});
+
+wireLiveReadout("mecU","outU","", v=>(v/100).toFixed(2));
+wireLiveReadout("nsimB","outNsimB","", v=>Number(v).toLocaleString("es-ES"));
+wireLiveReadout("sensPoints","outSensPoints","");
+wireLiveReadout("sensReplicas","outSensReplicas","");
+
+document.getElementById("mecU").addEventListener("input", renderTabA);
+["windK","windLambda","umbralW"].forEach(id=> document.getElementById(id).addEventListener("input", ()=>{ if(!document.getElementById("viewA").hidden) renderTabA(); }));
+
+document.getElementById("mecRandomU").addEventListener("click", ()=>{
+  document.getElementById("mecU").value = Math.round(Math.random()*100);
+  document.getElementById("outU").textContent = (document.getElementById("mecU").value/100).toFixed(2);
+  renderTabA();
+});
+
+document.getElementById("runB").addEventListener("click", ()=> withLoading(runTabB));
+document.getElementById("runC").addEventListener("click", ()=> withLoading(runSensitivity));
+
+function set(id,val){ document.getElementById(id).value = val; }
+
+document.getElementById("resetA").addEventListener("click", ()=>{
+  set("mecU",55);
+  document.getElementById("outU").textContent="0.55";
+  renderTabA();
+});
+document.getElementById("resetB").addEventListener("click", ()=>{
+  set("nsimB",30000); document.getElementById("outNsimB").textContent="30,000";
+  set("windK",2.2); set("windLambda",10);
+  set("turRadio",40); set("turRho",1.225); set("turCp",0.45);
+  set("umbralW",600);
+  runTabB();
+});
+document.getElementById("resetC").addEventListener("click", ()=>{
+  set("sensNsimMin",200); set("sensNsimMax",60000);
+  set("sensPoints",6); document.getElementById("outSensPoints").textContent="6";
+  set("sensReplicas",5); document.getElementById("outSensReplicas").textContent="5";
+  document.getElementById("sensTarget").value = "potencia";
+  lastC = null;
+  document.getElementById("kpiRowC").innerHTML = "";
+  document.getElementById("tableSens").innerHTML = "";
+  document.getElementById("cLabel").textContent = "sin ejecutar";
+  document.getElementById("sensReadout").textContent = "Pulsa «Analizar sensibilidad» para ejecutar el barrido.";
+});
+
+window.addEventListener("resize", ()=>{ clearTimeout(window.__rzT); window.__rzT = setTimeout(redrawVisible, 120); });
+
+/* ========================= INIT ========================= */
+function init(){
+  const K = computeK(readTurbina().radio, readTurbina().rho, readTurbina().cp);
+  document.getElementById("kHint").textContent = `K = ${K.toFixed(2)} (P = K·V³, con P en W y V en m/s)`;
+  ["turRadio","turRho","turCp"].forEach(id=> document.getElementById(id).addEventListener("input", ()=>{
+    const Knew = computeK(readTurbina().radio, readTurbina().rho, readTurbina().cp);
+    document.getElementById("kHint").textContent = `K = ${Knew.toFixed(2)} (P = K·V³, con P en W y V en m/s)`;
+    if(!document.getElementById("viewA").hidden) renderTabA();
+  }));
+  const wind0 = readWind();
+  document.getElementById("windHint").textContent = `Media del viento ≈ ${fmtWind(weibullMomentR(1, wind0.k, wind0.lambda))} (λ·Γ(1+1/k))`;
+  ["windK","windLambda"].forEach(id=> document.getElementById(id).addEventListener("input", ()=>{
+    const w = readWind();
+    document.getElementById("windHint").textContent = `Media del viento ≈ ${fmtWind(weibullMomentR(1, w.k, w.lambda))} (λ·Γ(1+1/k))`;
+  }));
+  renderTabA();
+  runTabB();
+}
+init();
+
+})();
+</script>
+
+</body>
+</html>
