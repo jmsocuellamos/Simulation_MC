@@ -1,0 +1,1072 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El distribuidor de fresas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===================================================================
+   DESIGN PLAN
+   Layout: mission-control deck — same family as the other teaching tools
+   in this series (fixed instrument sidebar + scrolling telemetry main).
+   Three tabs: the mechanism (one day, one inventory level), the full
+   Monte Carlo comparison across the four inventory levels (Vía A, the
+   profit matrix), and the marginal-analysis sensitivity (Vía B, the
+   "is one more box worth it?" question with its convergence sweep).
+   Color: dark-first palette. --good marks the recommended inventory
+   level and "increase" decisions; --critical marks thrown-away boxes
+   and "do not increase" decisions; --warning marks unmet demand.
+   Type: Chakra Petch (display) for headings/labels; IBM Plex Sans (body);
+   IBM Plex Mono (data) for every number.
+   =================================================================== */
+:root{
+  color-scheme: dark;
+  --bg: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232320;
+  --surface-3: #2a2a27;
+  --text: #ffffff;
+  --text-2: #c3c2b7;
+  --text-muted: #898781;
+  --border: rgba(255,255,255,0.12);
+  --border-strong: rgba(255,255,255,0.22);
+  --grid: #2c2c2a;
+  --accent: #3987e5;
+  --accent-ink: #eaf2ff;
+  --accent-2: #d9972a;
+  --accent-3: #199e70;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #e66767;
+  --shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35);
+  --radius: 10px;
+  --font-display: "Chakra Petch", "Rajdhani", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme: light;
+    --bg: #f1f0ea; --surface: #fcfcfb; --surface-2: #f2f1ec; --surface-3: #eae8e0;
+    --text: #0b0b0b; --text-2: #52514e; --text-muted: #706f6a;
+    --border: rgba(11,11,11,0.12); --border-strong: rgba(11,11,11,0.28);
+    --grid: #e1e0d9;
+    --accent: #2a78d6; --accent-ink: #0b2f5c; --accent-2: #a9700f; --accent-3: #137a53;
+    --good: #0b7a0b; --warning: #92650a; --critical: #b23232;
+  }
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg: #f1f0ea; --surface: #fcfcfb; --surface-2: #f2f1ec; --surface-3: #eae8e0;
+  --text: #0b0b0b; --text-2: #52514e; --text-muted: #706f6a;
+  --border: rgba(11,11,11,0.12); --border-strong: rgba(11,11,11,0.28);
+  --grid: #e1e0d9;
+  --accent: #2a78d6; --accent-ink: #0b2f5c; --accent-2: #a9700f; --accent-3: #137a53;
+  --good: #0b7a0b; --warning: #92650a; --critical: #b23232;
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232320; --surface-3: #2a2a27;
+  --text: #ffffff; --text-2: #c3c2b7; --text-muted: #898781;
+  --border: rgba(255,255,255,0.12); --border-strong: rgba(255,255,255,0.22);
+  --grid: #2c2c2a;
+  --accent: #3987e5; --accent-ink: #eaf2ff; --accent-2: #d9972a; --accent-3: #199e70;
+  --good: #0ca30c; --warning: #fab219; --critical: #e66767;
+}
+
+*{box-sizing:border-box;}
+body{ background: var(--bg); color: var(--text); font-family: var(--font-body); font-size:17px; margin:0; padding-inline:16px; }
+h1,h2,h3,h4{ font-family: var(--font-display); font-weight:600; letter-spacing:.01em; margin:0; text-wrap:balance; }
+p{ margin:0; }
+.mono{ font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+button{ font-family: var(--font-body); cursor:pointer; }
+input[type="range"]{ width:100%; accent-color: var(--accent); }
+input[type="number"]{
+  font-family: var(--font-mono); background: var(--surface); color: var(--text);
+  border:1px solid var(--border-strong); border-radius:6px; padding:5px 7px; width:100%;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.06) inset;
+}
+input[type="number"]:focus, input[type="range"]:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+select{ font-family: var(--font-mono); background: var(--surface); color: var(--text); border:1px solid var(--border-strong); border-radius:6px; padding:7px 8px; width:100%; appearance:auto; }
+.subcard input[type="number"]{ background: var(--surface-2); }
+.minitable input[type="number"]{ background: var(--surface-2); }
+label{ font-size:15px; color: var(--text-2); }
+.app{ max-width:1400px; margin:0 auto; padding-block: calc(14px + env(safe-area-inset-top,0px)) 48px; }
+
+/* ---------- top bar ---------- */
+.topbar{
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  padding:14px 18px; margin-bottom:16px;
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+  border:1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.brand{ display:flex; align-items:baseline; gap:10px; margin-right:auto; }
+.brand-mark{
+  display:inline-grid; place-items:center; width:34px; height:34px; border-radius:8px;
+  background: var(--accent); color:#fff; font-size:14px; font-family:var(--font-display); font-weight:700;
+  flex-shrink:0;
+}
+.brand h1{ font-size: 23px; color:var(--text); }
+.brand .brand-sub{ font-size:15px; color:var(--text-muted); font-family:var(--font-body); margin-left:8px; }
+.tabs{ display:flex; gap:6px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:3px; flex-wrap:wrap; }
+.tab-btn{
+  font-family: var(--font-display); font-size:15px; letter-spacing:.02em; text-transform:uppercase;
+  background:transparent; border:none; color:var(--text-muted); padding:8px 13px; border-radius:6px;
+}
+.tab-btn.active{ background: var(--accent); color:#fff; }
+.icon-btn{
+  width:34px; height:34px; border-radius:8px; border:1px solid var(--border); background:var(--surface-2);
+  color:var(--text); font-size:18px; display:grid; place-items:center;
+}
+.icon-btn:hover{ border-color: var(--border-strong); }
+
+/* ---------- shell ---------- */
+.shell{ display:grid; grid-template-columns: 320px 1fr; gap:16px; align-items:start; }
+@media (max-width: 860px){ .shell{ grid-template-columns: 1fr; } }
+
+.sidebar{
+  background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
+  padding:14px; display:flex; flex-direction:column; gap:10px; box-shadow: var(--shadow);
+  position: relative; isolation: isolate;
+}
+
+.acc{ border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface-2); position:relative; z-index:0; }
+.acc > summary{
+  list-style:none; cursor:pointer; padding:9px 11px; font-family:var(--font-display);
+  font-size:15px; letter-spacing:.03em; text-transform:uppercase; color:var(--text-2);
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+.acc > summary::-webkit-details-marker{ display:none; }
+.acc > summary::after{ content:"▸"; color:var(--text-muted); transition: transform .15s; }
+.acc[open] > summary::after{ transform: rotate(90deg); }
+.acc-body{ padding:10px 11px 12px; display:flex; flex-direction:column; gap:10px; border-top:1px solid var(--border); }
+.field{ display:flex; flex-direction:column; gap:4px; }
+.field-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.field-row .val{ font-family:var(--font-mono); font-size:15px; color:var(--accent); font-variant-numeric:tabular-nums; min-width:50px; text-align:right; }
+.subcard{ background:var(--surface-3); border:1px solid var(--border); border-radius:7px; padding:8px 9px; }
+.subcard h4{ font-size:15px; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.dot{ width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.minitable{ width:100%; border-collapse:collapse; font-size:14px; }
+.minitable th{ font-family:var(--font-display); font-weight:600; color:var(--text-muted); text-align:center; padding:2px; font-size:12px; text-transform:uppercase; }
+.minitable td{ padding:2px; text-align:center; }
+.minitable input[type=number]{ padding:5px 3px; font-size:14px; text-align:center; }
+.minitable td:first-child{ color:var(--text-2); font-size:13.5px; padding-right:3px; white-space:nowrap; }
+
+.btn{
+  font-family:var(--font-display); font-size:15.5px; letter-spacing:.02em; text-transform:uppercase;
+  border-radius:8px; border:1px solid var(--border-strong); padding:11px 14px; text-align:center;
+  background:var(--surface-2); color:var(--text);
+}
+.btn.primary{ background: var(--accent); border-color:var(--accent); color:#fff; font-size:17px; padding:13px; }
+.btn.primary:hover{ filter:brightness(1.08); }
+.btn.ghost{ background:transparent; }
+.btn-row{ display:flex; gap:8px; }
+.btn-row .btn{ flex:1; }
+.hint{ font-size:14px; color:var(--text-muted); line-height:1.5; }
+
+/* ---------- main deck ---------- */
+.deck{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+.card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); min-width:0; }
+.card h3{ font-size:18.5px; margin-bottom:3px; }
+.card .sub{ font-size:15px; color:var(--text-muted); margin-bottom:12px; }
+.section-title{ display:flex; align-items:baseline; gap:10px; margin: 6px 2px 0; }
+.section-title h2{ font-size:21px; }
+.section-title .n{ font-family:var(--font-mono); font-size:14px; color:var(--text-muted); border:1px solid var(--border); padding:2px 7px; border-radius:20px; }
+
+.kpi-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(215px,1fr)); gap:10px; }
+.tile{ background:var(--surface); border:1px solid var(--border); border-radius: var(--radius); padding:14px 15px; box-shadow:var(--shadow); position:relative; overflow:hidden; min-width:0; }
+.tile::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); }
+.tile.good::before{ background:var(--good); }
+.tile.warn::before{ background:var(--warning); }
+.tile.crit::before{ background:var(--critical); }
+.tile .lbl{ font-size:13.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; font-family:var(--font-display); }
+.tile .val{ font-family:var(--font-mono); font-size:32px; font-weight:600; margin-top:4px; letter-spacing:-.01em; }
+.tile .val small{ font-size:16px; color:var(--text-muted); font-weight:400; }
+.tile .ci{ font-size:14px; color:var(--text-muted); margin-top:3px; font-family:var(--font-mono); }
+.tile .note{ font-size:13.5px; color:var(--text-muted); margin-top:5px; line-height:1.4; }
+
+.charts-row{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:760px){ .charts-row{ grid-template-columns:1fr; } }
+canvas{ width:100%; display:block; }
+
+table.data{ width:100%; border-collapse:collapse; font-size:16.5px; }
+table.data th{ text-align:right; font-family:var(--font-display); font-size:14px; text-transform:uppercase; letter-spacing:.02em; color:var(--text-muted); padding:8px 8px; border-bottom:1px solid var(--border-strong); }
+table.data th:first-child, table.data td:first-child{ text-align:left; }
+table.data td{ text-align:right; padding:8px 7px; border-bottom:1px solid var(--border); font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+table.data tr:last-child td{ border-bottom:none; }
+.overflow-x{ overflow-x:auto; }
+
+.steps{ display:grid; grid-template-columns: repeat(3,1fr); gap:12px; }
+@media (max-width:760px){ .steps{ grid-template-columns:1fr; } }
+.step{ background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 13px; }
+.step .num{ font-family:var(--font-display); font-size:14px; color:var(--accent); letter-spacing:.03em; }
+.step p{ font-size:16px; color:var(--text-2); margin-top:5px; line-height:1.5; }
+.step .f{ font-family:var(--font-mono); color:var(--text); font-size:16px; }
+
+footer{ margin-top:28px; padding:16px 2px 4px; border-top:1px solid var(--border); color:var(--text-muted); font-size:14.5px; line-height:1.7; }
+footer b{ color:var(--text-2); }
+
+.badge{ display:inline-block; font-family:var(--font-mono); font-size:13.5px; padding:3px 8px; border-radius:20px; border:1px solid var(--border-strong); color:var(--text-2); }
+.loading-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; place-items:center; z-index:50; backdrop-filter: blur(2px); }
+.loading-overlay.show{ display:grid; }
+.loading-box{ background:var(--surface); border:1px solid var(--border-strong); border-radius:10px; padding:18px 26px; font-family:var(--font-display); font-size:16px; letter-spacing:.03em; text-transform:uppercase; display:flex; align-items:center; gap:10px; box-shadow:var(--shadow); }
+.spinner{ width:16px; height:16px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--accent); animation: spin 0.7s linear infinite; }
+@keyframes spin{ to{ transform: rotate(360deg); } }
+[hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+
+
+<div class="loading-overlay" id="loadingOverlay"><div class="loading-box"><span class="spinner"></span> Simulando…</div></div>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">DF</span>
+      <h1>El distribuidor de fresas</h1>
+      <span class="brand-sub">Inventario bajo incertidumbre · análisis marginal</span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="a" id="tabBtnA">Mecanismo · Un día de venta</button>
+      <button class="tab-btn" data-tab="b" id="tabBtnB">Simulación · Beneficio por nivel</button>
+      <button class="tab-btn" data-tab="c" id="tabBtnC">Sensibilidad · Análisis marginal</button>
+    </nav>
+    <button class="icon-btn" id="themeToggle" title="Cambiar tema claro/oscuro">◐</button>
+  </header>
+
+  <div class="shell">
+    <!-- ============ SIDEBAR A ============ -->
+    <aside class="sidebar" id="sidebarA">
+      <details class="acc" open>
+        <summary>Generar demanda del día</summary>
+        <div class="acc-body">
+          <div class="field">
+            <div class="field-row"><label>U demanda ~ Unif(0,1)</label><span class="val mono" id="outUd">0.50</span></div>
+            <input type="range" id="mecUd" min="0" max="100" value="50" step="1">
+          </div>
+          <div class="field">
+            <label>Nivel de inventario a probar</label>
+            <select id="mecNivel">
+              <option value="10">10 cajas</option>
+              <option value="11">11 cajas</option>
+              <option value="12" selected>12 cajas</option>
+              <option value="13">13 cajas</option>
+            </select>
+          </div>
+        </div>
+      </details>
+
+      <button class="btn" id="mecRandomU">🎲 U aleatorio</button>
+      <button class="btn ghost" id="resetA">Restablecer valores por defecto</button>
+    </aside>
+
+    <aside class="sidebar" id="sidebarB" hidden>
+      <details class="acc" open>
+        <summary>Demanda — campaña anterior</summary>
+        <div class="acc-body">
+          <table class="minitable">
+            <tr><th>Cajas</th><th>Días</th><th>Prob.</th></tr>
+            <tr><td>10</td><td><input type="number" id="dias10" value="15" min="0" step="1"></td><td class="mono" id="prob10">0.150</td></tr>
+            <tr><td>11</td><td><input type="number" id="dias11" value="20" min="0" step="1"></td><td class="mono" id="prob11">0.200</td></tr>
+            <tr><td>12</td><td><input type="number" id="dias12" value="40" min="0" step="1"></td><td class="mono" id="prob12">0.400</td></tr>
+            <tr><td>13</td><td><input type="number" id="dias13" value="25" min="0" step="1"></td><td class="mono" id="prob13">0.250</td></tr>
+          </table>
+          <div class="hint">Las probabilidades se recalculan como días / total de días.</div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>Economía</summary>
+        <div class="acc-body">
+          <div class="grid2">
+            <div class="field"><label>Coste unitario (C, €)</label><input type="number" id="costeC" value="20" min="1" step="1"></div>
+            <div class="field"><label>Precio de venta (P, €)</label><input type="number" id="precioP" value="50" min="1" step="1"></div>
+          </div>
+          <div class="hint" id="econHint">Ganancia marginal (P−C) = 30 € · Pérdida marginal (C) = 20 €</div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>Simulación Monte Carlo</summary>
+        <div class="acc-body">
+          <div class="field">
+            <div class="field-row"><label>Días simulados (nsim)</label><span class="val mono" id="outNsimB">20,000</span></div>
+            <input type="range" id="nsimB" min="1000" max="100000" value="20000" step="1000">
+          </div>
+        </div>
+      </details>
+
+      <div class="btn-row">
+        <button class="btn primary" id="runB">▶ Simular</button>
+      </div>
+      <button class="btn ghost" id="resetB">Restablecer valores por defecto</button>
+    </aside>
+
+    <aside class="sidebar" id="sidebarC" hidden>
+      <details class="acc" open>
+        <summary>k a analizar</summary>
+        <div class="acc-body">
+          <select id="sensK">
+            <option value="11">P(D ≥ 11) — ¿pasar de 10 a 11?</option>
+            <option value="12" selected>P(D ≥ 12) — ¿pasar de 11 a 12?</option>
+            <option value="13">P(D ≥ 13) — ¿pasar de 12 a 13?</option>
+          </select>
+          <div class="hint">La tabla de más abajo evalúa los tres pasos a la vez; este selector solo cambia el gráfico de convergencia.</div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>Qué variar</summary>
+        <div class="acc-body">
+          <div class="grid2">
+            <div class="field"><label>nsim mín.</label><input type="number" id="sensNsimMin" value="200" min="50" max="5000" step="50"></div>
+            <div class="field"><label>nsim máx.</label><input type="number" id="sensNsimMax" value="50000" min="500" max="200000" step="500"></div>
+          </div>
+          <div class="hint">Número de días de demanda simulados.</div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>Puntos y réplicas</summary>
+        <div class="acc-body">
+          <div class="field">
+            <div class="field-row"><label>Puntos a evaluar</label><span class="val mono" id="outSensPoints">6</span></div>
+            <input type="range" id="sensPoints" min="4" max="7" value="6" step="1">
+          </div>
+          <div class="field">
+            <div class="field-row"><label>Réplicas por punto (semillas)</label><span class="val mono" id="outSensReplicas">5</span></div>
+            <input type="range" id="sensReplicas" min="1" max="8" value="5" step="1">
+          </div>
+          <div class="hint">Los puntos se espacian logarítmicamente. Cada réplica relanza la simulación con una semilla distinta.</div>
+        </div>
+      </details>
+
+      <div class="btn-row">
+        <button class="btn primary" id="runC">▶ Analizar sensibilidad</button>
+      </div>
+      <button class="btn ghost" id="resetC">Restablecer valores por defecto</button>
+    </aside>
+
+    <!-- ============ MAIN DECK ============ -->
+    <main class="deck">
+
+      <section id="viewA">
+        <div class="section-title"><h2>Un día de venta</h2><span class="n mono" id="aLabel">Transformada inversa discreta</span></div>
+        <div class="card" style="margin-top:10px;">
+          <h3>De una uniforme a una decisión de inventario</h3>
+          <div class="sub">Cambia U o el nivel de inventario a probar, y observa cuántas cajas se venden, cuántas se tiran y el beneficio del día. Las probabilidades y la economía se editan en la pestaña Simulación.</div>
+          <div class="kpi-grid" id="kpiRowA"></div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <h3>Distribución empírica de la demanda</h3>
+          <div class="sub">Campaña anterior. En gris, el tramo de la acumulada donde ha caído U.</div>
+          <div class="overflow-x">
+            <table class="data" id="tableDemandaA"></table>
+          </div>
+        </div>
+
+        <div class="section-title" style="margin-top:22px;"><h2>Cómo funciona la decisión</h2></div>
+        <div class="steps" style="margin-top:10px;">
+          <div class="step">
+            <div class="num">1 · GENERAR (TRANSFORMADA INVERSA DISCRETA)</div>
+            <p>Se genera <span class="f">u ~ U(0,1)</span> y se localiza el primer tramo de la acumulada empírica <span class="f">F(d)</span> tal que <span class="f">u ≤ F(d)</span>: esa es la demanda del día.</p>
+          </div>
+          <div class="step">
+            <div class="num">2 · CLASIFICAR (OFERTA VS. DEMANDA)</div>
+            <p>Si <span class="f">oferta ≤ demanda</span>, se vende todo lo almacenado (y queda demanda sin servir). Si <span class="f">oferta &gt; demanda</span>, se vende la demanda y se tira el resto.</p>
+          </div>
+          <div class="step">
+            <div class="num">3 · VALORAR</div>
+            <p>Beneficio = cajas vendidas × 30€ − cajas tiradas × 20€. Repetido muchos días, el beneficio medio converge al valor esperado de cada nivel de inventario.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="viewB" hidden>
+        <div class="section-title"><h2>Beneficio esperado por nivel de inventario</h2><span class="n mono" id="bLabel">n = 20,000 días</span></div>
+        <div class="kpi-grid" id="kpiRowB"></div>
+
+        <div class="charts-row" style="margin-top:14px;">
+          <div class="card">
+            <h3>Beneficio esperado — MC vs. teórico</h3>
+            <div class="sub">Un par de barras por nivel de inventario. El nivel recomendado se resalta en verde.</div>
+            <canvas id="chartNiveles" height="260"></canvas>
+          </div>
+          <div class="card">
+            <h3>Distribución del beneficio diario</h3>
+            <div class="sub">Al nivel recomendado (<span id="histNivelLbl">12</span> cajas), beneficio de cada uno de los <span id="histNDias">20,000</span> días simulados.</div>
+            <canvas id="histBeneficio" height="260"></canvas>
+          </div>
+        </div>
+
+        <div class="section-title" style="margin-top:6px;"><h2>Vía A — Matriz de beneficios</h2></div>
+        <div class="card" style="margin-top:10px;">
+          <h3>Simulación Monte Carlo frente al valor teórico</h3>
+          <div class="sub">E[Beneficio(oferta)] = Σ Beneficio(oferta, demanda) × P(D = demanda), para cada nivel de inventario.</div>
+          <div class="overflow-x">
+            <table class="data" id="tableNiveles"></table>
+          </div>
+          <div class="hint" id="nivelesReadout" style="margin-top:10px;"></div>
+        </div>
+      </section>
+
+      <section id="viewC" hidden>
+        <div class="section-title"><h2>Vía B — Análisis marginal</h2><span class="n mono" id="cLabel">sin ejecutar</span></div>
+        <div class="kpi-grid" id="kpiRowC" style="margin-top:10px;"></div>
+
+        <div class="charts-row" style="margin-top:14px;">
+          <div class="card">
+            <h3>Convergencia hacia el valor teórico</h3>
+            <div class="sub">Puntos claros: media de cada réplica (semilla). Punto sólido: media combinada. Línea discontinua: valor teórico exacto.</div>
+            <canvas id="sensConverge" height="280"></canvas>
+          </div>
+          <div class="card">
+            <h3>Variabilidad entre réplicas (σ entre semillas)</h3>
+            <div class="sub">Cuánto cambia la estimación solo por cambiar la semilla, para cada n probado.</div>
+            <canvas id="sensVariability" height="280"></canvas>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <h3>¿Merece la pena comprar una caja más?</h3>
+          <div class="sub">Se aumenta el inventario de k−1 a k si P(D≥k) × ganancia marginal &gt; [1 − P(D≥k)] × pérdida marginal.</div>
+          <div class="overflow-x">
+            <table class="data" id="tableMarginal"></table>
+          </div>
+          <div class="hint" id="marginalReadout" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <h3>Tabla de barrido</h3>
+          <div class="sub">Convergencia de P(D≥k) para el k seleccionado arriba, al crecer el número de días simulados.</div>
+          <div class="overflow-x">
+            <table class="data" id="tableSens"></table>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        Simulación Monte Carlo 100% en el navegador (sin servidor): la demanda diaria se genera por transformada inversa discreta a partir de la distribución empírica de la campaña anterior. Los intervalos de confianza al 95% se estiman con el error estándar de la media (o de la proporción) sobre las réplicas; los valores teóricos se calculan de forma exacta a partir de esa misma distribución. Basado en el Estudio de caso «El Distribuidor de Fresas» de «B-70. Distribuciones derivadas», Javier Morales y Asun Martínez Mayoral, equipo IA4LEGOS (CC BY-SA 4.0).
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ========================= RNG ========================= */
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let rnd = mulberry32((Date.now() ^ (Math.random()*1e9)) >>> 0);
+function reseed(){ rnd = mulberry32((Date.now() ^ (Math.random()*1e9)) >>> 0); }
+
+/* ========================= STATS HELPERS ========================= */
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function mean(arr){ let s=0; for(let i=0;i<arr.length;i++) s+=arr[i]; return s/arr.length; }
+function variance(arr){ const m=mean(arr); let s=0; for(let i=0;i<arr.length;i++){ const d=arr[i]-m; s+=d*d; } return s/(arr.length-1); }
+function sd(arr){ return Math.sqrt(variance(arr)); }
+function mcEstim(arr){
+  const m = mean(arr), s = sd(arr), se = s/Math.sqrt(arr.length);
+  return { point:m, lo:m-1.96*se, hi:m+1.96*se, se };
+}
+const fmtPct = (v,d=1)=> (v*100).toFixed(d) + "%";
+const fmtEUR = (v)=> Math.round(v).toLocaleString("es-ES") + " €";
+const fmtCajas = (v)=> Math.round(v).toLocaleString("es-ES") + " cajas";
+
+/* ========================= PROBLEM CORE ========================= */
+function readDemandData(){
+  const g = id => document.getElementById(id);
+  const cajas = [10,11,12,13];
+  const dias = [
+    parseFloat(g("dias10").value) || 0,
+    parseFloat(g("dias11").value) || 0,
+    parseFloat(g("dias12").value) || 0,
+    parseFloat(g("dias13").value) || 0
+  ];
+  const total = dias.reduce((a,b)=>a+b,0) || 1;
+  const probs = dias.map(d=>d/total);
+  return { cajas, dias, probs, total };
+}
+function readEconomia(){
+  const C = parseFloat(document.getElementById("costeC").value) || 0;
+  const P = parseFloat(document.getElementById("precioP").value) || 0;
+  const MP = Math.max(0, P-C), ML = Math.max(0, C);
+  return { C, P, MP, ML, criticalRatio: (MP+ML)>0 ? ML/(MP+ML) : 0 };
+}
+function updateProbLabels(){
+  const data = readDemandData();
+  data.cajas.forEach((c,i)=>{ document.getElementById("prob"+c).textContent = data.probs[i].toFixed(3); });
+  const econ = readEconomia();
+  document.getElementById("econHint").textContent =
+    `Ganancia marginal (P−C) = ${econ.MP} € · Pérdida marginal (C) = ${econ.ML} €`;
+}
+function sampleDemand(data){
+  const u = rnd();
+  let cum = 0;
+  for(let i=0;i<data.cajas.length;i++){
+    cum += data.probs[i];
+    if(u <= cum) return data.cajas[i];
+  }
+  return data.cajas[data.cajas.length-1];
+}
+function profitFor(oferta, demanda, econ){
+  if(oferta <= demanda) return oferta*econ.MP;
+  return demanda*econ.MP - (oferta-demanda)*econ.ML;
+}
+function teoricoNivel(oferta, data, econ){
+  let e = 0;
+  for(let i=0;i<data.cajas.length;i++) e += profitFor(oferta, data.cajas[i], econ) * data.probs[i];
+  return e;
+}
+function teoricoPDge(k, data){
+  let p = 0;
+  for(let i=0;i<data.cajas.length;i++) if(data.cajas[i] >= k) p += data.probs[i];
+  return p;
+}
+
+/* ========================= TAB A: MECANISMO ========================= */
+function renderTabA(){
+  const g = id => document.getElementById(id);
+  const data = readDemandData();
+  const econ = readEconomia();
+  const u = parseFloat(g("mecUd").value)/100;
+  const nivel = parseInt(g("mecNivel").value);
+
+  let cum=0, demanda=data.cajas[data.cajas.length-1], idxHit=data.cajas.length-1;
+  for(let i=0;i<data.cajas.length;i++){
+    cum += data.probs[i];
+    if(u <= cum + 1e-9){ demanda = data.cajas[i]; idxHit = i; break; }
+  }
+
+  const vendidas = Math.min(nivel, demanda);
+  const tiradas = Math.max(0, nivel-demanda);
+  const noServidas = Math.max(0, demanda-nivel);
+  const beneficio = profitFor(nivel, demanda, econ);
+
+  const kpiRow = document.getElementById("kpiRowA");
+  kpiRow.innerHTML = "";
+  kpiRow.appendChild(tile("Demanda simulada", fmtCajas(demanda), null, "", `U = ${u.toFixed(2)}`));
+  kpiRow.appendChild(tile("Nivel almacenado", fmtCajas(nivel), null, "", null));
+  kpiRow.appendChild(tile("Cajas vendidas", fmtCajas(vendidas), null, "", null));
+  kpiRow.appendChild(tile("Cajas tiradas", fmtCajas(tiradas), null, tiradas>0?"crit":"", "sobrante almacenado"));
+  kpiRow.appendChild(tile("Cajas no servidas", fmtCajas(noServidas), null, noServidas>0?"warn":"", "demanda no atendida"));
+  kpiRow.appendChild(tile("Beneficio del día", fmtEUR(beneficio), null, "good", null));
+
+  let rows = `<tr><th>Cajas vendidas</th><th>Núm. días</th><th>Probabilidad</th><th>Acumulada</th></tr>`;
+  let cum2 = 0;
+  data.cajas.forEach((c,i)=>{
+    cum2 += data.probs[i];
+    const hl = i===idxHit;
+    rows += `<tr${hl?' style="background:var(--surface-2);font-weight:600;"':''}><td>${c}</td><td>${data.dias[i]}</td><td>${data.probs[i].toFixed(3)}</td><td>${cum2.toFixed(3)}</td></tr>`;
+  });
+  document.getElementById("tableDemandaA").innerHTML = rows;
+}
+
+/* ========================= TAB B: SIMULACIÓN (VÍA A) ========================= */
+let lastB = null;
+
+function readConfigB(){
+  const nsim = Math.round(parseFloat(document.getElementById("nsimB").value));
+  const data = readDemandData();
+  const econ = readEconomia();
+  return { nsim, data, econ };
+}
+
+function runTabB(){
+  reseed();
+  const cfg = readConfigB();
+  const D = new Int32Array(cfg.nsim);
+  for(let i=0;i<cfg.nsim;i++) D[i] = sampleDemand(cfg.data);
+
+  const niveles = cfg.data.cajas.map(q=>{
+    const profits = new Float64Array(cfg.nsim);
+    for(let i=0;i<cfg.nsim;i++) profits[i] = profitFor(q, D[i], cfg.econ);
+    const mc = mcEstim(Array.from(profits));
+    const teo = teoricoNivel(q, cfg.data, cfg.econ);
+    return { q, mc, teo, profits };
+  });
+  let best = niveles[0];
+  niveles.forEach(n=>{ if(n.mc.point > best.mc.point) best = n; });
+
+  lastB = { cfg, niveles, best };
+  renderTabB();
+}
+
+function renderTabB(){
+  const { cfg, niveles, best } = lastB;
+
+  document.getElementById("bLabel").textContent = "n = " + cfg.nsim.toLocaleString("es-ES") + " días";
+  document.getElementById("histNivelLbl").textContent = best.q;
+  document.getElementById("histNDias").textContent = cfg.nsim.toLocaleString("es-ES");
+
+  let peor = niveles[0];
+  niveles.forEach(n=>{ if(n.mc.point < peor.mc.point) peor = n; });
+
+  const kpiRow = document.getElementById("kpiRowB");
+  kpiRow.innerHTML = "";
+  kpiRow.appendChild(tile("Nivel recomendado (MC)", fmtCajas(best.q), null, "good", "mayor beneficio esperado simulado"));
+  kpiRow.appendChild(tile("Beneficio esperado (MC)", fmtEUR(best.mc.point), `IC95%: [${fmtEUR(best.mc.lo)}, ${fmtEUR(best.mc.hi)}]`, "", `al nivel de ${best.q} cajas`));
+  kpiRow.appendChild(tile("Beneficio esperado — teórico", fmtEUR(best.teo), null, "", "mismo nivel, valor exacto"));
+  kpiRow.appendChild(tile("Ganancia por elegir el óptimo", fmtEUR(best.mc.point-peor.mc.point), null, "good", `frente al peor nivel probado (${peor.q} cajas)`));
+
+  drawComparisonBars(document.getElementById("chartNiveles"), niveles, best.q);
+  drawHistogramProfit(document.getElementById("histBeneficio"), Array.from(best.profits), best.mc.point);
+
+  let rows = `<tr><th>Nivel (cajas)</th><th>Beneficio MC</th><th>IC95%</th><th>Teórico</th><th>MC − Teórico</th></tr>`;
+  niveles.forEach(n=>{
+    const hl = n.q===best.q;
+    rows += `<tr${hl?' style="background:var(--surface-2);font-weight:600;"':''}><td>${n.q}</td><td>${fmtEUR(n.mc.point)}</td>`+
+      `<td>[${fmtEUR(n.mc.lo)}, ${fmtEUR(n.mc.hi)}]</td><td>${fmtEUR(n.teo)}</td><td>${fmtEUR(n.mc.point-n.teo)}</td></tr>`;
+  });
+  document.getElementById("tableNiveles").innerHTML = rows;
+
+  document.getElementById("nivelesReadout").textContent =
+    `El mayor beneficio esperado se obtiene almacenando ${best.q} cajas (${fmtEUR(best.mc.point)} frente a ${fmtEUR(peor.mc.point)} en el peor nivel probado, ${peor.q} cajas).`;
+}
+
+/* ========================= TAB C: SENSIBILIDAD (VÍA B) ========================= */
+function logSpace(mn,mx,n){ const out=[]; for(let i=0;i<n;i++){ const v = n===1?mn: mn*Math.pow(mx/mn, i/(n-1)); out.push(Math.max(1,Math.round(v))); } return out; }
+
+function readConfigC(){
+  const g = id => document.getElementById(id);
+  const points = clamp(Math.round(parseFloat(g("sensPoints").value)), 4, 7);
+  const replicas = clamp(Math.round(parseFloat(g("sensReplicas").value)), 1, 8);
+  const kSel = parseInt(g("sensK").value);
+  const data = readDemandData();
+  const econ = readEconomia();
+  const mn = clamp(parseFloat(g("sensNsimMin").value), 50, 5000);
+  const mx = clamp(parseFloat(g("sensNsimMax").value), Math.max(mn+1,500), 200000);
+  const values = logSpace(mn, mx, points);
+  return { kSel, data, econ, values, replicas };
+}
+
+let lastC = null;
+
+function runSensitivity(){
+  const cfg = readConfigC();
+  const teoVal = teoricoPDge(cfg.kSel, cfg.data);
+
+  const points = cfg.values.map(n=>{
+    const replicaMeans = [];
+    let totalSum = 0;
+    for(let r=0;r<cfg.replicas;r++){
+      reseed();
+      let c=0;
+      for(let i=0;i<n;i++){ if(sampleDemand(cfg.data) >= cfg.kSel) c++; }
+      const m = c/n;
+      replicaMeans.push(m); totalSum += m;
+    }
+    const pooledMean = totalSum/cfg.replicas;
+    const betweenSD = cfg.replicas>1 ? sd(replicaMeans) : 0;
+    const pooledSE = betweenSD/Math.sqrt(Math.max(1,cfg.replicas));
+    return { x:n, replicaMeans, pooledMean, lo:pooledMean-1.96*pooledSE, hi:pooledMean+1.96*pooledSE, betweenSD, teo:teoVal };
+  });
+
+  const nFull = cfg.values[cfg.values.length-1];
+  const marginalRows = [11,12,13].map(k=>{
+    reseed();
+    const arr = new Uint8Array(nFull);
+    for(let i=0;i<nFull;i++) arr[i] = sampleDemand(cfg.data) >= k ? 1 : 0;
+    const mcP = mcEstim(Array.from(arr));
+    const teoP = teoricoPDge(k, cfg.data);
+    const gananciaMarg = mcP.point * cfg.econ.MP;
+    const perdidaMarg = (1-mcP.point) * cfg.econ.ML;
+    const decision = gananciaMarg > perdidaMarg;
+    return { k, mcP, teoP, gananciaMarg, perdidaMarg, decision };
+  });
+
+  lastC = { cfg, points, teo: teoVal, marginalRows, criticalRatio: cfg.econ.criticalRatio };
+  renderSensitivity();
+}
+
+function renderSensitivity(){
+  const { cfg, points, marginalRows, criticalRatio } = lastC;
+  document.getElementById("cLabel").textContent = points.length + " configuraciones · " + cfg.replicas + " réplicas c/u · P(D≥" + cfg.kSel + ")";
+
+  const kRow = marginalRows.find(r=>r.k===cfg.kSel);
+
+  const kpiRow = document.getElementById("kpiRowC");
+  kpiRow.innerHTML = "";
+  kpiRow.appendChild(tile("Ratio crítico (ML/(MP+ML))", fmtPct(criticalRatio), null, "", "se aumenta el inventario mientras P(D≥k) lo supere"));
+  kpiRow.appendChild(tile(`P(D≥${cfg.kSel}) — MC`, fmtPct(kRow.mcP.point), `IC95%: [${fmtPct(kRow.mcP.lo)}, ${fmtPct(kRow.mcP.hi)}]`, "", null));
+  kpiRow.appendChild(tile(`P(D≥${cfg.kSel}) — teórico`, fmtPct(kRow.teoP), null, "", null));
+  kpiRow.appendChild(tile("Decisión", kRow.decision?"Aumentar":"No aumentar", null, kRow.decision?"good":"crit", kRow.decision?`compensa pasar a ${cfg.kSel} cajas`:`no compensa pasar a ${cfg.kSel} cajas`));
+
+  drawSensitivityScatter(document.getElementById("sensConverge"), points, fmtPct);
+  drawBarChart(document.getElementById("sensVariability"), points.map(pt=>({
+    label: "n="+pt.x.toLocaleString("es-ES"), value: pt.betweenSD, color: "var(--accent)"
+  })), { fmt: fmtPct });
+
+  let rowsM = `<tr><th>k</th><th>P(D≥k) MC</th><th>IC95%</th><th>Teórico</th><th>Ganancia marg. esp.</th><th>Pérdida marg. esp.</th><th>Decisión</th></tr>`;
+  marginalRows.forEach(r=>{
+    const hl = r.k===cfg.kSel;
+    const decColor = r.decision ? "var(--good)" : "var(--critical)";
+    rowsM += `<tr${hl?' style="background:var(--surface-2);font-weight:600;"':''}><td>${r.k}</td><td>${fmtPct(r.mcP.point)}</td>`+
+      `<td>[${fmtPct(r.mcP.lo)}, ${fmtPct(r.mcP.hi)}]</td><td>${fmtPct(r.teoP)}</td>`+
+      `<td>${fmtEUR(r.gananciaMarg)}</td><td>${fmtEUR(r.perdidaMarg)}</td>`+
+      `<td style="color:${decColor};font-weight:600;">${r.decision?"Aumentar":"Parar"}</td></tr>`;
+  });
+  document.getElementById("tableMarginal").innerHTML = rowsM;
+
+  let rec = 10;
+  for(const r of marginalRows){ if(r.decision) rec = r.k; else break; }
+  document.getElementById("marginalReadout").textContent =
+    `Conviene aumentar el inventario mientras P(D≥k) supere el ratio crítico (${fmtPct(criticalRatio)}). Con estos datos, el análisis marginal recomienda almacenar ${rec} cajas: contrástalo con el nivel óptimo de la pestaña Simulación (Vía A), que debería coincidir.`;
+
+  let rows = `<tr><th>n (días)</th><th>Media combinada</th><th>IC95%</th><th>σ entre réplicas</th><th>Teórico</th></tr>`;
+  points.forEach(pt=>{
+    rows += `<tr><td>${pt.x.toLocaleString("es-ES")}</td><td>${fmtPct(pt.pooledMean)}</td>`+
+      `<td>[${fmtPct(pt.lo)}, ${fmtPct(pt.hi)}]</td><td>${fmtPct(pt.betweenSD)}</td><td>${fmtPct(pt.teo)}</td></tr>`;
+  });
+  document.getElementById("tableSens").innerHTML = rows;
+}
+
+/* ========================= CHARTS (canvas, no deps) ========================= */
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || name; }
+function resolveColor(c){ return c && c.startsWith("var(") ? cssVar(c.slice(4,-1)) : c; }
+
+function setupCanvas(canvas){
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || canvas.parentElement.clientWidth || 300;
+  const h = canvas.clientHeight || parseInt(canvas.getAttribute("height")) || 220;
+  canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return { ctx, w, h };
+}
+
+function tile(label, valueHTML, ciText, cls, noteText){
+  const d = document.createElement("div");
+  d.className = "tile" + (cls? " "+cls: "");
+  d.innerHTML = `<div class="lbl">${label}</div><div class="val">${valueHTML}</div>` +
+    (ciText? `<div class="ci">${ciText}</div>`:"") + (noteText? `<div class="note">${noteText}</div>`:"");
+  return d;
+}
+
+function roundRectTop(ctx,x,y,width,height,r){
+  ctx.beginPath();
+  ctx.moveTo(x, y+height);
+  ctx.lineTo(x, y+r);
+  ctx.arcTo(x,y,x+r,y,r);
+  ctx.lineTo(x+width-r,y);
+  ctx.arcTo(x+width,y,x+width,y+r,r);
+  ctx.lineTo(x+width,y+height);
+  ctx.closePath();
+}
+
+function drawComparisonBars(canvas, niveles, bestQ){
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:62, r:14, t:26, b:34};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const allVals = niveles.flatMap(n=>[n.mc.point, n.teo]);
+  const minV = Math.min(0, ...allVals), maxV = Math.max(...allVals)*1.1;
+  const range = (maxV-minV) || 1;
+  const n = niveles.length;
+  const groupGap = 22;
+  const groupW = (plotW - groupGap*(n-1)) / n;
+  const barGap = 6;
+  const barW = (groupW-barGap)/2;
+  const muted = cssVar("--text-muted"), gridColor = cssVar("--grid"), accent = cssVar("--accent"), accent2 = cssVar("--accent-2"), good = cssVar("--good"), text = cssVar("--text");
+  const zeroY = pad.t + plotH*(1-(0-minV)/range);
+
+  ctx.strokeStyle = gridColor; ctx.lineWidth = 1; ctx.font = "12px " + cssVar("--font-mono"); ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let i=0;i<=4;i++){
+    const v = minV + range*i/4;
+    const y = pad.t + plotH*(1-(v-minV)/range);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w-pad.r, y); ctx.stroke();
+    ctx.fillText(Math.round(v).toLocaleString("es-ES"), pad.l-6, y);
+  }
+  ctx.strokeStyle = gridColor; ctx.beginPath(); ctx.moveTo(pad.l, zeroY); ctx.lineTo(w-pad.r, zeroY); ctx.stroke();
+
+  niveles.forEach((nvl,i)=>{
+    const gx = pad.l + i*(groupW+groupGap);
+    const isBest = nvl.q===bestQ;
+
+    const mcH = plotH*((nvl.mc.point-minV)/range);
+    ctx.fillStyle = isBest ? good : accent;
+    roundRectTop(ctx, gx, pad.t+plotH-mcH, barW, mcH, 4); ctx.fill();
+
+    const teoH = plotH*((nvl.teo-minV)/range);
+    ctx.fillStyle = accent2; ctx.globalAlpha = 0.85;
+    roundRectTop(ctx, gx+barW+barGap, pad.t+plotH-teoH, barW, teoH, 4); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = text; ctx.font = "600 11px " + cssVar("--font-mono"); ctx.textAlign="center"; ctx.textBaseline="bottom";
+    ctx.fillText(Math.round(nvl.mc.point).toLocaleString("es-ES"), gx+barW/2, pad.t+plotH-mcH-4);
+    ctx.fillText(Math.round(nvl.teo).toLocaleString("es-ES"), gx+barW+barGap+barW/2, pad.t+plotH-teoH-4);
+
+    ctx.fillStyle = muted; ctx.font = "13px " + cssVar("--font-body"); ctx.textBaseline="top";
+    ctx.fillText(nvl.q+" cajas", gx+groupW/2, pad.t+plotH+8);
+  });
+
+  ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.font="12px " + cssVar("--font-mono");
+  ctx.fillStyle = accent; ctx.fillRect(pad.l, 6, 10, 10);
+  ctx.fillStyle = muted; ctx.fillText("MC", pad.l+14, 11);
+  ctx.fillStyle = accent2; ctx.fillRect(pad.l+56, 6, 10, 10);
+  ctx.fillStyle = muted; ctx.fillText("Teórico", pad.l+70, 11);
+}
+
+function drawHistogramProfit(canvas, values, meanVal){
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:60, r:14, t:14, b:32};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const minV = Math.min(...values), maxV = Math.max(...values);
+  const range = (maxV-minV) || 1;
+  const bins = 30;
+  const counts = new Array(bins).fill(0);
+  for(const v of values){ const bi = Math.min(bins-1, Math.max(0, Math.floor((v-minV)/range*bins))); counts[bi]++; }
+  const maxCount = Math.max(...counts);
+  const gridColor = cssVar("--grid"), muted = cssVar("--text-muted"), accent = cssVar("--accent"), text = cssVar("--text");
+  ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
+  ctx.font = "13px " + cssVar("--font-mono"); ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let i=0;i<=4;i++){
+    const y = pad.t + plotH - (plotH*i/4);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w-pad.r, y); ctx.stroke();
+    ctx.fillText(Math.round(maxCount*i/4).toString(), pad.l-6, y);
+  }
+  const barW = plotW/bins;
+  ctx.fillStyle = accent; ctx.globalAlpha = 0.8;
+  for(let i=0;i<bins;i++){
+    const bh = plotH * (counts[i]/maxCount);
+    ctx.fillRect(pad.l+i*barW+1, pad.t+plotH-bh, Math.max(1,barW-2), bh);
+  }
+  ctx.globalAlpha = 1;
+  const xMean = pad.l + plotW*((meanVal-minV)/range);
+  ctx.strokeStyle = text; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(xMean, pad.t); ctx.lineTo(xMean, pad.t+plotH); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = text; ctx.textAlign="center"; ctx.font="600 11.5px " + cssVar("--font-mono");
+  ctx.fillText("media=" + Math.round(meanVal).toLocaleString("es-ES") + "€", xMean, pad.t-2);
+  ctx.fillStyle = muted; ctx.textAlign="center"; ctx.textBaseline="top"; ctx.font="12px " + cssVar("--font-mono");
+  for(let i=0;i<=4;i++){
+    const x = pad.l + plotW*i/4;
+    ctx.fillText(Math.round(minV + range*i/4).toLocaleString("es-ES")+"€", x, pad.t+plotH+10);
+  }
+}
+
+function drawBarChart(canvas, items, opts){
+  opts = opts || {};
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:14, r:14, t:16, b:34};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const vals = items.map(d=>d.value);
+  const minVal = Math.min(0, ...vals), maxVal = Math.max(...vals, 1e-9);
+  const range = (maxVal-minVal) || 1;
+  const n = items.length;
+  const gap = 18;
+  const barW = (plotW - gap*(n-1)) / n;
+  const gridColor = cssVar("--grid"), muted = cssVar("--text-muted"), text = cssVar("--text");
+  const zeroY = pad.t + plotH*(1-(0-minVal)/range);
+  ctx.strokeStyle = gridColor; ctx.beginPath(); ctx.moveTo(pad.l, zeroY); ctx.lineTo(w-pad.r, zeroY); ctx.stroke();
+  items.forEach((it,i)=>{
+    const x = pad.l + i*(barW+gap);
+    const topY = pad.t + plotH*(1-(it.value-minVal)/range);
+    const bh = Math.max(2, zeroY-topY);
+    const color = resolveColor(it.color);
+    ctx.fillStyle = color;
+    roundRectTop(ctx, x, Math.min(topY,zeroY), barW, bh, 4);
+    ctx.fill();
+    ctx.fillStyle = text; ctx.textAlign="center"; ctx.font="600 13px " + cssVar("--font-mono");
+    ctx.fillText(opts.fmt ? opts.fmt(it.value) : it.value, x+barW/2, Math.min(topY,zeroY)-8);
+    ctx.fillStyle = muted; ctx.font="13px " + cssVar("--font-body"); ctx.textBaseline="top";
+    ctx.fillText(String(it.label), x+barW/2, pad.t+plotH+6);
+  });
+}
+
+function drawSensitivityScatter(canvas, points, fmt){
+  fmt = fmt || fmtPct;
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:66, r:18, t:18, b:40};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const allVals = points.flatMap(pt=>pt.replicaMeans.concat([pt.teo]));
+  const minV = Math.min(...allVals), maxV = Math.max(...allVals);
+  const span = (maxV-minV) || Math.max(1,Math.abs(minV)*0.1);
+  const yMin = minV - span*0.12, yMax = maxV + span*0.12;
+  const yPix = v => pad.t + plotH*(1-(v-yMin)/(yMax-yMin));
+  const n = points.length;
+  const xPix = i => pad.l + (n<=1 ? plotW/2 : plotW*i/(n-1));
+
+  const muted = cssVar("--text-muted"), grid = cssVar("--grid"), accent = cssVar("--accent");
+
+  ctx.strokeStyle = grid; ctx.lineWidth = 1; ctx.font = "12px " + cssVar("--font-mono"); ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let i=0;i<=4;i++){
+    const v = yMin + (yMax-yMin)*i/4;
+    const py = yPix(v);
+    ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(w-pad.r, py); ctx.stroke();
+    ctx.fillText(fmt(v), pad.l-6, py);
+  }
+
+  ctx.strokeStyle = muted; ctx.setLineDash([5,4]); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  points.forEach((pt,i)=>{ const x=xPix(i), y=yPix(pt.teo); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke(); ctx.setLineDash([]);
+
+  points.forEach((pt,i)=>{
+    const x = xPix(i);
+    const ys = pt.replicaMeans.map(yPix);
+    if(ys.length>1){
+      ctx.strokeStyle = muted; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, Math.min(...ys)); ctx.lineTo(x, Math.max(...ys)); ctx.stroke();
+    }
+    ctx.fillStyle = accent; ctx.globalAlpha = 0.45;
+    ys.forEach(y=>{ ctx.beginPath(); ctx.arc(x,y,2.6,0,Math.PI*2); ctx.fill(); });
+    ctx.globalAlpha = 1;
+  });
+
+  ctx.strokeStyle = accent; ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  points.forEach((pt,i)=>{ const x=xPix(i), y=yPix(pt.pooledMean); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+  points.forEach((pt,i)=>{
+    const x=xPix(i), y=yPix(pt.pooledMean);
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.arc(x,y,4.5,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = cssVar("--surface"); ctx.lineWidth=1.5; ctx.stroke();
+  });
+
+  ctx.fillStyle = muted; ctx.font = "12px " + cssVar("--font-mono"); ctx.textAlign="center"; ctx.textBaseline="top";
+  points.forEach((pt,i)=> ctx.fillText("n="+pt.x.toLocaleString("es-ES"), xPix(i), pad.t+plotH+8));
+}
+
+/* ========================= UI WIRING ========================= */
+function wireLiveReadout(rangeId, outId, suffix, fmt){
+  const el = document.getElementById(rangeId);
+  const out = document.getElementById(outId);
+  el.addEventListener("input", ()=>{ out.textContent = (fmt?fmt(el.value):Number(el.value).toLocaleString("es-ES")) + (suffix||""); });
+}
+
+function withLoading(fn){
+  const overlay = document.getElementById("loadingOverlay");
+  overlay.classList.add("show");
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{
+    try{ fn(); } finally { overlay.classList.remove("show"); }
+  }));
+}
+
+function redrawVisible(){
+  if(!document.getElementById("viewA").hidden) renderTabA();
+  if(!document.getElementById("viewB").hidden && lastB) renderTabB();
+  if(!document.getElementById("viewC").hidden && lastC) renderSensitivity();
+}
+
+function switchTab(which){
+  const tabs = { a:["tabBtnA","sidebarA","viewA"], b:["tabBtnB","sidebarB","viewB"], c:["tabBtnC","sidebarC","viewC"] };
+  Object.keys(tabs).forEach(k=>{
+    const [btnId, sideId, viewId] = tabs[k];
+    const active = k===which;
+    document.getElementById(btnId).classList.toggle("active", active);
+    document.getElementById(sideId).hidden = !active;
+    document.getElementById(viewId).hidden = !active;
+  });
+  if(which==="a") renderTabA();
+  if(which==="b" && !lastB) runTabB();
+  if(which==="c" && lastC) renderSensitivity();
+}
+
+document.getElementById("tabBtnA").addEventListener("click", ()=>switchTab("a"));
+document.getElementById("tabBtnB").addEventListener("click", ()=>switchTab("b"));
+document.getElementById("tabBtnC").addEventListener("click", ()=>switchTab("c"));
+
+document.getElementById("themeToggle").addEventListener("click", ()=>{
+  const root = document.documentElement;
+  const cur = root.getAttribute("data-theme");
+  const sysDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  let next;
+  if(!cur) next = sysDark ? "light" : "dark";
+  else if(cur==="dark") next = "light";
+  else next = "dark";
+  root.setAttribute("data-theme", next);
+  redrawVisible();
+});
+
+wireLiveReadout("mecUd","outUd","", v=>(v/100).toFixed(2));
+wireLiveReadout("nsimB","outNsimB","", v=>Number(v).toLocaleString("es-ES"));
+wireLiveReadout("sensPoints","outSensPoints","");
+wireLiveReadout("sensReplicas","outSensReplicas","");
+
+document.getElementById("mecUd").addEventListener("input", renderTabA);
+document.getElementById("mecNivel").addEventListener("change", renderTabA);
+
+["dias10","dias11","dias12","dias13","costeC","precioP"].forEach(id=>{
+  document.getElementById(id).addEventListener("input", ()=>{
+    updateProbLabels();
+    if(!document.getElementById("viewA").hidden) renderTabA();
+  });
+});
+
+document.getElementById("mecRandomU").addEventListener("click", ()=>{
+  document.getElementById("mecUd").value = Math.round(Math.random()*100);
+  document.getElementById("outUd").textContent = (document.getElementById("mecUd").value/100).toFixed(2);
+  renderTabA();
+});
+
+document.getElementById("runB").addEventListener("click", ()=> withLoading(runTabB));
+document.getElementById("runC").addEventListener("click", ()=> withLoading(runSensitivity));
+
+document.getElementById("sensK").addEventListener("change", ()=>{
+  if(lastC) withLoading(runSensitivity);
+});
+
+function set(id,val){ document.getElementById(id).value = val; }
+
+document.getElementById("resetA").addEventListener("click", ()=>{
+  set("mecUd",50); set("mecNivel","12");
+  document.getElementById("outUd").textContent="0.50";
+  renderTabA();
+});
+document.getElementById("resetB").addEventListener("click", ()=>{
+  set("nsimB",20000); document.getElementById("outNsimB").textContent="20,000";
+  set("dias10",15); set("dias11",20); set("dias12",40); set("dias13",25);
+  set("costeC",20); set("precioP",50);
+  updateProbLabels();
+  runTabB();
+});
+document.getElementById("resetC").addEventListener("click", ()=>{
+  set("sensK","12");
+  set("sensNsimMin",200); set("sensNsimMax",50000);
+  set("sensPoints",6); document.getElementById("outSensPoints").textContent="6";
+  set("sensReplicas",5); document.getElementById("outSensReplicas").textContent="5";
+  lastC = null;
+  document.getElementById("kpiRowC").innerHTML = "";
+  document.getElementById("tableMarginal").innerHTML = "";
+  document.getElementById("tableSens").innerHTML = "";
+  document.getElementById("cLabel").textContent = "sin ejecutar";
+  document.getElementById("marginalReadout").textContent = "";
+});
+
+window.addEventListener("resize", ()=>{ clearTimeout(window.__rzT); window.__rzT = setTimeout(redrawVisible, 120); });
+
+/* ========================= INIT ========================= */
+function init(){
+  updateProbLabels();
+  renderTabA();
+  runTabB();
+}
+init();
+
+})();
+</script>
+
+</body>
+</html>
