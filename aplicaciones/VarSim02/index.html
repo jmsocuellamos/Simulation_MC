@@ -1,0 +1,1044 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Riesgo y retorno de planes de inversión</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===================================================================
+   DESIGN PLAN
+   Layout: mission-control deck — same family as the quality-control tool
+   this pairs with (fixed instrument sidebar + scrolling telemetry main),
+   so the two teaching apps read as one series. Three tabs: the mechanism
+   (one plan, one draw), the consequence (expected return vs. risk across
+   three plans), and the sensitivity of that result to the simulation
+   engine's own settings (nsim).
+   Color: dark-first palette. --accent/--accent-2/--accent-3 are purely
+   categorical (Plan A / B / C) — risk itself is read off position on the
+   risk-return chart and off the good/warning/critical triad on the loss
+   KPI, never off which accent a plan happens to use.
+   Type: Chakra Petch (display, technical/cut-corner) for headings and
+   labels; IBM Plex Sans (body); IBM Plex Mono (data) for every number.
+   =================================================================== */
+:root{
+  color-scheme: dark;
+  --bg: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232320;
+  --surface-3: #2a2a27;
+  --text: #ffffff;
+  --text-2: #c3c2b7;
+  --text-muted: #898781;
+  --border: rgba(255,255,255,0.12);
+  --border-strong: rgba(255,255,255,0.22);
+  --grid: #2c2c2a;
+  --accent: #3987e5;
+  --accent-ink: #eaf2ff;
+  --accent-2: #d9972a;
+  --accent-3: #199e70;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #e66767;
+  --shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35);
+  --radius: 10px;
+  --font-display: "Chakra Petch", "Rajdhani", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme: light;
+    --bg: #f1f0ea; --surface: #fcfcfb; --surface-2: #f2f1ec; --surface-3: #eae8e0;
+    --text: #0b0b0b; --text-2: #52514e; --text-muted: #706f6a;
+    --border: rgba(11,11,11,0.12); --border-strong: rgba(11,11,11,0.28);
+    --grid: #e1e0d9;
+    --accent: #2a78d6; --accent-ink: #0b2f5c; --accent-2: #a9700f; --accent-3: #137a53;
+    --good: #0b7a0b; --warning: #92650a; --critical: #b23232;
+  }
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg: #f1f0ea; --surface: #fcfcfb; --surface-2: #f2f1ec; --surface-3: #eae8e0;
+  --text: #0b0b0b; --text-2: #52514e; --text-muted: #706f6a;
+  --border: rgba(11,11,11,0.12); --border-strong: rgba(11,11,11,0.28);
+  --grid: #e1e0d9;
+  --accent: #2a78d6; --accent-ink: #0b2f5c; --accent-2: #a9700f; --accent-3: #137a53;
+  --good: #0b7a0b; --warning: #92650a; --critical: #b23232;
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232320; --surface-3: #2a2a27;
+  --text: #ffffff; --text-2: #c3c2b7; --text-muted: #898781;
+  --border: rgba(255,255,255,0.12); --border-strong: rgba(255,255,255,0.22);
+  --grid: #2c2c2a;
+  --accent: #3987e5; --accent-ink: #eaf2ff; --accent-2: #d9972a; --accent-3: #199e70;
+  --good: #0ca30c; --warning: #fab219; --critical: #e66767;
+}
+
+*{box-sizing:border-box;}
+body{ background: var(--bg); color: var(--text); font-family: var(--font-body); font-size:17px; margin:0; padding-inline:16px; }
+h1,h2,h3,h4{ font-family: var(--font-display); font-weight:600; letter-spacing:.01em; margin:0; text-wrap:balance; }
+p{ margin:0; }
+.mono{ font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+button{ font-family: var(--font-body); cursor:pointer; }
+input[type="range"]{ width:100%; accent-color: var(--accent); }
+input[type="number"]{
+  font-family: var(--font-mono); background: var(--surface-2); color: var(--text);
+  border:1px solid var(--border); border-radius:6px; padding:5px 7px; width:100%;
+}
+input[type="number"]:focus, input[type="range"]:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+select{ font-family: var(--font-mono); background: var(--surface-2); color: var(--text); border:1px solid var(--border); border-radius:6px; padding:7px 8px; width:100%; }
+label{ font-size:15px; color: var(--text-2); }
+.app{ max-width:1400px; margin:0 auto; padding-block: calc(14px + env(safe-area-inset-top,0px)) 48px; }
+
+/* ---------- top bar ---------- */
+.topbar{
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  padding:14px 18px; margin-bottom:16px;
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+  border:1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.brand{ display:flex; align-items:baseline; gap:10px; margin-right:auto; }
+.brand-mark{
+  display:inline-grid; place-items:center; width:34px; height:34px; border-radius:8px;
+  background: var(--accent); color:#fff; font-size:14px; font-family:var(--font-display); font-weight:700;
+  flex-shrink:0;
+}
+.brand h1{ font-size: 23px; color:var(--text); }
+.brand .brand-sub{ font-size:15px; color:var(--text-muted); font-family:var(--font-body); margin-left:8px; }
+.tabs{ display:flex; gap:6px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:3px; flex-wrap:wrap; }
+.tab-btn{
+  font-family: var(--font-display); font-size:15px; letter-spacing:.02em; text-transform:uppercase;
+  background:transparent; border:none; color:var(--text-muted); padding:8px 13px; border-radius:6px;
+}
+.tab-btn.active{ background: var(--accent); color:#fff; }
+.icon-btn{
+  width:34px; height:34px; border-radius:8px; border:1px solid var(--border); background:var(--surface-2);
+  color:var(--text); font-size:18px; display:grid; place-items:center;
+}
+.icon-btn:hover{ border-color: var(--border-strong); }
+
+/* ---------- shell ---------- */
+.shell{ display:grid; grid-template-columns: 320px 1fr; gap:16px; align-items:start; }
+@media (max-width: 860px){ .shell{ grid-template-columns: 1fr; } }
+
+.sidebar{
+  background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
+  padding:14px; display:flex; flex-direction:column; gap:10px; box-shadow: var(--shadow);
+  position: sticky; top: calc(10px + env(safe-area-inset-top,0px));
+  max-height: calc(100vh - 20px); overflow-y:auto;
+}
+@media (max-width: 860px){ .sidebar{ position:static; max-height:none; } }
+
+.acc{ border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface-2); }
+.acc > summary{
+  list-style:none; cursor:pointer; padding:9px 11px; font-family:var(--font-display);
+  font-size:15px; letter-spacing:.03em; text-transform:uppercase; color:var(--text-2);
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+.acc > summary::-webkit-details-marker{ display:none; }
+.acc > summary::after{ content:"▸"; color:var(--text-muted); transition: transform .15s; }
+.acc[open] > summary::after{ transform: rotate(90deg); }
+.acc-body{ padding:10px 11px 12px; display:flex; flex-direction:column; gap:10px; border-top:1px solid var(--border); }
+.field{ display:flex; flex-direction:column; gap:4px; }
+.field-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.field-row .val{ font-family:var(--font-mono); font-size:15px; color:var(--accent); font-variant-numeric:tabular-nums; min-width:50px; text-align:right; }
+.subcard{ background:var(--surface-3); border:1px solid var(--border); border-radius:7px; padding:8px 9px; }
+.subcard h4{ font-size:15px; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.dot{ width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+.minitable{ width:100%; border-collapse:collapse; font-size:14px; }
+.minitable th{ font-family:var(--font-display); font-weight:600; color:var(--text-muted); text-align:center; padding:2px; font-size:12px; text-transform:uppercase; }
+.minitable td{ padding:2px; }
+.minitable input[type=number]{ padding:5px 3px; font-size:14px; text-align:center; }
+.minitable td:first-child{ color:var(--text-2); font-size:13.5px; padding-right:3px; white-space:nowrap; }
+
+.btn{
+  font-family:var(--font-display); font-size:15.5px; letter-spacing:.02em; text-transform:uppercase;
+  border-radius:8px; border:1px solid var(--border-strong); padding:11px 14px; text-align:center;
+  background:var(--surface-2); color:var(--text);
+}
+.btn.primary{ background: var(--accent); border-color:var(--accent); color:#fff; font-size:17px; padding:13px; }
+.btn.primary:hover{ filter:brightness(1.08); }
+.btn.ghost{ background:transparent; }
+.btn-row{ display:flex; gap:8px; }
+.btn-row .btn{ flex:1; }
+.hint{ font-size:14px; color:var(--text-muted); line-height:1.5; }
+
+/* ---------- main deck ---------- */
+.deck{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+.card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); min-width:0; }
+.card h3{ font-size:18.5px; margin-bottom:3px; }
+.card .sub{ font-size:15px; color:var(--text-muted); margin-bottom:12px; }
+.section-title{ display:flex; align-items:baseline; gap:10px; margin: 6px 2px 0; }
+.section-title h2{ font-size:21px; }
+.section-title .n{ font-family:var(--font-mono); font-size:14px; color:var(--text-muted); border:1px solid var(--border); padding:2px 7px; border-radius:20px; }
+
+.kpi-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(215px,1fr)); gap:10px; }
+.tile{ background:var(--surface); border:1px solid var(--border); border-radius: var(--radius); padding:14px 15px; box-shadow:var(--shadow); position:relative; overflow:hidden; min-width:0; }
+.tile::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); }
+.tile.good::before{ background:var(--good); }
+.tile.warn::before{ background:var(--warning); }
+.tile.crit::before{ background:var(--critical); }
+.tile .lbl{ font-size:13.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; font-family:var(--font-display); }
+.tile .val{ font-family:var(--font-mono); font-size:32px; font-weight:600; margin-top:4px; letter-spacing:-.01em; }
+.tile .val small{ font-size:16px; color:var(--text-muted); font-weight:400; }
+.tile .ci{ font-size:14px; color:var(--text-muted); margin-top:3px; font-family:var(--font-mono); }
+.tile .note{ font-size:13.5px; color:var(--text-muted); margin-top:5px; line-height:1.4; }
+
+.charts-row{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:760px){ .charts-row{ grid-template-columns:1fr; } }
+canvas{ width:100%; display:block; }
+
+table.data{ width:100%; border-collapse:collapse; font-size:16.5px; }
+table.data th{ text-align:right; font-family:var(--font-display); font-size:14px; text-transform:uppercase; letter-spacing:.02em; color:var(--text-muted); padding:8px 8px; border-bottom:1px solid var(--border-strong); }
+table.data th:first-child, table.data td:first-child{ text-align:left; }
+table.data td{ text-align:right; padding:8px 7px; border-bottom:1px solid var(--border); font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+table.data tr:last-child td{ border-bottom:none; }
+.pol-chip{ display:inline-flex; align-items:center; gap:6px; font-family:var(--font-body); }
+.overflow-x{ overflow-x:auto; }
+
+.steps{ display:grid; grid-template-columns: repeat(3,1fr); gap:12px; }
+@media (max-width:760px){ .steps{ grid-template-columns:1fr; } }
+.step{ background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 13px; }
+.step .num{ font-family:var(--font-display); font-size:14px; color:var(--accent); letter-spacing:.03em; }
+.step p{ font-size:16px; color:var(--text-2); margin-top:5px; line-height:1.5; }
+.step .f{ font-family:var(--font-mono); color:var(--text); font-size:16px; }
+
+footer{ margin-top:28px; padding:16px 2px 4px; border-top:1px solid var(--border); color:var(--text-muted); font-size:14.5px; line-height:1.7; }
+footer b{ color:var(--text-2); }
+
+.badge{ display:inline-block; font-family:var(--font-mono); font-size:13.5px; padding:3px 8px; border-radius:20px; border:1px solid var(--border-strong); color:var(--text-2); }
+.loading-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; place-items:center; z-index:50; backdrop-filter: blur(2px); }
+.loading-overlay.show{ display:grid; }
+.loading-box{ background:var(--surface); border:1px solid var(--border-strong); border-radius:10px; padding:18px 26px; font-family:var(--font-display); font-size:16px; letter-spacing:.03em; text-transform:uppercase; display:flex; align-items:center; gap:10px; box-shadow:var(--shadow); }
+.spinner{ width:16px; height:16px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--accent); animation: spin 0.7s linear infinite; }
+@keyframes spin{ to{ transform: rotate(360deg); } }
+[hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+
+
+<div class="loading-overlay" id="loadingOverlay"><div class="loading-box"><span class="spinner"></span> Simulando…</div></div>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">RR</span>
+      <h1>Riesgo y retorno de planes de inversión</h1>
+      <span class="brand-sub">Transformada inversa y simulación Monte Carlo</span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="a" id="tabBtnA">Mecanismo · Transformada inversa</button>
+      <button class="tab-btn" data-tab="b" id="tabBtnB">Simulación · Riesgo vs. retorno</button>
+      <button class="tab-btn" data-tab="c" id="tabBtnC">Sensibilidad · Configuración</button>
+    </nav>
+    <button class="icon-btn" id="themeToggle" title="Cambiar tema claro/oscuro">◐</button>
+  </header>
+
+  <div class="shell">
+    <!-- ============ SIDEBAR A ============ -->
+    <aside class="sidebar" id="sidebarA">
+      <details class="acc" open>
+        <summary>Plan a visualizar</summary>
+        <div class="acc-body">
+          <div class="field">
+            <label>Plan (lee sus valores y probabilidades de la pestaña Simulación)</label>
+            <select id="mecPlan">
+              <option value="A">A — retorno fijo</option>
+              <option value="B" selected>B — moderado</option>
+              <option value="C">C — agresivo</option>
+            </select>
+          </div>
+          <div class="hint" id="mecPlanHint"></div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>U de ejemplo</summary>
+        <div class="acc-body">
+          <div class="field">
+            <div class="field-row"><label>U ~ Unif(0,1)</label><span class="val mono" id="outMecU">0.55</span></div>
+            <input type="range" id="mecU" min="0" max="100" value="55" step="1">
+          </div>
+          <button class="btn" id="mecRandomU">🎲 U aleatorio</button>
+        </div>
+      </details>
+
+      <button class="btn ghost" id="resetA">Restablecer valores por defecto</button>
+    </aside>
+
+    <aside class="sidebar" id="sidebarB" hidden>
+      <details class="acc" open>
+        <summary>Simulación e inversión</summary>
+        <div class="acc-body">
+          <div class="field">
+            <div class="field-row"><label>Nº de simulaciones (nsim)</label><span class="val mono" id="outNsimB">10,000</span></div>
+            <input type="range" id="nsimB" min="1000" max="20000" value="10000" step="500">
+          </div>
+          <div class="field"><label>Inversión inicial I₀ (€)</label><input type="number" id="invI0" value="25000" min="0" step="500"></div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>Planes de inversión</summary>
+        <div class="acc-body">
+          <div class="subcard">
+            <h4><span class="dot" style="background:var(--accent)"></span>Plan A — fijo</h4>
+            <div class="field"><label>Retorno (€, prob. 100%)</label><input type="number" id="planA_val" value="27500" step="100"></div>
+          </div>
+          <div class="subcard">
+            <h4><span class="dot" style="background:var(--accent-2)"></span>Plan B — moderado</h4>
+            <div class="grid2">
+              <div class="field"><label>Retorno bajo (€)</label><input type="number" id="planB_lo" value="27000" step="100"></div>
+              <div class="field"><label>Retorno alto (€)</label><input type="number" id="planB_hi" value="28000" step="100"></div>
+            </div>
+            <div class="field" style="margin-top:6px;"><label>Prob. retorno bajo (%)</label><input type="number" id="planB_plo" value="40" min="0" max="100" step="1"></div>
+            <div class="hint">La probabilidad del retorno alto es el complementario (100 − bajo).</div>
+          </div>
+          <div class="subcard">
+            <h4><span class="dot" style="background:var(--accent-3)"></span>Plan C — agresivo</h4>
+            <table class="minitable">
+              <tr><th>Escenario</th><th>Valor (€)</th><th>Prob (%)</th></tr>
+              <tr><td>Bajo</td><td><input type="number" id="planC_v0" value="24000" step="100"></td><td><input type="number" id="planC_p0" value="20" step="1"></td></tr>
+              <tr><td>Medio</td><td><input type="number" id="planC_v1" value="27000" step="100"></td><td><input type="number" id="planC_p1" value="50" step="1"></td></tr>
+              <tr><td>Alto</td><td><input type="number" id="planC_v2" value="33000" step="100"></td><td><input type="number" id="planC_p2" value="30" step="1"></td></tr>
+            </table>
+            <div class="hint">Las probabilidades se normalizan para sumar 100% aunque no cuadren exactamente.</div>
+          </div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>Plan a analizar en detalle</summary>
+        <div class="acc-body">
+          <select id="planSelect">
+            <option value="A">A — fijo</option>
+            <option value="B">B — moderado</option>
+            <option value="C" selected>C — agresivo</option>
+          </select>
+        </div>
+      </details>
+
+      <div class="btn-row">
+        <button class="btn primary" id="runB">▶ Simular</button>
+      </div>
+      <button class="btn ghost" id="resetB">Restablecer valores por defecto</button>
+    </aside>
+
+    <aside class="sidebar" id="sidebarC" hidden>
+      <details class="acc" open>
+        <summary>Qué variar</summary>
+        <div class="acc-body">
+          <div class="grid2">
+            <div class="field"><label>nsim mín.</label><input type="number" id="sensNsimMin" value="200" min="50" max="5000" step="50"></div>
+            <div class="field"><label>nsim máx.</label><input type="number" id="sensNsimMax" value="20000" min="500" max="50000" step="500"></div>
+          </div>
+          <div class="field">
+            <div class="field-row"><label>Puntos a evaluar</label><span class="val mono" id="outSensPoints">6</span></div>
+            <input type="range" id="sensPoints" min="4" max="7" value="6" step="1">
+          </div>
+          <div class="hint">Los puntos se espacian logarítmicamente entre nsim mín. y máx.</div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>Réplicas y plan</summary>
+        <div class="acc-body">
+          <div class="field">
+            <div class="field-row"><label>Réplicas por punto (semillas)</label><span class="val mono" id="outSensReplicas">5</span></div>
+            <input type="range" id="sensReplicas" min="1" max="8" value="5" step="1">
+          </div>
+          <div class="field">
+            <label>Plan (toma valores y probabilidades de la pestaña Simulación)</label>
+            <select id="sensPlan">
+              <option value="A">A — fijo</option>
+              <option value="B">B — moderado</option>
+              <option value="C" selected>C — agresivo</option>
+            </select>
+          </div>
+          <div class="hint">Cada réplica relanza la simulación con una semilla distinta: su dispersión mide cuánto "tiembla" la estimación para ese nsim.</div>
+        </div>
+      </details>
+
+      <div class="btn-row">
+        <button class="btn primary" id="runC">▶ Analizar sensibilidad</button>
+      </div>
+      <button class="btn ghost" id="resetC">Restablecer valores por defecto</button>
+    </aside>
+
+    <!-- ============ MAIN DECK ============ -->
+    <main class="deck">
+
+      <section id="viewA">
+        <div class="section-title"><h2>Una tirada de la transformada inversa</h2><span class="n mono" id="aLabel">Plan B</span></div>
+        <div class="card" style="margin-top:10px;">
+          <h3>De un uniforme U a un retorno R</h3>
+          <div class="sub">Cambia de plan o lanza una nueva U, y observa qué retorno produce el algoritmo. Los valores y probabilidades de cada plan se editan en la pestaña Simulación.</div>
+          <div class="kpi-grid" id="kpiRowA"></div>
+        </div>
+
+        <div class="section-title" style="margin-top:22px;"><h2>Cómo funciona el algoritmo</h2></div>
+        <div class="steps" style="margin-top:10px;">
+          <div class="step">
+            <div class="num">1 · GENERAR</div>
+            <p>Se genera <span class="f">u ~ U(0,1)</span>. Es lo único que sabe producir un generador de números aleatorios.</p>
+          </div>
+          <div class="step">
+            <div class="num">2 · BUSCAR EL TRAMO</div>
+            <p>Se busca el menor índice <span class="f">i</span> tal que <span class="f">u ≤ F(i) = p₁+…+pᵢ</span>, usando las probabilidades acumuladas del plan elegido.</p>
+          </div>
+          <div class="step">
+            <div class="num">3 · DEVOLVER</div>
+            <p>Se devuelve el retorno <span class="f">R = vᵢ</span> de ese tramo. Repetido muchas veces, reproduce exactamente las probabilidades del plan.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="viewB" hidden>
+        <div class="section-title"><h2>Rendimiento esperado — Plan: <span id="planNameLabel">C</span></h2><span class="n mono" id="bLabel">n = 10,000 simulaciones</span></div>
+        <div class="kpi-grid" id="kpiRowB"></div>
+
+        <div class="charts-row" style="margin-top:14px;">
+          <div class="card">
+            <h3>Distribución del retorno simulado</h3>
+            <div class="sub">Histograma de las <span id="histN">10,000</span> simulaciones, con la media y la inversión inicial I₀ marcadas.</div>
+            <canvas id="histB" height="250"></canvas>
+          </div>
+          <div class="card">
+            <h3>Riesgo vs. retorno de los tres planes</h3>
+            <div class="sub">Eje X: riesgo σ(R) simulado. Eje Y: retorno medio simulado. Más a la derecha, más incierto; más arriba, más rentable.</div>
+            <canvas id="scatterRR" height="250"></canvas>
+          </div>
+        </div>
+
+        <div class="section-title" style="margin-top:6px;"><h2>Comparación de planes</h2></div>
+        <div class="card" style="margin-top:10px;">
+          <h3>Simulación Monte Carlo frente al valor teórico</h3>
+          <div class="sub">Retorno teórico = Σ pᵢ·vᵢ. Riesgo teórico = raíz de Σ pᵢ·(vᵢ−media)². Pr(pérdida) = Pr(R &lt; I₀).</div>
+          <div class="overflow-x">
+            <table class="data" id="tablePlanes"></table>
+          </div>
+          <div class="hint" id="planesReadout" style="margin-top:10px;"></div>
+        </div>
+      </section>
+
+      <section id="viewC" hidden>
+        <div class="section-title"><h2>Sensibilidad del estimador Monte Carlo</h2><span class="n mono" id="cLabel">sin ejecutar</span></div>
+        <div class="kpi-grid" id="kpiRowC" style="margin-top:10px;"></div>
+
+        <div class="charts-row" style="margin-top:14px;">
+          <div class="card">
+            <h3>Convergencia hacia el valor teórico</h3>
+            <div class="sub">Puntos claros: media de cada réplica (semilla). Punto sólido: media combinada. Línea discontinua: retorno teórico exacto.</div>
+            <canvas id="sensConverge" height="280"></canvas>
+          </div>
+          <div class="card">
+            <h3>Variabilidad entre réplicas (σ entre semillas)</h3>
+            <div class="sub">Cuánto cambia la media estimada solo por cambiar la semilla, para cada nsim probado.</div>
+            <canvas id="sensVariability" height="280"></canvas>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <h3>Tabla de barrido</h3>
+          <div class="sub">Una fila por valor de nsim probado.</div>
+          <div class="overflow-x">
+            <table class="data" id="tableSens"></table>
+          </div>
+          <div class="hint" id="sensReadout" style="margin-top:10px;">Pulsa «Analizar sensibilidad» para ejecutar el barrido.</div>
+        </div>
+      </section>
+
+      <footer>
+        Simulación Monte Carlo 100% en el navegador (sin servidor): transformada inversa para una variable discreta con 1, 2 o 3 valores posibles. Los intervalos de confianza al 95% se estiman con el error estándar de la media sobre las nsim réplicas. Basado en el Ejemplo 2 de «B-70. Distribuciones derivadas», Javier Morales y Asun Martínez Mayoral, equipo IA4LEGOS (CC BY-SA 4.0).
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ========================= RNG ========================= */
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let rnd = mulberry32((Date.now() ^ (Math.random()*1e9)) >>> 0);
+function reseed(){ rnd = mulberry32((Date.now() ^ (Math.random()*1e9)) >>> 0); }
+
+/* ========================= STATS HELPERS ========================= */
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function mean(arr){ let s=0; for(let i=0;i<arr.length;i++) s+=arr[i]; return s/arr.length; }
+function variance(arr){ const m=mean(arr); let s=0; for(let i=0;i<arr.length;i++){ const d=arr[i]-m; s+=d*d; } return s/(arr.length-1); }
+function sd(arr){ return Math.sqrt(variance(arr)); }
+function quantileSorted(sorted, q){
+  if(sorted.length===0) return NaN;
+  const idx = q*(sorted.length-1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if(lo===hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi]-sorted[lo])*(idx-lo);
+}
+function mcEstim(arr){
+  const m = mean(arr), s = sd(arr), se = s/Math.sqrt(arr.length);
+  return { point:m, lo:m-1.96*se, hi:m+1.96*se, se };
+}
+function proportionCI(p, n){
+  const se = Math.sqrt(Math.max(p*(1-p),1e-9)/n);
+  return { point:p, se, lo:Math.max(0,p-1.96*se), hi:Math.min(1,p+1.96*se) };
+}
+function normalize(p){ const s=p.reduce((a,b)=>a+b,0) || 1; return p.map(x=>x/s); }
+function cumsum(p){ let c=0; return p.map(x=>{ c+=x; return c; }); }
+const fmtEUR = (v)=> (v<0?"-":"") + "€" + Math.abs(v).toLocaleString("es-ES",{maximumFractionDigits: Math.abs(v)<100?2:0});
+const fmtPct = (v,d=1)=> (v*100).toFixed(d) + "%";
+
+/* ========================= PROBLEM CORE ========================= */
+function inverseIndex(u, cdf){
+  for(let i=0;i<cdf.length;i++){ if(u<=cdf[i]) return i; }
+  return cdf.length-1;
+}
+function sampleValue(cdf, valores){ return valores[inverseIndex(rnd(), cdf)]; }
+function simulaPlan(valores, probs, nsim){
+  const cdf = cumsum(normalize(probs));
+  const out = new Float64Array(nsim);
+  for(let s=0;s<nsim;s++){ out[s] = sampleValue(cdf, valores); }
+  return out;
+}
+function retornoTeorico(valores, probs){
+  const pn = normalize(probs);
+  let e=0; for(let i=0;i<pn.length;i++) e += pn[i]*valores[i];
+  return e;
+}
+function riesgoTeorico(valores, probs){
+  const pn = normalize(probs);
+  const m = retornoTeorico(valores, probs);
+  let v=0; for(let i=0;i<pn.length;i++) v += pn[i]*(valores[i]-m)*(valores[i]-m);
+  return Math.sqrt(v);
+}
+
+const PLANS = ["A","B","C"];
+const PLAN_NAMES = { A:"A — fijo", B:"B — moderado", C:"C — agresivo" };
+const PLAN_COLORS = { A:"var(--accent)", B:"var(--accent-2)", C:"var(--accent-3)" };
+
+function readPlan(key){
+  const g = id => document.getElementById(id);
+  if(key==="A"){
+    return { valores:[parseFloat(g("planA_val").value)], probs:[1] };
+  }
+  if(key==="B"){
+    const lo = clamp(parseFloat(g("planB_plo").value)/100, 0, 1);
+    return { valores:[parseFloat(g("planB_lo").value), parseFloat(g("planB_hi").value)], probs:[lo, 1-lo] };
+  }
+  return {
+    valores:[parseFloat(g("planC_v0").value), parseFloat(g("planC_v1").value), parseFloat(g("planC_v2").value)],
+    probs: normalize([parseFloat(g("planC_p0").value), parseFloat(g("planC_p1").value), parseFloat(g("planC_p2").value)]),
+  };
+}
+function readI0(){ return parseFloat(document.getElementById("invI0").value); }
+
+/* ========================= TAB A: MECANISMO ========================= */
+function renderTabA(){
+  const g = id => document.getElementById(id);
+  const planKey = g("mecPlan").value;
+  const plan = readPlan(planKey);
+  const u = parseFloat(g("mecU").value)/100;
+  const cdf = cumsum(normalize(plan.probs));
+  const idx = inverseIndex(u, cdf);
+  const retorno = plan.valores[idx];
+  const I0 = readI0();
+  const neto = retorno - I0;
+
+  document.getElementById("aLabel").textContent = "Plan " + planKey;
+  document.getElementById("mecPlanHint").textContent = planKey==="A"
+    ? "El plan A es determinista: cualquier U cae siempre en el mismo (único) tramo."
+    : `Tramos: ${plan.valores.map((v,i)=>fmtEUR(v)+" (p="+(plan.probs[i]*100).toFixed(0)+"%)").join(" · ")}`;
+
+  const kpiRow = document.getElementById("kpiRowA");
+  kpiRow.innerHTML = "";
+  kpiRow.appendChild(tile("U generado", u.toFixed(2), null, "", "altura uniforme lanzada al eje de probabilidad"));
+  kpiRow.appendChild(tile("Retorno simulado (R)", fmtEUR(retorno), null, "", "tramo "+(idx+1)+" de "+plan.valores.length));
+  kpiRow.appendChild(tile("Resultado neto (R − I₀)", fmtEUR(neto), null, neto>=0?"good":"crit", null));
+}
+
+/* ========================= TAB B: SIMULACIÓN ========================= */
+let lastB = null;
+
+function readConfigB(){
+  const nsim = Math.round(parseFloat(document.getElementById("nsimB").value));
+  const I0 = readI0();
+  const plans = {};
+  PLANS.forEach(k=>{ plans[k] = readPlan(k); });
+  const selected = document.getElementById("planSelect").value;
+  return { nsim, I0, plans, selected };
+}
+
+function runTabB(){
+  reseed();
+  const cfg = readConfigB();
+  const results = {};
+  PLANS.forEach(k=>{
+    const plan = cfg.plans[k];
+    const sims = Array.from(simulaPlan(plan.valores, plan.probs, cfg.nsim));
+    const mc = mcEstim(sims);
+    const sdMC = sd(sims);
+    const teoMean = retornoTeorico(plan.valores, plan.probs);
+    const teoSd = riesgoTeorico(plan.valores, plan.probs);
+    const nLoss = sims.filter(v=>v<cfg.I0).length;
+    const lossCI = proportionCI(nLoss/sims.length, sims.length);
+    results[k] = { sims, mc, sdMC, teoMean, teoSd, lossCI };
+  });
+  lastB = { cfg, results };
+  renderTabB();
+}
+
+function renderTabB(){
+  const { cfg, results } = lastB;
+  const sel = results[cfg.selected];
+
+  document.getElementById("bLabel").textContent = "n = " + cfg.nsim.toLocaleString("es-ES") + " simulaciones";
+  document.getElementById("histN").textContent = cfg.nsim.toLocaleString("es-ES");
+  document.getElementById("planNameLabel").textContent = cfg.selected;
+
+  const kpiRow = document.getElementById("kpiRowB");
+  kpiRow.innerHTML = "";
+  kpiRow.appendChild(tile("Retorno medio (MC)", fmtEUR(sel.mc.point), `IC95%: [${fmtEUR(sel.mc.lo)}, ${fmtEUR(sel.mc.hi)}]`, "", null));
+  kpiRow.appendChild(tile("Retorno teórico", fmtEUR(sel.teoMean), null, "", "Σ pᵢ·vᵢ"));
+  kpiRow.appendChild(tile("Riesgo σ(R) — MC", fmtEUR(sel.sdMC), null, "", "incertidumbre del retorno"));
+  kpiRow.appendChild(tile("Riesgo σ(R) — teórico", fmtEUR(sel.teoSd), null, "", null));
+  kpiRow.appendChild(tile("Pr(pérdida patrimonial)", fmtPct(sel.lossCI.point), `IC95%: [${fmtPct(sel.lossCI.lo)}, ${fmtPct(sel.lossCI.hi)}]`, sel.lossCI.point>0.1?"crit":(sel.lossCI.point>0?"warn":"good"), `Pr(R < I₀ = ${fmtEUR(cfg.I0)})`));
+
+  drawHistogram(document.getElementById("histB"), sel.sims, sel.mc.point, cfg.I0);
+
+  drawRiskReturnScatter(document.getElementById("scatterRR"), PLANS.map(k=>({
+    key:k, label:k, mean: results[k].mc.point, sd: results[k].sdMC, color: PLAN_COLORS[k]
+  })));
+
+  let rows = `<tr><th>Plan</th><th>Retorno medio MC (€)</th><th>Retorno teórico (€)</th><th>σ MC (€)</th><th>σ teórico (€)</th><th>Pr(pérdida)</th></tr>`;
+  PLANS.forEach(k=>{
+    const r = results[k];
+    rows += `<tr><td><span class="pol-chip"><span class="dot" style="background:${PLAN_COLORS[k]}"></span>${PLAN_NAMES[k]}</span></td>`+
+      `<td>${fmtEUR(r.mc.point)}</td><td>${fmtEUR(r.teoMean)}</td><td>${fmtEUR(r.sdMC)}</td><td>${fmtEUR(r.teoSd)}</td><td>${fmtPct(r.lossCI.point)}</td></tr>`;
+  });
+  document.getElementById("tablePlanes").innerHTML = rows;
+
+  const bestReturn = PLANS.reduce((a,b)=> results[b].mc.point>results[a].mc.point? b:a);
+  const safest = PLANS.reduce((a,b)=> results[b].sdMC<results[a].sdMC? b:a);
+  document.getElementById("planesReadout").textContent =
+    `El plan ${bestReturn} ofrece el mayor retorno medio esperado, pero no es el más seguro: el plan ${safest} es el de menor riesgo (σ más bajo). `+
+    `Elegir entre ellos depende del perfil de riesgo de la empresa, no solo de maximizar la media — por eso conviene mirar la tabla completa y el gráfico de riesgo vs. retorno, no solo la primera columna.`;
+}
+
+/* ========================= TAB C: SENSIBILIDAD ========================= */
+function logSpace(mn,mx,n){ const out=[]; for(let i=0;i<n;i++){ const v = n===1?mn: mn*Math.pow(mx/mn, i/(n-1)); out.push(Math.max(1,Math.round(v))); } return out; }
+
+function readConfigC(){
+  const g = id => document.getElementById(id);
+  const points = clamp(Math.round(parseFloat(g("sensPoints").value)), 4, 7);
+  const replicas = clamp(Math.round(parseFloat(g("sensReplicas").value)), 1, 8);
+  const planKey = g("sensPlan").value;
+  const plan = readPlan(planKey);
+  const mn = clamp(parseFloat(g("sensNsimMin").value), 50, 5000);
+  const mx = clamp(parseFloat(g("sensNsimMax").value), Math.max(mn+1,500), 50000);
+  const values = logSpace(mn, mx, points);
+  return { planKey, plan, values, replicas };
+}
+
+let lastC = null;
+
+function runSensitivity(){
+  const cfg = readConfigC();
+  const teo = retornoTeorico(cfg.plan.valores, cfg.plan.probs);
+  const points = cfg.values.map(nsim=>{
+    let totalSum=0, totalSumSq=0, totalN=0;
+    const replicaMeans = [];
+    for(let r=0;r<cfg.replicas;r++){
+      reseed();
+      const sims = simulaPlan(cfg.plan.valores, cfg.plan.probs, nsim);
+      let s=0, sq=0;
+      for(let k=0;k<sims.length;k++){ s+=sims[k]; sq+=sims[k]*sims[k]; }
+      replicaMeans.push(s/sims.length);
+      totalSum+=s; totalSumSq+=sq; totalN+=sims.length;
+    }
+    const pooledMean = totalSum/totalN;
+    const pooledVar = Math.max(0, (totalSumSq - totalN*pooledMean*pooledMean)/Math.max(1,totalN-1));
+    const pooledSE = Math.sqrt(pooledVar/totalN);
+    const betweenSD = cfg.replicas>1 ? sd(replicaMeans) : 0;
+    return { x:nsim, replicaMeans, pooledMean, lo:pooledMean-1.96*pooledSE, hi:pooledMean+1.96*pooledSE, betweenSD, teo };
+  });
+  lastC = { cfg, points, teo };
+  renderSensitivity();
+}
+
+function renderSensitivity(){
+  const { cfg, points } = lastC;
+  document.getElementById("cLabel").textContent = points.length + " configuraciones · " + cfg.replicas + " réplicas c/u · plan " + cfg.planKey;
+
+  const first = points[0].betweenSD, last = points[points.length-1].betweenSD;
+  const reduction = (first>0 && last>0) ? (first/last) : null;
+
+  const kpiRow = document.getElementById("kpiRowC");
+  kpiRow.innerHTML = "";
+  kpiRow.appendChild(tile("Plan analizado", cfg.planKey, null, "", PLAN_NAMES[cfg.planKey]));
+  kpiRow.appendChild(tile("Rango de nsim probado", `${points[0].x.toLocaleString("es-ES")} – ${points[points.length-1].x.toLocaleString("es-ES")}`, null, "", points.length+" puntos"));
+  kpiRow.appendChild(tile("Réplicas por punto", String(cfg.replicas), null, "", "semillas independientes"));
+  kpiRow.appendChild(tile("Reducción de variabilidad", reduction? ("×"+reduction.toFixed(1)) : "—", null, reduction?"good":"", reduction? "σ entre réplicas del primer punto frente al último" : "con 1 réplica o plan determinista no hay variabilidad que medir"));
+
+  drawSensitivityScatter(document.getElementById("sensConverge"), points);
+  drawBarChart(document.getElementById("sensVariability"), points.map(pt=>({
+    label: "n="+pt.x.toLocaleString("es-ES"), value: pt.betweenSD, color: "var(--accent)"
+  })), { fmt:(v)=>fmtEUR(v) });
+
+  let rows = `<tr><th>nsim</th><th>Media combinada (€)</th><th>IC95% (€)</th><th>σ entre réplicas (€)</th><th>Teórico (€)</th></tr>`;
+  points.forEach(pt=>{
+    rows += `<tr><td>${pt.x.toLocaleString("es-ES")}</td><td>${fmtEUR(pt.pooledMean)}</td>`+
+      `<td>[${fmtEUR(pt.lo)}, ${fmtEUR(pt.hi)}]</td><td>${fmtEUR(pt.betweenSD)}</td><td>${fmtEUR(pt.teo)}</td></tr>`;
+  });
+  document.getElementById("tableSens").innerHTML = rows;
+
+  document.getElementById("sensReadout").textContent = cfg.plan.valores.length===1
+    ? `El plan A es determinista (un único valor con probabilidad 1): no hay variabilidad que reducir, por eso σ entre réplicas es 0 para cualquier nsim.`
+    : `A medida que crece nsim, la media combinada converge al retorno teórico y la dispersión entre semillas se reduce`+
+      (reduction? ` (${reduction.toFixed(1)} veces menor entre el primer y el último punto)` : "")+
+      `: así se ve, de forma directa, cuánto nsim hace falta para fiarse de la estimación.`;
+}
+
+function fmtSensLabel(x){ return "n="+x.toLocaleString("es-ES"); }
+
+/* ========================= CHARTS (canvas, no deps) ========================= */
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || name; }
+function resolveColor(c){ return c && c.startsWith("var(") ? cssVar(c.slice(4,-1)) : c; }
+
+function setupCanvas(canvas){
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || canvas.parentElement.clientWidth || 300;
+  const h = canvas.clientHeight || parseInt(canvas.getAttribute("height")) || 220;
+  canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return { ctx, w, h };
+}
+
+function tile(label, valueHTML, ciText, cls, noteText){
+  const d = document.createElement("div");
+  d.className = "tile" + (cls? " "+cls: "");
+  d.innerHTML = `<div class="lbl">${label}</div><div class="val">${valueHTML}</div>` +
+    (ciText? `<div class="ci">${ciText}</div>`:"") + (noteText? `<div class="note">${noteText}</div>`:"");
+  return d;
+}
+
+function drawHistogram(canvas, values, meanVal, i0){
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:62, r:14, t:14, b:32};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const minV = Math.min(...values, i0), maxV = Math.max(...values);
+  const range = (maxV-minV) || 1;
+  const bins = 40;
+  const counts = new Array(bins).fill(0);
+  for(const v of values){ const bi = Math.min(bins-1, Math.max(0, Math.floor((v-minV)/range*bins))); counts[bi]++; }
+  const maxCount = Math.max(...counts);
+  const gridColor = cssVar("--grid"), muted = cssVar("--text-muted"), accent = cssVar("--accent"), critical = cssVar("--critical"), text = cssVar("--text");
+  ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
+  ctx.font = "13px " + cssVar("--font-mono"); ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let i=0;i<=4;i++){
+    const y = pad.t + plotH - (plotH*i/4);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w-pad.r, y); ctx.stroke();
+    ctx.fillText(Math.round(maxCount*i/4).toString(), pad.l-6, y);
+  }
+  const barW = plotW/bins;
+  for(let i=0;i<bins;i++){
+    const bh = plotH * (counts[i]/maxCount);
+    const x0 = minV + i*range/bins;
+    ctx.fillStyle = x0<i0 ? critical : accent;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(pad.l+i*barW+1, pad.t+plotH-bh, Math.max(1,barW-2), bh);
+  }
+  ctx.globalAlpha = 1;
+  const xMean = pad.l + plotW*((meanVal-minV)/range);
+  ctx.strokeStyle = text; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(xMean, pad.t); ctx.lineTo(xMean, pad.t+plotH); ctx.stroke();
+  const xI0 = pad.l + plotW*((i0-minV)/range);
+  ctx.strokeStyle = critical;
+  ctx.beginPath(); ctx.moveTo(xI0, pad.t); ctx.lineTo(xI0, pad.t+plotH); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = text; ctx.textAlign="center"; ctx.font="600 12.5px " + cssVar("--font-mono");
+  ctx.fillText(fmtEUR(meanVal), xMean, pad.t-2);
+  ctx.fillStyle = critical; ctx.font="600 11.5px " + cssVar("--font-mono");
+  ctx.fillText("I₀="+fmtEUR(i0), xI0, pad.t+plotH+14);
+  ctx.fillStyle = muted; ctx.textAlign="center"; ctx.textBaseline="top"; ctx.font="13px " + cssVar("--font-mono");
+  for(let i=0;i<=4;i++){
+    const x = pad.l + plotW*i/4;
+    ctx.fillText(fmtEUR(minV + range*i/4), x, pad.t+plotH+30);
+  }
+}
+
+function roundRectTop(ctx,x,y,width,height,r){
+  ctx.beginPath();
+  ctx.moveTo(x, y+height);
+  ctx.lineTo(x, y+r);
+  ctx.arcTo(x,y,x+r,y,r);
+  ctx.lineTo(x+width-r,y);
+  ctx.arcTo(x+width,y,x+width,y+r,r);
+  ctx.lineTo(x+width,y+height);
+  ctx.closePath();
+}
+
+function drawBarChart(canvas, items, opts){
+  opts = opts || {};
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:14, r:14, t:16, b:34};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const vals = items.map(d=>d.value);
+  const minVal = Math.min(0, ...vals), maxVal = Math.max(...vals, 1e-9);
+  const range = (maxVal-minVal) || 1;
+  const n = items.length;
+  const gap = 18;
+  const barW = (plotW - gap*(n-1)) / n;
+  const gridColor = cssVar("--grid"), muted = cssVar("--text-muted"), text = cssVar("--text");
+  const zeroY = pad.t + plotH*(1-(0-minVal)/range);
+  ctx.strokeStyle = gridColor; ctx.beginPath(); ctx.moveTo(pad.l, zeroY); ctx.lineTo(w-pad.r, zeroY); ctx.stroke();
+  items.forEach((it,i)=>{
+    const x = pad.l + i*(barW+gap);
+    const topY = pad.t + plotH*(1-(it.value-minVal)/range);
+    const bh = Math.max(2, zeroY-topY);
+    const color = resolveColor(it.color);
+    ctx.fillStyle = color;
+    roundRectTop(ctx, x, Math.min(topY,zeroY), barW, bh, 4);
+    ctx.fill();
+    ctx.fillStyle = text; ctx.textAlign="center"; ctx.font="600 15px " + cssVar("--font-mono");
+    ctx.fillText(opts.fmt ? opts.fmt(it.value) : it.value, x+barW/2, Math.min(topY,zeroY)-8);
+    ctx.fillStyle = muted; ctx.font="14px " + cssVar("--font-body"); ctx.textBaseline="top";
+    ctx.fillText(String(it.label), x+barW/2, pad.t+plotH+6);
+  });
+}
+
+function drawSensitivityScatter(canvas, points){
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:66, r:18, t:18, b:40};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const allVals = points.flatMap(pt=>pt.replicaMeans.concat([pt.teo]));
+  const minV = Math.min(...allVals), maxV = Math.max(...allVals);
+  const span = (maxV-minV) || Math.max(1,Math.abs(minV)*0.1);
+  const yMin = minV - span*0.12, yMax = maxV + span*0.12;
+  const yPix = v => pad.t + plotH*(1-(v-yMin)/(yMax-yMin));
+  const n = points.length;
+  const xPix = i => pad.l + (n<=1 ? plotW/2 : plotW*i/(n-1));
+
+  const muted = cssVar("--text-muted"), grid = cssVar("--grid"), accent = cssVar("--accent");
+
+  ctx.strokeStyle = grid; ctx.lineWidth = 1; ctx.font = "13px " + cssVar("--font-mono"); ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let i=0;i<=4;i++){
+    const v = yMin + (yMax-yMin)*i/4;
+    const py = yPix(v);
+    ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(w-pad.r, py); ctx.stroke();
+    ctx.fillText(fmtEUR(v), pad.l-6, py);
+  }
+
+  ctx.strokeStyle = muted; ctx.setLineDash([5,4]); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  points.forEach((pt,i)=>{ const x=xPix(i), y=yPix(pt.teo); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke(); ctx.setLineDash([]);
+
+  points.forEach((pt,i)=>{
+    const x = xPix(i);
+    const ys = pt.replicaMeans.map(yPix);
+    if(ys.length>1){
+      ctx.strokeStyle = muted; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, Math.min(...ys)); ctx.lineTo(x, Math.max(...ys)); ctx.stroke();
+    }
+    ctx.fillStyle = accent; ctx.globalAlpha = 0.45;
+    ys.forEach(y=>{ ctx.beginPath(); ctx.arc(x,y,2.6,0,Math.PI*2); ctx.fill(); });
+    ctx.globalAlpha = 1;
+  });
+
+  ctx.strokeStyle = accent; ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  points.forEach((pt,i)=>{ const x=xPix(i), y=yPix(pt.pooledMean); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+  points.forEach((pt,i)=>{
+    const x=xPix(i), y=yPix(pt.pooledMean);
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.arc(x,y,4.5,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = cssVar("--surface"); ctx.lineWidth=1.5; ctx.stroke();
+  });
+
+  ctx.fillStyle = muted; ctx.font = "13px " + cssVar("--font-mono"); ctx.textAlign="center"; ctx.textBaseline="top";
+  points.forEach((pt,i)=> ctx.fillText(fmtSensLabel(pt.x), xPix(i), pad.t+plotH+8));
+}
+
+function drawRiskReturnScatter(canvas, plans){
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:72, r:28, t:18, b:40};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const maxSd = Math.max(...plans.map(p=>p.sd), 1e-6) * 1.25;
+  const meanVals = plans.map(p=>p.mean);
+  const minMean = Math.min(...meanVals), maxMean = Math.max(...meanVals);
+  const spanMean = (maxMean-minMean) || Math.max(1, Math.abs(minMean)*0.05);
+  const yMin = minMean - spanMean*0.25, yMax = maxMean + spanMean*0.25;
+  const xPix = v => pad.l + plotW*(v/maxSd);
+  const yPix = v => pad.t + plotH*(1-(v-yMin)/(yMax-yMin));
+
+  const muted = cssVar("--text-muted"), grid = cssVar("--grid"), text = cssVar("--text");
+
+  ctx.strokeStyle = grid; ctx.lineWidth = 1; ctx.font = "13px " + cssVar("--font-mono");
+  ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let i=0;i<=4;i++){
+    const v = yMin + (yMax-yMin)*i/4;
+    const py = yPix(v);
+    ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(w-pad.r, py); ctx.stroke();
+    ctx.fillText(fmtEUR(v), pad.l-6, py);
+  }
+  ctx.textAlign="center"; ctx.textBaseline="top";
+  for(let i=0;i<=4;i++){
+    const v = maxSd*i/4;
+    const px = xPix(v);
+    ctx.strokeStyle = grid; ctx.beginPath(); ctx.moveTo(px, pad.t); ctx.lineTo(px, pad.t+plotH); ctx.stroke();
+    ctx.fillStyle = muted; ctx.fillText(fmtEUR(v), px, pad.t+plotH+8);
+  }
+
+  ctx.fillStyle = muted; ctx.font = "13px " + cssVar("--font-body"); ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+  ctx.fillText("Riesgo σ(R) — menos seguro →", pad.l+plotW/2, h-4);
+  ctx.save(); ctx.translate(16, pad.t+plotH/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText("Retorno medio (€)", 0, 0);
+  ctx.restore();
+
+  plans.forEach(p=>{
+    const x = xPix(p.sd), y = yPix(p.mean);
+    const color = resolveColor(p.color);
+    ctx.fillStyle = color; ctx.globalAlpha = 0.22;
+    ctx.beginPath(); ctx.arc(x,y,13,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(x,y,7,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = cssVar("--surface"); ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = text; ctx.font = "600 15px " + cssVar("--font-display"); ctx.textAlign="left"; ctx.textBaseline="middle";
+    ctx.fillText(p.label, x+14, y);
+  });
+}
+
+/* ========================= UI WIRING ========================= */
+function wireLiveReadout(rangeId, outId, suffix, fmt){
+  const el = document.getElementById(rangeId);
+  const out = document.getElementById(outId);
+  el.addEventListener("input", ()=>{ out.textContent = (fmt?fmt(el.value):Number(el.value).toLocaleString("es-ES")) + (suffix||""); });
+}
+
+function withLoading(fn){
+  const overlay = document.getElementById("loadingOverlay");
+  overlay.classList.add("show");
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{
+    try{ fn(); } finally { overlay.classList.remove("show"); }
+  }));
+}
+
+function redrawVisible(){
+  if(!document.getElementById("viewA").hidden) renderTabA();
+  if(!document.getElementById("viewB").hidden && lastB) renderTabB();
+  if(!document.getElementById("viewC").hidden && lastC) renderSensitivity();
+}
+
+function switchTab(which){
+  ["a","b","c"].forEach(key=>{
+    const active = key===which;
+    document.getElementById("view"+key.toUpperCase()).hidden = !active;
+    document.getElementById("sidebar"+key.toUpperCase()).hidden = !active;
+    document.getElementById("tabBtn"+key.toUpperCase()).classList.toggle("active", active);
+  });
+  redrawVisible();
+}
+
+function resetA(){
+  document.getElementById("mecPlan").value = "B";
+  document.getElementById("mecU").value = 55;
+  document.getElementById("outMecU").textContent = "0.55";
+  renderTabA();
+}
+
+function resetB(){
+  const set=(id,v)=>{ document.getElementById(id).value=v; };
+  set("nsimB",10000); document.getElementById("outNsimB").textContent="10,000";
+  set("invI0",25000);
+  set("planA_val",27500);
+  set("planB_lo",27000); set("planB_hi",28000); set("planB_plo",40);
+  set("planC_v0",24000); set("planC_p0",20);
+  set("planC_v1",27000); set("planC_p1",50);
+  set("planC_v2",33000); set("planC_p2",30);
+  document.getElementById("planSelect").value = "C";
+  runTabB();
+}
+
+function resetC(){
+  const set=(id,v)=>{ document.getElementById(id).value=v; };
+  set("sensNsimMin",200); set("sensNsimMax",20000);
+  set("sensPoints",6); document.getElementById("outSensPoints").textContent="6";
+  set("sensReplicas",5); document.getElementById("outSensReplicas").textContent="5";
+  document.getElementById("sensPlan").value = "C";
+  runSensitivity();
+}
+
+function init(){
+  document.getElementById("mecPlan").addEventListener("change", renderTabA);
+  wireLiveReadout("mecU","outMecU","", v=>(Number(v)/100).toFixed(2));
+  document.getElementById("mecU").addEventListener("input", renderTabA);
+  document.getElementById("mecRandomU").addEventListener("click", ()=>{
+    const v = Math.round(rnd()*100);
+    document.getElementById("mecU").value = v;
+    document.getElementById("outMecU").textContent = (v/100).toFixed(2);
+    renderTabA();
+  });
+  document.getElementById("resetA").addEventListener("click", resetA);
+
+  wireLiveReadout("nsimB","outNsimB");
+  document.getElementById("planSelect").addEventListener("change", ()=>{ if(lastB) renderTabB(); });
+  document.getElementById("runB").addEventListener("click", ()=> withLoading(runTabB));
+  document.getElementById("resetB").addEventListener("click", ()=> withLoading(resetB));
+
+  wireLiveReadout("sensPoints","outSensPoints");
+  wireLiveReadout("sensReplicas","outSensReplicas");
+  document.getElementById("runC").addEventListener("click", ()=> withLoading(runSensitivity));
+  document.getElementById("resetC").addEventListener("click", ()=> withLoading(resetC));
+
+  document.getElementById("tabBtnA").addEventListener("click", ()=>switchTab("a"));
+  document.getElementById("tabBtnB").addEventListener("click", ()=>switchTab("b"));
+  document.getElementById("tabBtnC").addEventListener("click", ()=>switchTab("c"));
+
+  document.getElementById("themeToggle").addEventListener("click", ()=>{
+    const root = document.documentElement;
+    const cur = root.getAttribute("data-theme");
+    const next = cur==="dark" ? "light" : (cur==="light" ? null : "dark");
+    if(next) root.setAttribute("data-theme", next); else root.removeAttribute("data-theme");
+    redrawVisible();
+  });
+
+  let resizeTimer=null;
+  window.addEventListener("resize", ()=>{ clearTimeout(resizeTimer); resizeTimer=setTimeout(redrawVisible, 120); });
+
+  // First paint: populate with the notebook's own defaults so the page opens
+  // already showing a real result, not an empty shell.
+  renderTabA();
+  withLoading(runTabB);
+}
+
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+
+})();
+</script>
+
+</body>
+</html>
