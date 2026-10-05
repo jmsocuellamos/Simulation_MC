@@ -1,8 +1,4 @@
-<!doctype html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Riesgo y retorno de planes de inversión</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -86,11 +82,14 @@ p{ margin:0; }
 button{ font-family: var(--font-body); cursor:pointer; }
 input[type="range"]{ width:100%; accent-color: var(--accent); }
 input[type="number"]{
-  font-family: var(--font-mono); background: var(--surface-2); color: var(--text);
-  border:1px solid var(--border); border-radius:6px; padding:5px 7px; width:100%;
+  font-family: var(--font-mono); background: var(--surface); color: var(--text);
+  border:1px solid var(--border-strong); border-radius:6px; padding:5px 7px; width:100%;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.06) inset;
 }
 input[type="number"]:focus, input[type="range"]:focus{ outline:2px solid var(--accent); outline-offset:1px; }
-select{ font-family: var(--font-mono); background: var(--surface-2); color: var(--text); border:1px solid var(--border); border-radius:6px; padding:7px 8px; width:100%; }
+select{ font-family: var(--font-mono); background: var(--surface); color: var(--text); border:1px solid var(--border-strong); border-radius:6px; padding:7px 8px; width:100%; appearance:auto; }
+.subcard input[type="number"]{ background: var(--surface-2); }
+.minitable input[type="number"]{ background: var(--surface-2); }
 label{ font-size:15px; color: var(--text-2); }
 .app{ max-width:1400px; margin:0 auto; padding-block: calc(14px + env(safe-area-inset-top,0px)) 48px; }
 
@@ -129,12 +128,10 @@ label{ font-size:15px; color: var(--text-2); }
 .sidebar{
   background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
   padding:14px; display:flex; flex-direction:column; gap:10px; box-shadow: var(--shadow);
-  position: sticky; top: calc(10px + env(safe-area-inset-top,0px));
-  max-height: calc(100vh - 20px); overflow-y:auto;
+  position: relative; isolation: isolate;
 }
-@media (max-width: 860px){ .sidebar{ position:static; max-height:none; } }
 
-.acc{ border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface-2); }
+.acc{ border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface-2); position:relative; z-index:0; }
 .acc > summary{
   list-style:none; cursor:pointer; padding:9px 11px; font-family:var(--font-display);
   font-size:15px; letter-spacing:.03em; text-transform:uppercase; color:var(--text-2);
@@ -221,9 +218,6 @@ footer b{ color:var(--text-2); }
 @keyframes spin{ to{ transform: rotate(360deg); } }
 [hidden]{ display:none !important; }
 </style>
-</head>
-<body>
-
 
 <div class="loading-overlay" id="loadingOverlay"><div class="loading-box"><span class="spinner"></span> Simulando…</div></div>
 
@@ -1040,5 +1034,4 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
 })();
 </script>
 
-</body>
-</html>
+</body></html>
