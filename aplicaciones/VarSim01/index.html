@@ -1,0 +1,1089 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SOLE-QC Control de Calidad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===================================================================
+   DESIGN PLAN
+   Layout: mission-control deck (same family as the cost-control deck this
+   mirrors) — fixed instrument sidebar beside a scrolling telemetry main.
+   A static briefing card up top states the Ejemplo 1 problem once; two
+   tabs let the reader manipulate it: the mechanism (one box, one draw)
+   and the consequence (1500 boxes, a month of production).
+   Color: dark-first palette. --accent (steelblue) carries the "actual"
+   policy and the primary data; --accent-2 (amber) = "mejora"; --accent-3
+   (green) = "óptima" — a deliberate low→high progression, kept separate
+   from the good/warning/critical defect-risk triad used in the mechanism
+   tab (0/1/2 defects).
+   Type: Chakra Petch (display, technical/cut-corner) for headings and
+   labels; IBM Plex Sans (body); IBM Plex Mono (data) for every number.
+   =================================================================== */
+:root{
+  color-scheme: dark;
+  --bg: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232320;
+  --surface-3: #2a2a27;
+  --text: #ffffff;
+  --text-2: #c3c2b7;
+  --text-muted: #898781;
+  --border: rgba(255,255,255,0.12);
+  --border-strong: rgba(255,255,255,0.22);
+  --grid: #2c2c2a;
+  --accent: #3987e5;
+  --accent-ink: #eaf2ff;
+  --accent-2: #d9972a;
+  --accent-3: #199e70;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #e66767;
+  --shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35);
+  --radius: 10px;
+  --font-display: "Chakra Petch", "Rajdhani", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme: light;
+    --bg: #f1f0ea; --surface: #fcfcfb; --surface-2: #f2f1ec; --surface-3: #eae8e0;
+    --text: #0b0b0b; --text-2: #52514e; --text-muted: #706f6a;
+    --border: rgba(11,11,11,0.12); --border-strong: rgba(11,11,11,0.28);
+    --grid: #e1e0d9;
+    --accent: #2a78d6; --accent-ink: #0b2f5c; --accent-2: #a9700f; --accent-3: #137a53;
+    --good: #0b7a0b; --warning: #92650a; --critical: #b23232;
+  }
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg: #f1f0ea; --surface: #fcfcfb; --surface-2: #f2f1ec; --surface-3: #eae8e0;
+  --text: #0b0b0b; --text-2: #52514e; --text-muted: #706f6a;
+  --border: rgba(11,11,11,0.12); --border-strong: rgba(11,11,11,0.28);
+  --grid: #e1e0d9;
+  --accent: #2a78d6; --accent-ink: #0b2f5c; --accent-2: #a9700f; --accent-3: #137a53;
+  --good: #0b7a0b; --warning: #92650a; --critical: #b23232;
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232320; --surface-3: #2a2a27;
+  --text: #ffffff; --text-2: #c3c2b7; --text-muted: #898781;
+  --border: rgba(255,255,255,0.12); --border-strong: rgba(255,255,255,0.22);
+  --grid: #2c2c2a;
+  --accent: #3987e5; --accent-ink: #eaf2ff; --accent-2: #d9972a; --accent-3: #199e70;
+  --good: #0ca30c; --warning: #fab219; --critical: #e66767;
+}
+
+*{box-sizing:border-box;}
+body{ background: var(--bg); color: var(--text); font-family: var(--font-body); margin:0; padding-inline:16px; }
+h1,h2,h3,h4{ font-family: var(--font-display); font-weight:600; letter-spacing:.01em; margin:0; text-wrap:balance; }
+p{ margin:0; }
+.mono{ font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+button{ font-family: var(--font-body); cursor:pointer; }
+input[type="range"]{ width:100%; accent-color: var(--accent); }
+input[type="number"]{
+  font-family: var(--font-mono); background: var(--surface-2); color: var(--text);
+  border:1px solid var(--border); border-radius:6px; padding:5px 7px; width:100%;
+}
+input[type="number"]:focus, input[type="range"]:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+select{ font-family: var(--font-mono); background: var(--surface-2); color: var(--text); border:1px solid var(--border); border-radius:6px; padding:7px 8px; width:100%; }
+label{ font-size:12.5px; color: var(--text-2); }
+.app{ max-width:1400px; margin:0 auto; padding-block: calc(14px + env(safe-area-inset-top,0px)) 48px; }
+
+/* ---------- top bar ---------- */
+.topbar{
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  padding:14px 18px; margin-bottom:16px;
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+  border:1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.brand{ display:flex; align-items:baseline; gap:10px; margin-right:auto; }
+.brand-mark{
+  display:inline-grid; place-items:center; width:34px; height:34px; border-radius:8px;
+  background: var(--accent); color:#fff; font-size:12px; font-family:var(--font-display); font-weight:700;
+  flex-shrink:0;
+}
+.brand h1{ font-size: 19px; color:var(--text); }
+.brand .brand-sub{ font-size:12px; color:var(--text-muted); font-family:var(--font-body); margin-left:8px; }
+.tabs{ display:flex; gap:6px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:3px; flex-wrap:wrap; }
+.tab-btn{
+  font-family: var(--font-display); font-size:12.5px; letter-spacing:.02em; text-transform:uppercase;
+  background:transparent; border:none; color:var(--text-muted); padding:8px 13px; border-radius:6px;
+}
+.tab-btn.active{ background: var(--accent); color:#fff; }
+.icon-btn{
+  width:34px; height:34px; border-radius:8px; border:1px solid var(--border); background:var(--surface-2);
+  color:var(--text); font-size:15px; display:grid; place-items:center;
+}
+.icon-btn:hover{ border-color: var(--border-strong); }
+
+/* ---------- briefing ---------- */
+.brief{
+  background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
+  padding:16px 18px; margin-bottom:16px; box-shadow: var(--shadow);
+  display:grid; grid-template-columns: 1.3fr 1fr; gap:18px; align-items:start;
+}
+@media (max-width:860px){ .brief{ grid-template-columns:1fr; } }
+.brief h2{ font-size:15px; margin-bottom:8px; }
+.brief p{ font-size:13px; color:var(--text-2); line-height:1.6; }
+.brief p + p{ margin-top:8px; }
+.brief .badge-row{ margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; }
+
+/* ---------- shell ---------- */
+.shell{ display:grid; grid-template-columns: 300px 1fr; gap:16px; align-items:start; }
+@media (max-width: 860px){ .shell{ grid-template-columns: 1fr; } }
+
+.sidebar{
+  background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
+  padding:14px; display:flex; flex-direction:column; gap:10px; box-shadow: var(--shadow);
+  position: sticky; top: calc(10px + env(safe-area-inset-top,0px));
+  max-height: calc(100vh - 20px); overflow-y:auto;
+}
+@media (max-width: 860px){ .sidebar{ position:static; max-height:none; } }
+
+.acc{ border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface-2); }
+.acc > summary{
+  list-style:none; cursor:pointer; padding:9px 11px; font-family:var(--font-display);
+  font-size:12.5px; letter-spacing:.03em; text-transform:uppercase; color:var(--text-2);
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+.acc > summary::-webkit-details-marker{ display:none; }
+.acc > summary::after{ content:"▸"; color:var(--text-muted); transition: transform .15s; }
+.acc[open] > summary::after{ transform: rotate(90deg); }
+.acc-body{ padding:10px 11px 12px; display:flex; flex-direction:column; gap:10px; border-top:1px solid var(--border); }
+.field{ display:flex; flex-direction:column; gap:4px; }
+.field-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.field-row .val{ font-family:var(--font-mono); font-size:12px; color:var(--accent); font-variant-numeric:tabular-nums; min-width:40px; text-align:right; }
+.subcard{ background:var(--surface-3); border:1px solid var(--border); border-radius:7px; padding:8px 9px; }
+.subcard h4{ font-size:12px; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.dot{ width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+.grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+.minitable{ width:100%; border-collapse:collapse; font-size:11px; }
+.minitable th{ font-family:var(--font-display); font-weight:600; color:var(--text-muted); text-align:center; padding:2px; font-size:9.5px; text-transform:uppercase; }
+.minitable td{ padding:2px; }
+.minitable input[type=number]{ padding:4px 3px; font-size:11px; text-align:center; }
+.minitable td:first-child{ color:var(--text-2); font-size:10.5px; padding-right:3px; white-space:nowrap; }
+
+.btn{
+  font-family:var(--font-display); font-size:13px; letter-spacing:.02em; text-transform:uppercase;
+  border-radius:8px; border:1px solid var(--border-strong); padding:11px 14px; text-align:center;
+  background:var(--surface-2); color:var(--text);
+}
+.btn.primary{ background: var(--accent); border-color:var(--accent); color:#fff; font-size:14px; padding:13px; }
+.btn.primary:hover{ filter:brightness(1.08); }
+.btn.ghost{ background:transparent; }
+.btn-row{ display:flex; gap:8px; }
+.btn-row .btn{ flex:1; }
+.hint{ font-size:11px; color:var(--text-muted); line-height:1.5; }
+
+/* ---------- main deck ---------- */
+.deck{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+.card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); min-width:0; }
+.card h3{ font-size:14.5px; margin-bottom:3px; }
+.card .sub{ font-size:12px; color:var(--text-muted); margin-bottom:12px; }
+.section-title{ display:flex; align-items:baseline; gap:10px; margin: 6px 2px 0; }
+.section-title h2{ font-size:16px; }
+.section-title .n{ font-family:var(--font-mono); font-size:11px; color:var(--text-muted); border:1px solid var(--border); padding:2px 7px; border-radius:20px; }
+
+.kpi-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:10px; }
+.tile{ background:var(--surface); border:1px solid var(--border); border-radius: var(--radius); padding:14px 15px; box-shadow:var(--shadow); position:relative; overflow:hidden; min-width:0; }
+.tile::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); }
+.tile.good::before{ background:var(--good); }
+.tile.warn::before{ background:var(--warning); }
+.tile.crit::before{ background:var(--critical); }
+.tile .lbl{ font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; font-family:var(--font-display); }
+.tile .val{ font-family:var(--font-mono); font-size:24px; font-weight:600; margin-top:4px; letter-spacing:-.01em; }
+.tile .val small{ font-size:12.5px; color:var(--text-muted); font-weight:400; }
+.tile .ci{ font-size:11px; color:var(--text-muted); margin-top:3px; font-family:var(--font-mono); }
+.tile .note{ font-size:10.5px; color:var(--text-muted); margin-top:5px; line-height:1.4; }
+
+.charts-row{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:760px){ .charts-row{ grid-template-columns:1fr; } }
+canvas{ width:100%; display:block; }
+
+table.data{ width:100%; border-collapse:collapse; font-size:12.5px; }
+table.data th{ text-align:right; font-family:var(--font-display); font-size:11px; text-transform:uppercase; letter-spacing:.02em; color:var(--text-muted); padding:6px 7px; border-bottom:1px solid var(--border-strong); }
+table.data th:first-child, table.data td:first-child{ text-align:left; }
+table.data td{ text-align:right; padding:8px 7px; border-bottom:1px solid var(--border); font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+table.data tr:last-child td{ border-bottom:none; }
+.pol-chip{ display:inline-flex; align-items:center; gap:6px; font-family:var(--font-body); }
+.overflow-x{ overflow-x:auto; }
+
+.steps{ display:grid; grid-template-columns: repeat(3,1fr); gap:12px; }
+@media (max-width:760px){ .steps{ grid-template-columns:1fr; } }
+.step{ background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 13px; }
+.step .num{ font-family:var(--font-display); font-size:11px; color:var(--accent); letter-spacing:.03em; }
+.step p{ font-size:12.5px; color:var(--text-2); margin-top:5px; line-height:1.5; }
+.step .f{ font-family:var(--font-mono); color:var(--text); font-size:12.5px; }
+
+footer{ margin-top:28px; padding:16px 2px 4px; border-top:1px solid var(--border); color:var(--text-muted); font-size:11.5px; line-height:1.7; }
+footer b{ color:var(--text-2); }
+
+.badge{ display:inline-block; font-family:var(--font-mono); font-size:10.5px; padding:2px 7px; border-radius:20px; border:1px solid var(--border-strong); color:var(--text-2); }
+.loading-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; place-items:center; z-index:50; backdrop-filter: blur(2px); }
+.loading-overlay.show{ display:grid; }
+.loading-box{ background:var(--surface); border:1px solid var(--border-strong); border-radius:10px; padding:18px 26px; font-family:var(--font-display); font-size:13px; letter-spacing:.03em; text-transform:uppercase; display:flex; align-items:center; gap:10px; box-shadow:var(--shadow); }
+.spinner{ width:16px; height:16px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--accent); animation: spin 0.7s linear infinite; }
+@keyframes spin{ to{ transform: rotate(360deg); } }
+[hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+
+
+<div class="loading-overlay" id="loadingOverlay"><div class="loading-box"><span class="spinner"></span> Simulando lotes…</div></div>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">QC</span>
+      <h1>SOLE-QC</h1>
+      <span class="brand-sub">Transformada inversa · beneficio de lotes de calzado</span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="a" id="tabBtnA">Mecanismo · Transformada inversa</button>
+      <button class="tab-btn" data-tab="b" id="tabBtnB">Simulación · Beneficio por lote</button>
+      <button class="tab-btn" data-tab="c" id="tabBtnC">Sensibilidad · Configuración</button>
+    </nav>
+    <button class="icon-btn" id="themeToggle" title="Cambiar tema claro/oscuro">◐</button>
+  </header>
+
+  <section class="brief">
+    <div>
+      <h2>Ejemplo 1 · Control de calidad en una cadena de calzado</h2>
+      <p>Las piezas se venden en <b style="color:var(--text)">cajas de 2 unidades</b>. Una caja sin defectos deja <b style="color:var(--text)">300&nbsp;€</b> de beneficio. Si al servirla contiene piezas defectuosas, el cliente la devuelve: se pierden los 300&nbsp;€ de beneficio y, además, 50&nbsp;€ por cada pieza defectuosa.</p>
+      <p>Como las cajas no se inspeccionan al cerrarse, la empresa solo conoce la <b style="color:var(--text)">tasa de defectos observada en las devoluciones</b>: N = número de piezas defectuosas por caja, con Pr(N=0)=0.82, Pr(N=1)=0.15, Pr(N=2)=0.03. Quiere estimar el beneficio del próximo mes, en el que puede producir hasta 1500 cajas.</p>
+      <div class="badge-row">
+        <span class="badge">N=0 → +300€ · p=0.82</span>
+        <span class="badge">N=1 → −50€ · p=0.15</span>
+        <span class="badge">N=2 → −100€ · p=0.03</span>
+      </div>
+    </div>
+    <div class="subcard" style="padding:12px 14px;">
+      <h4>Por qué transformada inversa</h4>
+      <p class="hint" style="font-size:12px;line-height:1.6;">No existe fórmula cerrada para "el beneficio de 1500 cajas". Pero si sabemos simular <i>una</i> caja (transformada inversa sobre N), sabemos simular el lote entero: se repite y se suma. La pestaña izquierda muestra el mecanismo sobre una caja; la derecha, lo que ese mecanismo implica sobre 1500.</p>
+    </div>
+  </section>
+
+  <div class="shell">
+    <!-- ============ SIDEBAR A ============ -->
+    <aside class="sidebar" id="sidebarA">
+      <details class="acc" open>
+        <summary>Pr(N=k) — política de calidad</summary>
+        <div class="acc-body">
+          <div class="field">
+            <div class="field-row"><label><span class="dot" style="background:var(--good)"></span> N=0 (sin defectos)</label><span class="val mono" id="outAp0">82%</span></div>
+            <input type="range" id="Ap0" min="0" max="100" value="82" step="1">
+          </div>
+          <div class="field">
+            <div class="field-row"><label><span class="dot" style="background:var(--warning)"></span> N=1 defecto</label><span class="val mono" id="outAp1">15%</span></div>
+            <input type="range" id="Ap1" min="0" max="100" value="15" step="1">
+          </div>
+          <div class="field">
+            <div class="field-row"><label><span class="dot" style="background:var(--critical)"></span> N=2 defectos</label><span class="val mono" id="outAp2">3%</span></div>
+            <input type="range" id="Ap2" min="0" max="100" value="3" step="1">
+          </div>
+          <div class="hint">Las tres se renormalizan automáticamente para sumar 100%.</div>
+        </div>
+      </details>
+
+      <details class="acc">
+        <summary>Beneficio por caja (€)</summary>
+        <div class="acc-body">
+          <div class="grid3">
+            <div class="field"><label>N=0</label><input type="number" id="Ab0" value="300" step="5"></div>
+            <div class="field"><label>N=1</label><input type="number" id="Ab1" value="-50" step="5"></div>
+            <div class="field"><label>N=2</label><input type="number" id="Ab2" value="-100" step="5"></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>U de ejemplo</summary>
+        <div class="acc-body">
+          <div class="field">
+            <div class="field-row"><label>U ~ Unif(0,1)</label><span class="val mono" id="outAu">0.85</span></div>
+            <input type="range" id="Au" min="0" max="100" value="85" step="1">
+          </div>
+          <button class="btn" id="randomU">🎲 U aleatorio</button>
+        </div>
+      </details>
+
+      <button class="btn ghost" id="resetA">Restablecer valores por defecto</button>
+    </aside>
+
+    <aside class="sidebar" id="sidebarB" hidden>
+      <details class="acc" open>
+        <summary>Tamaño del lote y de la simulación</summary>
+        <div class="acc-body">
+          <div class="field">
+            <div class="field-row"><label>Cajas por lote (ncajas)</label><span class="val mono" id="outNcajas">1,500</span></div>
+            <input type="range" id="ncajas" min="200" max="3000" value="1500" step="50">
+          </div>
+          <div class="field">
+            <div class="field-row"><label>Lotes simulados (nsim)</label><span class="val mono" id="outNsimB">10,000</span></div>
+            <input type="range" id="nsimB" min="1000" max="20000" value="10000" step="500">
+          </div>
+        </div>
+      </details>
+
+      <details class="acc">
+        <summary>Beneficio por caja (€)</summary>
+        <div class="acc-body">
+          <div class="grid3">
+            <div class="field"><label>N=0</label><input type="number" id="Bb0" value="300" step="5"></div>
+            <div class="field"><label>N=1</label><input type="number" id="Bb1" value="-50" step="5"></div>
+            <div class="field"><label>N=2</label><input type="number" id="Bb2" value="-100" step="5"></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>Políticas de calidad Pr(N=k), %</summary>
+        <div class="acc-body">
+          <table class="minitable">
+            <tr><th></th><th>N=0</th><th>N=1</th><th>N=2</th></tr>
+            <tr><td><span class="dot" style="background:var(--accent)"></span>Actual</td><td><input type="number" id="pol_actual_0" value="82" step="1"></td><td><input type="number" id="pol_actual_1" value="15" step="1"></td><td><input type="number" id="pol_actual_2" value="3" step="1"></td></tr>
+            <tr><td><span class="dot" style="background:var(--accent-2)"></span>Mejora</td><td><input type="number" id="pol_mejora_0" value="85" step="1"></td><td><input type="number" id="pol_mejora_1" value="13" step="1"></td><td><input type="number" id="pol_mejora_2" value="2" step="1"></td></tr>
+            <tr><td><span class="dot" style="background:var(--accent-3)"></span>Óptima</td><td><input type="number" id="pol_optima_0" value="90" step="1"></td><td><input type="number" id="pol_optima_1" value="10" step="1"></td><td><input type="number" id="pol_optima_2" value="0" step="1"></td></tr>
+          </table>
+          <div class="hint">Cada fila se normaliza para sumar 100% aunque no cuadre exactamente.</div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>Política a analizar en detalle</summary>
+        <div class="acc-body">
+          <select id="polSelect">
+            <option value="actual" selected>Actual (0.82 / 0.15 / 0.03)</option>
+            <option value="mejora">Mejora (0.85 / 0.13 / 0.02)</option>
+            <option value="optima">Óptima (0.90 / 0.10 / 0.00)</option>
+          </select>
+        </div>
+      </details>
+
+      <div class="btn-row">
+        <button class="btn primary" id="runB">▶ Simular</button>
+      </div>
+      <button class="btn ghost" id="resetB">Restablecer valores por defecto</button>
+    </aside>
+
+    <aside class="sidebar" id="sidebarC" hidden>
+      <details class="acc" open>
+        <summary>Qué variar</summary>
+        <div class="acc-body">
+          <div class="field">
+            <label>Parámetro del motor de simulación</label>
+            <select id="sensParam">
+              <option value="nsim" selected>Nº de lotes simulados (nsim)</option>
+              <option value="ncajas">Tamaño del lote (ncajas)</option>
+            </select>
+          </div>
+          <div id="sensNsimFields">
+            <div class="grid3">
+              <div class="field"><label>nsim mín.</label><input type="number" id="sensNsimMin" value="250" min="50" max="5000" step="50"></div>
+              <div class="field"><label>nsim máx.</label><input type="number" id="sensNsimMax" value="10000" min="500" max="15000" step="500"></div>
+              <div class="field"><label>ncajas fijo</label><input type="number" id="sensNcajasFixed" value="1500" min="100" max="2000" step="50"></div>
+            </div>
+          </div>
+          <div id="sensNcajasFields" hidden>
+            <div class="grid3">
+              <div class="field"><label>ncajas mín.</label><input type="number" id="sensNcajasMin" value="200" min="50" max="1500" step="50"></div>
+              <div class="field"><label>ncajas máx.</label><input type="number" id="sensNcajasMax" value="3000" min="200" max="3000" step="50"></div>
+              <div class="field"><label>nsim fijo</label><input type="number" id="sensNsimFixed" value="3000" min="500" max="5000" step="100"></div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-row"><label>Puntos a evaluar</label><span class="val mono" id="outSensPoints">5</span></div>
+            <input type="range" id="sensPoints" min="4" max="6" value="5" step="1">
+          </div>
+          <div class="hint">Los puntos de nsim se espacian logarítmicamente; los de ncajas, linealmente.</div>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>Réplicas y política</summary>
+        <div class="acc-body">
+          <div class="field">
+            <div class="field-row"><label>Réplicas por punto (semillas)</label><span class="val mono" id="outSensReplicas">5</span></div>
+            <input type="range" id="sensReplicas" min="1" max="6" value="5" step="1">
+          </div>
+          <div class="field">
+            <label>Política (toma Pr y beneficios de la pestaña Simulación)</label>
+            <select id="sensPolicy">
+              <option value="actual" selected>Actual</option>
+              <option value="mejora">Mejora</option>
+              <option value="optima">Óptima</option>
+            </select>
+          </div>
+          <div class="hint">Cada réplica relanza la simulación con una semilla distinta: su dispersión mide cuánto "tiembla" la estimación para esa configuración.</div>
+        </div>
+      </details>
+
+      <div class="btn-row">
+        <button class="btn primary" id="runC">▶ Analizar sensibilidad</button>
+      </div>
+      <button class="btn ghost" id="resetC">Restablecer valores por defecto</button>
+    </aside>
+
+    <!-- ============ MAIN DECK ============ -->
+    <main class="deck">
+
+      <section id="viewA">
+        <div class="section-title"><h2>Una tirada de la transformada inversa</h2><span class="n mono" id="aLabel">Pr(N=k)</span></div>
+        <div class="card" style="margin-top:10px;">
+          <h3>De un uniforme U a un número de defectos N</h3>
+          <div class="sub">Cambia Pr(N=k) o el beneficio por caja en la barra lateral, o lanza una nueva U, y observa el resultado del algoritmo.</div>
+          <div class="kpi-grid" id="kpiRowA"></div>
+        </div>
+
+        <div class="section-title" style="margin-top:22px;"><h2>Cómo funciona el algoritmo</h2></div>
+        <div class="steps" style="margin-top:10px;">
+          <div class="step">
+            <div class="num">1 · GENERAR</div>
+            <p>Se genera <span class="f">u ~ U(0,1)</span>. Un generador de números aleatorios solo sabe producir esto: alturas uniformes entre 0 y 1.</p>
+          </div>
+          <div class="step">
+            <div class="num">2 · BUSCAR EL ESCALÓN</div>
+            <p>Se busca el menor índice <span class="f">i</span> tal que <span class="f">u ≤ F(i) = p₀+…+pᵢ</span>. Es "en qué escalón de la escalera cae el dardo".</p>
+          </div>
+          <div class="step">
+            <div class="num">3 · DEVOLVER</div>
+            <p>Se devuelve <span class="f">N = i</span> y su beneficio asociado <span class="f">bᵢ</span>. Repetido muchas veces, reproduce exactamente las probabilidades p₀,p₁,p₂.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="viewB" hidden>
+        <div class="section-title"><h2>Objetivo 1 · Beneficio esperado del lote — Política: <span id="polNameLabel">Actual</span></h2><span class="n mono" id="bLabel">n = 10,000 lotes</span></div>
+        <div class="kpi-grid" id="kpiRowB"></div>
+
+        <div class="charts-row" style="margin-top:14px;">
+          <div class="card">
+            <h3>Distribución del beneficio por lote</h3>
+            <div class="sub">Histograma de los <span id="histN">10,000</span> lotes simulados de <span id="histNcajas">1,500</span> cajas, con la media en línea discontinua.</div>
+            <canvas id="histB" height="230"></canvas>
+          </div>
+          <div class="card">
+            <h3>Beneficio medio por lote, según política</h3>
+            <div class="sub">Mismo ncajas y nsim para las tres políticas; solo cambia Pr(N=k).</div>
+            <canvas id="barPolicies" height="230"></canvas>
+          </div>
+        </div>
+
+        <div class="section-title" style="margin-top:6px;"><h2>Objetivo 2 · Comparación de políticas de calidad</h2></div>
+        <div class="card" style="margin-top:10px;">
+          <h3>Simulación Monte Carlo frente al valor teórico</h3>
+          <div class="sub">E(beneficio/lote) = ncajas · Σ pᵢ·beneficioᵢ — la columna teórica confirma que la simulación acierta.</div>
+          <div class="overflow-x">
+            <table class="data" id="tablePolicies"></table>
+          </div>
+          <div class="hint" id="policiesReadout" style="margin-top:10px;"></div>
+        </div>
+      </section>
+
+      <section id="viewC" hidden>
+        <div class="section-title"><h2>Sensibilidad del estimador Monte Carlo</h2><span class="n mono" id="cLabel">sin ejecutar</span></div>
+        <div class="kpi-grid" id="kpiRowC" style="margin-top:10px;"></div>
+
+        <div class="charts-row" style="margin-top:14px;">
+          <div class="card">
+            <h3>Convergencia hacia el valor teórico</h3>
+            <div class="sub">Puntos claros: media de cada réplica (semilla). Punto sólido: media combinada. Línea discontinua: beneficio teórico exacto.</div>
+            <canvas id="sensConverge" height="260"></canvas>
+          </div>
+          <div class="card">
+            <h3>Variabilidad entre réplicas (σ entre semillas)</h3>
+            <div class="sub">Cuánto cambia la media estimada solo por cambiar la semilla, para cada configuración del motor.</div>
+            <canvas id="sensVariability" height="260"></canvas>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <h3>Tabla de barrido</h3>
+          <div class="sub">Una fila por configuración del sistema de simulación probada.</div>
+          <div class="overflow-x">
+            <table class="data" id="tableSens"></table>
+          </div>
+          <div class="hint" id="sensReadout" style="margin-top:10px;">Pulsa «Analizar sensibilidad» para ejecutar el barrido.</div>
+        </div>
+      </section>
+
+      <footer>
+        Simulación Monte Carlo 100% en el navegador (sin servidor): transformada inversa para la variable discreta N, y lote como suma de ncajas cajas i.i.d. Los intervalos de confianza al 95% se estiman con el error estándar de la media sobre las nsim réplicas. Basado en el Ejemplo 1 de «B-70. Distribuciones derivadas», Javier Morales y Asun Martínez Mayoral, equipo IA4LEGOS (CC BY-SA 4.0).
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ========================= RNG ========================= */
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let rnd = mulberry32((Date.now() ^ (Math.random()*1e9)) >>> 0);
+function reseed(){ rnd = mulberry32((Date.now() ^ (Math.random()*1e9)) >>> 0); }
+
+/* ========================= STATS HELPERS ========================= */
+function mean(arr){ let s=0; for(let i=0;i<arr.length;i++) s+=arr[i]; return s/arr.length; }
+function variance(arr){ const m=mean(arr); let s=0; for(let i=0;i<arr.length;i++){ const d=arr[i]-m; s+=d*d; } return s/(arr.length-1); }
+function sd(arr){ return Math.sqrt(variance(arr)); }
+function quantileSorted(sorted, q){
+  if(sorted.length===0) return NaN;
+  const idx = q*(sorted.length-1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if(lo===hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi]-sorted[lo])*(idx-lo);
+}
+function mcEstim(arr){
+  const m = mean(arr), s = sd(arr), se = s/Math.sqrt(arr.length);
+  return { point:m, lo:m-1.96*se, hi:m+1.96*se, se };
+}
+function normalize(p){ const s=p.reduce((a,b)=>a+b,0) || 1; return p.map(x=>x/s); }
+function cumsum(p){ let c=0; return p.map(x=>{ c+=x; return c; }); }
+
+/* ========================= FORMATTERS ========================= */
+const fmtEUR = (v)=> (v<0?"-":"") + "€" + Math.abs(v).toLocaleString("es-ES",{maximumFractionDigits: Math.abs(v)<100?2:0});
+const fmtPct = (v,d=1)=> (v*100).toFixed(d) + "%";
+
+/* ========================= PROBLEM CORE ========================= */
+// Transformada inversa: menor índice i tal que u <= F(i)
+function inverseIndex(u, cdf){
+  for(let i=0;i<cdf.length;i++){ if(u<=cdf[i]) return i; }
+  return cdf.length-1;
+}
+function sampleIndex(cdf){ return inverseIndex(rnd(), cdf); }
+
+function simulaLote(cdf, benef, ncajas){
+  let s=0;
+  for(let i=0;i<ncajas;i++){ s += benef[sampleIndex(cdf)]; }
+  return s;
+}
+function simulaPolitica(p, benef, ncajas, nsim){
+  const cdf = cumsum(normalize(p));
+  const out = new Float64Array(nsim);
+  for(let s=0;s<nsim;s++){ out[s] = simulaLote(cdf, benef, ncajas); }
+  return out;
+}
+function beneficioTeorico(p, benef, ncajas){
+  const pn = normalize(p);
+  let e=0; for(let i=0;i<pn.length;i++) e += pn[i]*benef[i];
+  return e*ncajas;
+}
+
+/* ========================= TAB A: MECANISMO ========================= */
+function linkProbSliders(ids, outs){
+  ids.forEach((id,idx)=>{
+    document.getElementById(id).addEventListener("input", ()=>{
+      const vals = ids.map(i=>parseFloat(document.getElementById(i).value));
+      const changed = idx;
+      const others = [0,1,2].filter(i=>i!==changed);
+      const newVal = Math.max(0,Math.min(100,vals[changed]));
+      let remaining = 100-newVal;
+      const otherSum = vals[others[0]]+vals[others[1]];
+      let a,b;
+      if(otherSum<=0){ a=remaining/2; b=remaining/2; }
+      else { a = remaining*(vals[others[0]]/otherSum); b = remaining*(vals[others[1]]/otherSum); }
+      vals[changed]=newVal; vals[others[0]]=a; vals[others[1]]=b;
+      ids.forEach((id2,i2)=>{ document.getElementById(id2).value = Math.round(vals[i2]); document.getElementById(outs[i2]).textContent = Math.round(vals[i2])+"%"; });
+      renderTabA();
+    });
+  });
+}
+
+function readConfigA(){
+  const g = id => document.getElementById(id);
+  const p = [parseFloat(g("Ap0").value)/100, parseFloat(g("Ap1").value)/100, parseFloat(g("Ap2").value)/100];
+  const benef = [parseFloat(g("Ab0").value), parseFloat(g("Ab1").value), parseFloat(g("Ab2").value)];
+  const u = parseFloat(g("Au").value)/100;
+  return { p: normalize(p), benef, u };
+}
+
+function renderTabA(){
+  const cfg = readConfigA();
+  const cdf = cumsum(cfg.p);
+  const simIndex = inverseIndex(cfg.u, cdf);
+  const benefit = cfg.benef[simIndex];
+
+  const kpiRow = document.getElementById("kpiRowA");
+  kpiRow.innerHTML = "";
+  kpiRow.appendChild(tile("U generado", cfg.u.toFixed(2), null, "", "altura uniforme lanzada al eje Y"));
+  kpiRow.appendChild(tile("N simulado (piezas defectuosas)", String(simIndex), null, simIndex===0?"good":(simIndex===1?"warn":"crit"), "escalón donde cayó U"));
+  kpiRow.appendChild(tile("Beneficio de la caja", fmtEUR(benefit), null, benefit>=0?"good":"crit", null));
+}
+
+/* ========================= TAB B: SIMULACIÓN ========================= */
+const POLICIES = ["actual","mejora","optima"];
+const POLICY_NAMES = { actual:"Actual", mejora:"Mejora", optima:"Óptima" };
+const POLICY_COLORS = { actual:"var(--accent)", mejora:"var(--accent-2)", optima:"var(--accent-3)" };
+
+function readConfigB(){
+  const g = id => document.getElementById(id);
+  const num = id => parseFloat(g(id).value);
+  const ncajas = Math.round(num("ncajas"));
+  const nsim = Math.round(num("nsimB"));
+  const benef = [num("Bb0"), num("Bb1"), num("Bb2")];
+  const policies = {};
+  POLICIES.forEach(key=>{
+    policies[key] = [num(`pol_${key}_0`)/100, num(`pol_${key}_1`)/100, num(`pol_${key}_2`)/100];
+  });
+  const selected = g("polSelect").value;
+  return { ncajas, nsim, benef, policies, selected };
+}
+
+let lastB = null;
+
+function runTabB(){
+  reseed();
+  const cfg = readConfigB();
+  const results = {};
+  POLICIES.forEach(key=>{
+    const lotes = simulaPolitica(cfg.policies[key], cfg.benef, cfg.ncajas, cfg.nsim);
+    const arr = Array.from(lotes);
+    results[key] = { lotes: arr, mc: mcEstim(arr), teo: beneficioTeorico(cfg.policies[key], cfg.benef, cfg.ncajas) };
+  });
+  lastB = { cfg, results };
+  renderTabB();
+}
+
+function renderTabB(){
+  const { cfg, results } = lastB;
+  const sel = results[cfg.selected];
+  const sorted = [...sel.lotes].sort((a,b)=>a-b);
+
+  document.getElementById("bLabel").textContent = "n = " + cfg.nsim.toLocaleString("es-ES") + " lotes";
+  document.getElementById("histN").textContent = cfg.nsim.toLocaleString("es-ES");
+  document.getElementById("histNcajas").textContent = cfg.ncajas.toLocaleString("es-ES");
+  document.getElementById("polNameLabel").textContent = POLICY_NAMES[cfg.selected];
+
+  const kpiRow = document.getElementById("kpiRowB");
+  kpiRow.innerHTML = "";
+  kpiRow.appendChild(tile("Beneficio medio por lote (MC)", fmtEUR(sel.mc.point), `IC95%: [${fmtEUR(sel.mc.lo)}, ${fmtEUR(sel.mc.hi)}]`, "", null));
+  kpiRow.appendChild(tile("Valor teórico exacto", fmtEUR(sel.teo), null, "", "ncajas · Σ pᵢ·beneficioᵢ"));
+  kpiRow.appendChild(tile("Desviación típica σ(Y)", fmtEUR(sd(sel.lotes)), null, "", "incertidumbre del beneficio de un lote"));
+  kpiRow.appendChild(tile("Coef. de variación CV(Y)", (sd(sel.lotes)/sel.mc.point).toFixed(3), null, "", null));
+  kpiRow.appendChild(tile("Percentil 5 (peor caso)", fmtEUR(quantileSorted(sorted,0.05)), null, "warn", "1 de cada 20 lotes resulta peor que esto"));
+
+  drawHistogram(document.getElementById("histB"), sel.lotes, sel.mc.point);
+
+  drawBarChart(document.getElementById("barPolicies"), POLICIES.map(key=>({
+    label: POLICY_NAMES[key], value: results[key].mc.point, color: POLICY_COLORS[key]
+  })), { fmt: (v)=>fmtEUR(v) });
+
+  let rows = `<tr><th>Política</th><th>Pr(N=0,1,2)</th><th>MC media (€)</th><th>IC95% inf (€)</th><th>IC95% sup (€)</th><th>Teórico (€)</th></tr>`;
+  POLICIES.forEach(key=>{
+    const pn = normalize(cfg.policies[key]);
+    const r = results[key];
+    rows += `<tr><td><span class="pol-chip"><span class="dot" style="background:${POLICY_COLORS[key]}"></span>${POLICY_NAMES[key]}</span></td>`+
+      `<td>${pn.map(x=>x.toFixed(2)).join(" / ")}</td>`+
+      `<td>${fmtEUR(r.mc.point)}</td><td>${fmtEUR(r.mc.lo)}</td><td>${fmtEUR(r.mc.hi)}</td><td>${fmtEUR(r.teo)}</td></tr>`;
+  });
+  document.getElementById("tablePolicies").innerHTML = rows;
+
+  const bestKey = POLICIES.reduce((a,b)=> results[b].mc.point>results[a].mc.point? b:a);
+  const worstKey = POLICIES.reduce((a,b)=> results[b].mc.point<results[a].mc.point? b:a);
+  const gain = results[bestKey].mc.point - results[worstKey].mc.point;
+  document.getElementById("policiesReadout").textContent =
+    `Cada mejora en la tasa de defectos eleva el beneficio esperado por lote: la política «${POLICY_NAMES[bestKey]}» supera a «${POLICY_NAMES[worstKey]}» en ${fmtEUR(gain)} por lote (${fmtEUR(gain*30)} en un mes de 30 lotes), y la columna teórica confirma que la simulación reproduce ese valor.`;
+}
+
+/* ========================= TAB C: SENSIBILIDAD ========================= */
+function logSpace(mn,mx,n){ const out=[]; for(let i=0;i<n;i++){ const v = n===1?mn: mn*Math.pow(mx/mn, i/(n-1)); out.push(Math.max(1,Math.round(v))); } return out; }
+function linSpace(mn,mx,n){ const out=[]; for(let i=0;i<n;i++){ out.push(n===1?mn: mn+(mx-mn)*i/(n-1)); } return out.map(v=>Math.max(1,Math.round(v))); }
+
+function readConfigC(){
+  const g = id => document.getElementById(id);
+  const param = g("sensParam").value; // 'nsim' | 'ncajas'
+  const points = clamp(Math.round(parseFloat(g("sensPoints").value)), 4, 6);
+  const replicas = clamp(Math.round(parseFloat(g("sensReplicas").value)), 1, 6);
+  const polKey = g("sensPolicy").value;
+
+  // Reads Pr(N=k) and benefits straight from the Simulación tab's own inputs,
+  // so the sensitivity sweep always analyzes whatever policy is set up there.
+  const benef = [parseFloat(g("Bb0").value), parseFloat(g("Bb1").value), parseFloat(g("Bb2").value)];
+  const p = normalize([
+    parseFloat(g(`pol_${polKey}_0`).value)/100,
+    parseFloat(g(`pol_${polKey}_1`).value)/100,
+    parseFloat(g(`pol_${polKey}_2`).value)/100,
+  ]);
+
+  let values, fixedOther;
+  if(param==="nsim"){
+    const mn = clamp(parseFloat(g("sensNsimMin").value), 50, 5000);
+    const mx = clamp(parseFloat(g("sensNsimMax").value), Math.max(mn+1,500), 15000);
+    values = logSpace(mn, mx, points);
+    fixedOther = clamp(Math.round(parseFloat(g("sensNcajasFixed").value)), 100, 2000);
+  } else {
+    const mn = clamp(parseFloat(g("sensNcajasMin").value), 50, 1500);
+    const mx = clamp(parseFloat(g("sensNcajasMax").value), Math.max(mn+1,200), 3000);
+    values = linSpace(mn, mx, points);
+    fixedOther = clamp(Math.round(parseFloat(g("sensNsimFixed").value)), 500, 5000);
+  }
+  return { param, values, replicas, polKey, p, benef, fixedOther };
+}
+
+let lastC = null;
+
+function runSensitivity(){
+  const cfg = readConfigC();
+  const points = cfg.values.map(x=>{
+    const ncajas_i = cfg.param==="ncajas" ? x : cfg.fixedOther;
+    const nsim_i   = cfg.param==="nsim"   ? x : cfg.fixedOther;
+    let totalSum=0, totalSumSq=0, totalN=0;
+    const replicaMeans = [];
+    for(let r=0;r<cfg.replicas;r++){
+      reseed();
+      const lotes = simulaPolitica(cfg.p, cfg.benef, ncajas_i, nsim_i);
+      let s=0, sq=0;
+      for(let k=0;k<lotes.length;k++){ s+=lotes[k]; sq+=lotes[k]*lotes[k]; }
+      replicaMeans.push(s/lotes.length);
+      totalSum+=s; totalSumSq+=sq; totalN+=lotes.length;
+    }
+    const pooledMean = totalSum/totalN;
+    const pooledVar = Math.max(0, (totalSumSq - totalN*pooledMean*pooledMean)/Math.max(1,totalN-1));
+    const pooledSE = Math.sqrt(pooledVar/totalN);
+    const betweenSD = cfg.replicas>1 ? sd(replicaMeans) : 0;
+    const teo = beneficioTeorico(cfg.p, cfg.benef, ncajas_i);
+    return { x, ncajas:ncajas_i, nsim:nsim_i, replicaMeans, pooledMean, lo:pooledMean-1.96*pooledSE, hi:pooledMean+1.96*pooledSE, betweenSD, teo };
+  });
+  lastC = { cfg, points };
+  renderSensitivity();
+}
+
+function renderSensitivity(){
+  const { cfg, points } = lastC;
+  const paramLabel = cfg.param==="nsim" ? "nsim" : "ncajas";
+  document.getElementById("cLabel").textContent = points.length + " configuraciones · " + cfg.replicas + " réplicas c/u";
+
+  const first = points[0].betweenSD, last = points[points.length-1].betweenSD;
+  const reduction = (first>0 && last>0) ? (first/last) : null;
+
+  const kpiRow = document.getElementById("kpiRowC");
+  kpiRow.innerHTML = "";
+  kpiRow.appendChild(tile("Parámetro variado", paramLabel==="nsim"?"nsim (lotes)":"ncajas (tamaño)", null, "", paramLabel==="nsim" ? `ncajas fijo = ${cfg.fixedOther.toLocaleString("es-ES")}` : `nsim fijo = ${cfg.fixedOther.toLocaleString("es-ES")}`));
+  kpiRow.appendChild(tile("Rango probado", `${points[0].x.toLocaleString("es-ES")} – ${points[points.length-1].x.toLocaleString("es-ES")}`, null, "", points.length+" puntos"));
+  kpiRow.appendChild(tile("Réplicas por punto", String(cfg.replicas), null, "", "semillas independientes"));
+  kpiRow.appendChild(tile("Reducción de variabilidad", reduction? ("×"+reduction.toFixed(1)) : "—", null, reduction?"good":"", reduction? "σ entre réplicas del primer punto frente al último" : "con 1 réplica no hay variabilidad que medir"));
+
+  drawSensitivityScatter(document.getElementById("sensConverge"), points, paramLabel);
+  drawBarChart(document.getElementById("sensVariability"), points.map(pt=>({
+    label: fmtSensLabel(pt.x, paramLabel), value: pt.betweenSD, color: "var(--accent)"
+  })), { fmt:(v)=>fmtEUR(v) });
+
+  let rows = `<tr><th>${paramLabel}</th><th>ncajas</th><th>nsim</th><th>Media combinada (€)</th><th>IC95% (€)</th><th>σ entre réplicas (€)</th><th>Teórico (€)</th></tr>`;
+  points.forEach(pt=>{
+    rows += `<tr><td>${pt.x.toLocaleString("es-ES")}</td><td>${pt.ncajas.toLocaleString("es-ES")}</td><td>${pt.nsim.toLocaleString("es-ES")}</td>`+
+      `<td>${fmtEUR(pt.pooledMean)}</td><td>[${fmtEUR(pt.lo)}, ${fmtEUR(pt.hi)}]</td><td>${fmtEUR(pt.betweenSD)}</td><td>${fmtEUR(pt.teo)}</td></tr>`;
+  });
+  document.getElementById("tableSens").innerHTML = rows;
+
+  document.getElementById("sensReadout").textContent =
+    `A medida que ${paramLabel==="nsim"?"crece nsim (más lotes simulados)":"crece ncajas (lotes más grandes)"}, la media combinada converge al valor teórico y la dispersión entre semillas se reduce` +
+    (reduction? ` (${reduction.toFixed(1)} veces menor entre el primer y el último punto)` : "") +
+    `: así se ve, de forma directa, de qué configuración del motor de simulación depende la precisión del resultado.`;
+}
+
+function fmtSensLabel(x, paramLabel){ return (paramLabel==="nsim" ? "n=" : "c=") + x.toLocaleString("es-ES"); }
+
+function drawSensitivityScatter(canvas, points, paramLabel){
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:60, r:16, t:16, b:36};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const allVals = points.flatMap(pt=>pt.replicaMeans.concat([pt.teo]));
+  const minV = Math.min(...allVals), maxV = Math.max(...allVals);
+  const span = (maxV-minV) || Math.max(1,Math.abs(minV)*0.1);
+  const yMin = minV - span*0.12, yMax = maxV + span*0.12;
+  const yPix = v => pad.t + plotH*(1-(v-yMin)/(yMax-yMin));
+  const n = points.length;
+  const xPix = i => pad.l + (n<=1 ? plotW/2 : plotW*i/(n-1));
+
+  const muted = cssVar("--text-muted"), grid = cssVar("--grid"), accent = cssVar("--accent"), text = cssVar("--text");
+
+  ctx.strokeStyle = grid; ctx.lineWidth = 1; ctx.font = "10px " + cssVar("--font-mono"); ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let i=0;i<=4;i++){
+    const v = yMin + (yMax-yMin)*i/4;
+    const py = yPix(v);
+    ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(w-pad.r, py); ctx.stroke();
+    ctx.fillText(fmtEUR(v), pad.l-6, py);
+  }
+
+  // theoretical reference (dashed, connects per-point teo — flat when the other param is held fixed)
+  ctx.strokeStyle = muted; ctx.setLineDash([5,4]); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  points.forEach((pt,i)=>{ const x=xPix(i), y=yPix(pt.teo); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // per-replica dots + range line
+  points.forEach((pt,i)=>{
+    const x = xPix(i);
+    const ys = pt.replicaMeans.map(yPix);
+    if(ys.length>1){
+      ctx.strokeStyle = muted; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, Math.min(...ys)); ctx.lineTo(x, Math.max(...ys)); ctx.stroke();
+    }
+    ctx.fillStyle = accent; ctx.globalAlpha = 0.45;
+    ys.forEach(y=>{ ctx.beginPath(); ctx.arc(x,y,2.6,0,Math.PI*2); ctx.fill(); });
+    ctx.globalAlpha = 1;
+  });
+
+  // pooled-mean trend line + solid markers
+  ctx.strokeStyle = accent; ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  points.forEach((pt,i)=>{ const x=xPix(i), y=yPix(pt.pooledMean); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+  points.forEach((pt,i)=>{
+    const x=xPix(i), y=yPix(pt.pooledMean);
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.arc(x,y,4.5,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = cssVar("--surface"); ctx.lineWidth=1.5; ctx.stroke();
+  });
+
+  // x labels
+  ctx.fillStyle = muted; ctx.font = "10px " + cssVar("--font-mono"); ctx.textAlign="center"; ctx.textBaseline="top";
+  points.forEach((pt,i)=> ctx.fillText(fmtSensLabel(pt.x, paramLabel), xPix(i), pad.t+plotH+8));
+}
+
+/* ========================= CHARTS (canvas, no deps) ========================= */
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || name; }
+function resolveColor(c){ return c && c.startsWith("var(") ? cssVar(c.slice(4,-1)) : c; }
+
+function setupCanvas(canvas){
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || canvas.parentElement.clientWidth || 300;
+  const h = canvas.clientHeight || parseInt(canvas.getAttribute("height")) || 220;
+  canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return { ctx, w, h };
+}
+
+function tile(label, valueHTML, ciText, cls, noteText){
+  const d = document.createElement("div");
+  d.className = "tile" + (cls? " "+cls: "");
+  d.innerHTML = `<div class="lbl">${label}</div><div class="val">${valueHTML}</div>` +
+    (ciText? `<div class="ci">${ciText}</div>`:"") + (noteText? `<div class="note">${noteText}</div>`:"");
+  return d;
+}
+
+function drawHistogram(canvas, values, meanVal){
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:56, r:14, t:12, b:28};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const minV = Math.min(...values), maxV = Math.max(...values);
+  const bins = 40;
+  const counts = new Array(bins).fill(0);
+  const range = (maxV-minV) || 1;
+  for(const v of values){ const bi = Math.min(bins-1, Math.max(0, Math.floor((v-minV)/range*bins))); counts[bi]++; }
+  const maxCount = Math.max(...counts);
+  const gridColor = cssVar("--grid"), muted = cssVar("--text-muted"), accent = cssVar("--accent"), critical = cssVar("--critical");
+  ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
+  ctx.font = "10px " + cssVar("--font-mono"); ctx.fillStyle = muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let i=0;i<=4;i++){
+    const y = pad.t + plotH - (plotH*i/4);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w-pad.r, y); ctx.stroke();
+    ctx.fillText(Math.round(maxCount*i/4).toString(), pad.l-6, y);
+  }
+  const barW = plotW/bins;
+  for(let i=0;i<bins;i++){
+    const bh = plotH * (counts[i]/maxCount);
+    const x0 = minV + i*range/bins;
+    ctx.fillStyle = x0<0 ? critical : accent;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(pad.l+i*barW+1, pad.t+plotH-bh, Math.max(1,barW-2), bh);
+  }
+  ctx.globalAlpha = 1;
+  const xMean = pad.l + plotW*((meanVal-minV)/range);
+  ctx.strokeStyle = cssVar("--text"); ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(xMean, pad.t); ctx.lineTo(xMean, pad.t+plotH); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = cssVar("--text"); ctx.textAlign="center"; ctx.font="600 10.5px " + cssVar("--font-mono");
+  ctx.fillText(fmtEUR(meanVal), xMean, pad.t-2);
+  ctx.fillStyle = muted; ctx.textAlign="center"; ctx.textBaseline="top"; ctx.font="10px " + cssVar("--font-mono");
+  for(let i=0;i<=4;i++){
+    const x = pad.l + plotW*i/4;
+    ctx.fillText(fmtEUR(minV + range*i/4), x, pad.t+plotH+6);
+  }
+}
+
+function roundRectTop(ctx,x,y,width,height,r){
+  ctx.beginPath();
+  ctx.moveTo(x, y+height);
+  ctx.lineTo(x, y+r);
+  ctx.arcTo(x,y,x+r,y,r);
+  ctx.lineTo(x+width-r,y);
+  ctx.arcTo(x+width,y,x+width,y+r,r);
+  ctx.lineTo(x+width,y+height);
+  ctx.closePath();
+}
+
+function drawBarChart(canvas, items, opts){
+  opts = opts || {};
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:14, r:14, t:14, b:30};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const vals = items.map(d=>d.value);
+  const minVal = Math.min(0, ...vals), maxVal = Math.max(...vals, 1e-9);
+  const range = (maxVal-minVal) || 1;
+  const n = items.length;
+  const gap = 18;
+  const barW = (plotW - gap*(n-1)) / n;
+  const gridColor = cssVar("--grid"), muted = cssVar("--text-muted"), text = cssVar("--text");
+  const zeroY = pad.t + plotH*(1-(0-minVal)/range);
+  ctx.strokeStyle = gridColor; ctx.beginPath(); ctx.moveTo(pad.l, zeroY); ctx.lineTo(w-pad.r, zeroY); ctx.stroke();
+  items.forEach((it,i)=>{
+    const x = pad.l + i*(barW+gap);
+    const topY = pad.t + plotH*(1-(it.value-minVal)/range);
+    const bh = Math.max(2, zeroY-topY);
+    const color = resolveColor(it.color);
+    ctx.fillStyle = color;
+    roundRectTop(ctx, x, Math.min(topY,zeroY), barW, bh, 4);
+    ctx.fill();
+    ctx.fillStyle = text; ctx.textAlign="center"; ctx.font="600 12px " + cssVar("--font-mono");
+    ctx.fillText(opts.fmt ? opts.fmt(it.value) : it.value, x+barW/2, Math.min(topY,zeroY)-8);
+    ctx.fillStyle = muted; ctx.font="11px " + cssVar("--font-body"); ctx.textBaseline="top";
+    ctx.fillText(String(it.label), x+barW/2, pad.t+plotH+6);
+  });
+}
+
+function redrawVisible(){
+  if(!document.getElementById("viewA").hidden) renderTabA();
+  if(!document.getElementById("viewB").hidden && lastB) renderTabB();
+  if(!document.getElementById("viewC").hidden && lastC) renderSensitivity();
+}
+
+/* ========================= UI WIRING ========================= */
+function wireLiveReadout(rangeId, outId, suffix, fmt){
+  const el = document.getElementById(rangeId);
+  const out = document.getElementById(outId);
+  el.addEventListener("input", ()=>{ out.textContent = (fmt?fmt(el.value):Number(el.value).toLocaleString("es-ES")) + (suffix||""); });
+}
+
+function withLoading(fn){
+  const overlay = document.getElementById("loadingOverlay");
+  overlay.classList.add("show");
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{
+    try{ fn(); } finally { overlay.classList.remove("show"); }
+  }));
+}
+
+function switchTab(which){
+  ["a","b","c"].forEach(key=>{
+    const active = key===which;
+    document.getElementById("view"+key.toUpperCase()).hidden = !active;
+    document.getElementById("sidebar"+key.toUpperCase()).hidden = !active;
+    document.getElementById("tabBtn"+key.toUpperCase()).classList.toggle("active", active);
+  });
+  redrawVisible();
+}
+
+function resetA(){
+  const set=(id,v)=>{ document.getElementById(id).value=v; };
+  set("Ap0",82); set("Ap1",15); set("Ap2",3);
+  document.getElementById("outAp0").textContent="82%"; document.getElementById("outAp1").textContent="15%"; document.getElementById("outAp2").textContent="3%";
+  set("Ab0",300); set("Ab1",-50); set("Ab2",-100);
+  set("Au",85); document.getElementById("outAu").textContent="0.85";
+  renderTabA();
+}
+
+function resetB(){
+  const set=(id,v)=>{ document.getElementById(id).value=v; };
+  set("ncajas",1500); document.getElementById("outNcajas").textContent="1,500";
+  set("nsimB",10000); document.getElementById("outNsimB").textContent="10,000";
+  set("Bb0",300); set("Bb1",-50); set("Bb2",-100);
+  set("pol_actual_0",82); set("pol_actual_1",15); set("pol_actual_2",3);
+  set("pol_mejora_0",85); set("pol_mejora_1",13); set("pol_mejora_2",2);
+  set("pol_optima_0",90); set("pol_optima_1",10); set("pol_optima_2",0);
+  document.getElementById("polSelect").value="actual";
+  runTabB();
+}
+
+function resetC(){
+  const set=(id,v)=>{ document.getElementById(id).value=v; };
+  set("sensParam","nsim");
+  document.getElementById("sensNsimFields").hidden = false;
+  document.getElementById("sensNcajasFields").hidden = true;
+  set("sensNsimMin",250); set("sensNsimMax",10000); set("sensNcajasFixed",1500);
+  set("sensNcajasMin",200); set("sensNcajasMax",3000); set("sensNsimFixed",3000);
+  set("sensPoints",5); document.getElementById("outSensPoints").textContent="5";
+  set("sensReplicas",5); document.getElementById("outSensReplicas").textContent="5";
+  set("sensPolicy","actual");
+  runSensitivity();
+}
+
+function init(){
+  linkProbSliders(["Ap0","Ap1","Ap2"], ["outAp0","outAp1","outAp2"]);
+  wireLiveReadout("Au","outAu","", v=>(Number(v)/100).toFixed(2));
+  document.getElementById("Au").addEventListener("input", renderTabA);
+  document.getElementById("Ab0").addEventListener("input", renderTabA);
+  document.getElementById("Ab1").addEventListener("input", renderTabA);
+  document.getElementById("Ab2").addEventListener("input", renderTabA);
+  document.getElementById("randomU").addEventListener("click", ()=>{
+    const v = Math.round(rnd()*100);
+    document.getElementById("Au").value = v;
+    document.getElementById("outAu").textContent = (v/100).toFixed(2);
+    renderTabA();
+  });
+  document.getElementById("resetA").addEventListener("click", resetA);
+
+  wireLiveReadout("ncajas","outNcajas");
+  wireLiveReadout("nsimB","outNsimB");
+  document.getElementById("polSelect").addEventListener("change", ()=>{ if(lastB) renderTabB(); });
+  document.getElementById("runB").addEventListener("click", ()=> withLoading(runTabB));
+  document.getElementById("resetB").addEventListener("click", ()=> withLoading(resetB));
+
+  wireLiveReadout("sensPoints","outSensPoints");
+  wireLiveReadout("sensReplicas","outSensReplicas");
+  document.getElementById("sensParam").addEventListener("change", ()=>{
+    const isNsim = document.getElementById("sensParam").value === "nsim";
+    document.getElementById("sensNsimFields").hidden = !isNsim;
+    document.getElementById("sensNcajasFields").hidden = isNsim;
+  });
+  document.getElementById("runC").addEventListener("click", ()=> withLoading(runSensitivity));
+  document.getElementById("resetC").addEventListener("click", ()=> withLoading(resetC));
+
+  document.getElementById("tabBtnA").addEventListener("click", ()=>switchTab("a"));
+  document.getElementById("tabBtnB").addEventListener("click", ()=>switchTab("b"));
+  document.getElementById("tabBtnC").addEventListener("click", ()=>switchTab("c"));
+
+  document.getElementById("themeToggle").addEventListener("click", ()=>{
+    const root = document.documentElement;
+    const cur = root.getAttribute("data-theme");
+    const next = cur==="dark" ? "light" : (cur==="light" ? null : "dark");
+    if(next) root.setAttribute("data-theme", next); else root.removeAttribute("data-theme");
+    redrawVisible();
+  });
+
+  let resizeTimer=null;
+  window.addEventListener("resize", ()=>{ clearTimeout(resizeTimer); resizeTimer=setTimeout(redrawVisible, 120); });
+
+  // First paint: populate with the notebook's own defaults so the page opens
+  // already showing a real result, not an empty shell.
+  renderTabA();
+  withLoading(runTabB);
+}
+
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+
+})();
+</script>
+
+</body>
+</html>
