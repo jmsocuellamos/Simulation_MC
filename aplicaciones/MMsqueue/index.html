@@ -1,0 +1,1826 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colas M/M/s</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===================================================================
+   DESIGN PLAN
+   Layout: mission-control deck — same family as the other teaching tools
+   in this series (fixed instrument sidebar + scrolling telemetry main).
+   Three tabs: the theory (birth-death CTMC, closed-form P0/L/Lq/W/Wq and
+   the full p_n distribution via Erlang C), the discrete-event simulation
+   that validates those formulas against a Gillespie-style next-event
+   engine, and the cost/dimensioning view (CTS/CTSn/CTQ/CT plus a sweep
+   over s to find the economically optimal number of servers, excluding
+   unstable configurations).
+   Color: dark-first palette. --accent marks the server region of the
+   state space, --accent-2 the queue region (unbounded — no blocking in
+   M/M/s), --critical flags unstable (ρ≥1) outcomes, --good the
+   recommended configuration.
+   Type: Chakra Petch (display) for headings/labels; IBM Plex Sans (body);
+   IBM Plex Mono (data) for every number.
+   =================================================================== */
+:root{
+  color-scheme: dark;
+  --bg: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232320;
+  --surface-3: #2a2a27;
+  --text: #ffffff;
+  --text-2: #c3c2b7;
+  --text-muted: #898781;
+  --border: rgba(255,255,255,0.12);
+  --border-strong: rgba(255,255,255,0.22);
+  --grid: #2c2c2a;
+  --accent: #3987e5;
+  --accent-ink: #eaf2ff;
+  --accent-2: #d9972a;
+  --accent-3: #199e70;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #e66767;
+  --shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35);
+  --radius: 10px;
+  --font-display: "Chakra Petch", "Rajdhani", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme: light;
+    --bg: #f1f0ea; --surface: #fcfcfb; --surface-2: #f2f1ec; --surface-3: #eae8e0;
+    --text: #0b0b0b; --text-2: #52514e; --text-muted: #706f6a;
+    --border: rgba(11,11,11,0.12); --border-strong: rgba(11,11,11,0.28);
+    --grid: #e1e0d9;
+    --accent: #2a78d6; --accent-ink: #0b2f5c; --accent-2: #a9700f; --accent-3: #137a53;
+    --good: #0b7a0b; --warning: #92650a; --critical: #b23232;
+  }
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg: #f1f0ea; --surface: #fcfcfb; --surface-2: #f2f1ec; --surface-3: #eae8e0;
+  --text: #0b0b0b; --text-2: #52514e; --text-muted: #706f6a;
+  --border: rgba(11,11,11,0.12); --border-strong: rgba(11,11,11,0.28);
+  --grid: #e1e0d9;
+  --accent: #2a78d6; --accent-ink: #0b2f5c; --accent-2: #a9700f; --accent-3: #137a53;
+  --good: #0b7a0b; --warning: #92650a; --critical: #b23232;
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232320; --surface-3: #2a2a27;
+  --text: #ffffff; --text-2: #c3c2b7; --text-muted: #898781;
+  --border: rgba(255,255,255,0.12); --border-strong: rgba(255,255,255,0.22);
+  --grid: #2c2c2a;
+  --accent: #3987e5; --accent-ink: #eaf2ff; --accent-2: #d9972a; --accent-3: #199e70;
+  --good: #0ca30c; --warning: #fab219; --critical: #e66767;
+}
+
+*{box-sizing:border-box;}
+body{ background: var(--bg); color: var(--text); font-family: var(--font-body); font-size:17px; margin:0; padding-inline:16px; }
+h1,h2,h3,h4{ font-family: var(--font-display); font-weight:600; letter-spacing:.01em; margin:0; text-wrap:balance; }
+p{ margin:0; }
+.mono{ font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+button{ font-family: var(--font-body); cursor:pointer; }
+input[type="range"]{ width:100%; accent-color: var(--accent); }
+input[type="number"]{
+  font-family: var(--font-mono); background: var(--surface); color: var(--text);
+  border:1px solid var(--border-strong); border-radius:6px; padding:5px 7px; width:100%;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.06) inset;
+}
+input[type="number"]:focus, input[type="range"]:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+select{ font-family: var(--font-mono); background: var(--surface); color: var(--text); border:1px solid var(--border-strong); border-radius:6px; padding:7px 8px; width:100%; appearance:auto; }
+.subcard input[type="number"]{ background: var(--surface-2); }
+.minitable input[type="number"]{ background: var(--surface-2); }
+label{ font-size:15px; color: var(--text-2); }
+.app{ max-width:1440px; margin:0 auto; padding-block: calc(14px + env(safe-area-inset-top,0px)) 48px; }
+
+/* ---------- top bar ---------- */
+.topbar{
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  padding:14px 18px; margin-bottom:16px;
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+  border:1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.brand{ display:flex; align-items:baseline; gap:10px; margin-right:auto; }
+.brand-mark{
+  display:inline-grid; place-items:center; width:34px; height:34px; border-radius:8px;
+  background: var(--accent); color:#fff; font-size:14px; font-family:var(--font-display); font-weight:700;
+  flex-shrink:0;
+}
+.brand h1{ font-size: 23px; color:var(--text); }
+.brand .brand-sub{ font-size:15px; color:var(--text-muted); font-family:var(--font-body); margin-left:8px; }
+.tabs{ display:flex; gap:6px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:3px; flex-wrap:wrap; }
+.tab-btn{
+  font-family: var(--font-display); font-size:15px; letter-spacing:.02em; text-transform:uppercase;
+  background:transparent; border:none; color:var(--text-muted); padding:8px 13px; border-radius:6px;
+}
+.tab-btn.active{ background: var(--accent); color:#fff; }
+.icon-btn{
+  width:34px; height:34px; border-radius:8px; border:1px solid var(--border); background:var(--surface-2);
+  color:var(--text); font-size:18px; display:grid; place-items:center;
+}
+.icon-btn:hover{ border-color: var(--border-strong); }
+
+/* ---------- shell ---------- */
+.shell{ display:grid; grid-template-columns: 320px 1fr; gap:16px; align-items:start; }
+@media (max-width: 860px){ .shell{ grid-template-columns: 1fr; } }
+
+.sidebar{
+  background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
+  padding:14px; display:flex; flex-direction:column; gap:10px; box-shadow: var(--shadow);
+  position: relative; isolation: isolate;
+}
+
+.acc{ border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface-2); position:relative; z-index:0; }
+.acc > summary{
+  list-style:none; cursor:pointer; padding:9px 11px; font-family:var(--font-display);
+  font-size:15px; letter-spacing:.03em; text-transform:uppercase; color:var(--text-2);
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+.acc > summary::-webkit-details-marker{ display:none; }
+.acc > summary::after{ content:"▸"; color:var(--text-muted); transition: transform .15s; }
+.acc[open] > summary::after{ transform: rotate(90deg); }
+.acc-body{ padding:10px 11px 12px; display:flex; flex-direction:column; gap:10px; border-top:1px solid var(--border); }
+.field{ display:flex; flex-direction:column; gap:4px; }
+.field-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.field-row .val{ font-family:var(--font-mono); font-size:15px; color:var(--accent); font-variant-numeric:tabular-nums; min-width:50px; text-align:right; }
+.subcard{ background:var(--surface-3); border:1px solid var(--border); border-radius:7px; padding:8px 9px; }
+.subcard h4{ font-size:15px; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.dot{ width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.minitable{ width:100%; border-collapse:collapse; font-size:14px; }
+.minitable th{ font-family:var(--font-display); font-weight:600; color:var(--text-muted); text-align:center; padding:2px; font-size:12px; text-transform:uppercase; }
+.minitable td{ padding:2px; text-align:center; }
+.minitable input[type=number]{ padding:5px 3px; font-size:14px; text-align:center; }
+.minitable td:first-child{ color:var(--text-2); font-size:13.5px; padding-right:3px; white-space:nowrap; }
+
+.btn{
+  font-family:var(--font-display); font-size:15.5px; letter-spacing:.02em; text-transform:uppercase;
+  border-radius:8px; border:1px solid var(--border-strong); padding:11px 14px; text-align:center;
+  background:var(--surface-2); color:var(--text);
+}
+.btn.primary{ background: var(--accent); border-color:var(--accent); color:#fff; font-size:17px; padding:13px; }
+.btn.primary:hover{ filter:brightness(1.08); }
+.btn.ghost{ background:transparent; }
+.btn-row{ display:flex; gap:8px; }
+.btn-row .btn{ flex:1; }
+.pipeline-controls{ display:flex; align-items:center; gap:14px; margin-top:12px; flex-wrap:wrap; }
+.pipeline-controls .btn{ flex:0 0 auto; width:44px; padding:9px 0; font-size:17px; }
+.pipeline-controls .field{ flex:1 1 160px; margin:0; min-width:140px; }
+.pipeline-stats{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+.pipeline-stats .chip{ background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:5px 9px; flex:1 1 96px; min-width:88px; }
+.pipeline-stats .chip .lbl{ font-size:10.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.02em; font-family:var(--font-display); white-space:normal; line-height:1.25; }
+.pipeline-stats .chip .val{ font-family:var(--font-mono); font-size:16px; font-weight:600; margin-top:1px; color:var(--text); }
+.pipeline-stats .chip.clock{ border-color:var(--accent-3); }
+.pipeline-canvas-wrap{ max-width:760px; margin:0 auto; }
+.pipeline-canvas-wrap canvas{ height:240px; }
+.hint{ font-size:14px; color:var(--text-muted); line-height:1.5; }
+
+/* ---------- main deck ---------- */
+.deck{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+.card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); min-width:0; }
+.card h3{ font-size:18.5px; margin-bottom:3px; }
+.card .sub{ font-size:15px; color:var(--text-muted); margin-bottom:12px; }
+.section-title{ display:flex; align-items:baseline; gap:10px; margin: 6px 2px 0; flex-wrap:wrap; }
+.section-title h2{ font-size:21px; }
+.section-title .n{ font-family:var(--font-mono); font-size:14px; color:var(--text-muted); border:1px solid var(--border); padding:2px 7px; border-radius:20px; }
+
+.kpi-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:10px; }
+.tile{ background:var(--surface); border:1px solid var(--border); border-radius: var(--radius); padding:14px 15px; box-shadow:var(--shadow); position:relative; overflow:hidden; min-width:0; }
+.tile::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); }
+.tile.good::before{ background:var(--good); }
+.tile.warn::before{ background:var(--warning); }
+.tile.crit::before{ background:var(--critical); }
+.tile .lbl{ font-size:13.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; font-family:var(--font-display); }
+.tile .val{ font-family:var(--font-mono); font-size:29px; font-weight:600; margin-top:4px; letter-spacing:-.01em; }
+.tile .val small{ font-size:16px; color:var(--text-muted); font-weight:400; }
+.tile .ci{ font-size:14px; color:var(--text-muted); margin-top:3px; font-family:var(--font-mono); }
+.tile .note{ font-size:13.5px; color:var(--text-muted); margin-top:5px; line-height:1.4; }
+
+.charts-row{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:760px){ .charts-row{ grid-template-columns:1fr; } }
+canvas{ width:100%; display:block; }
+
+table.data{ width:100%; border-collapse:collapse; font-size:16px; }
+table.data th{ text-align:right; font-family:var(--font-display); font-size:13.5px; text-transform:uppercase; letter-spacing:.02em; color:var(--text-muted); padding:8px 7px; border-bottom:1px solid var(--border-strong); }
+table.data th:first-child, table.data td:first-child{ text-align:left; }
+table.data td{ text-align:right; padding:7px 6px; border-bottom:1px solid var(--border); font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+table.data tr:last-child td{ border-bottom:none; }
+.overflow-x{ overflow-x:auto; }
+.scroll-y{ max-height:360px; overflow-y:auto; }
+
+.steps{ display:grid; grid-template-columns: repeat(3,1fr); gap:12px; }
+@media (max-width:760px){ .steps{ grid-template-columns:1fr; } }
+.step{ background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 13px; }
+.step .num{ font-family:var(--font-display); font-size:14px; color:var(--accent); letter-spacing:.03em; }
+.step p{ font-size:16px; color:var(--text-2); margin-top:5px; line-height:1.5; }
+.step .f{ font-family:var(--font-mono); color:var(--text); font-size:16px; }
+
+footer{ margin-top:28px; padding:16px 2px 4px; border-top:1px solid var(--border); color:var(--text-muted); font-size:14.5px; line-height:1.7; }
+footer b{ color:var(--text-2); }
+
+.badge{ display:inline-block; font-family:var(--font-mono); font-size:13.5px; padding:3px 8px; border-radius:20px; border:1px solid var(--border-strong); color:var(--text-2); }
+.loading-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; place-items:center; z-index:50; backdrop-filter: blur(2px); }
+.loading-overlay.show{ display:grid; }
+.loading-box{ background:var(--surface); border:1px solid var(--border-strong); border-radius:10px; padding:18px 26px; font-family:var(--font-display); font-size:16px; letter-spacing:.03em; text-transform:uppercase; display:flex; align-items:center; gap:10px; box-shadow:var(--shadow); }
+.spinner{ width:16px; height:16px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--accent); animation: spin 0.7s linear infinite; }
+@keyframes spin{ to{ transform: rotate(360deg); } }
+[hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+
+
+<div class="loading-overlay" id="loadingOverlay"><div class="loading-box"><span class="spinner"></span> Calculando…</div></div>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">SC</span>
+      <h1>Colas M/M/s</h1>
+      <span class="brand-sub">Teoría de colas · capacidad infinita</span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="a" id="tabBtnA">Sistema · Teoría y KPIs</button>
+      <button class="tab-btn" data-tab="b" id="tabBtnB">Simulación · Validación</button>
+      <button class="tab-btn" data-tab="c" id="tabBtnC">Costes · Dimensionamiento</button>
+    </nav>
+    <button class="icon-btn" id="themeToggle" title="Cambiar tema claro/oscuro">◐</button>
+  </header>
+
+  <div class="shell">
+    <!-- ============ SIDEBAR A (fuente única de λ, μ, s) ============ -->
+    <aside class="sidebar" id="sidebarA">
+      <details class="acc" open>
+        <summary>Parámetros del sistema</summary>
+        <div class="acc-body">
+          <div class="field"><label>λ — tasa de llegadas (Poisson)</label><input type="number" id="lambda" value="6" min="0.0001" step="0.1"></div>
+          <div class="field"><label>μ — tasa de servicio (por servidor)</label><input type="number" id="mu" value="4" min="0.0001" step="0.1"></div>
+          <div class="field">
+            <label>Unidad de tiempo de λ y μ</label>
+            <select id="timeUnit">
+              <option value="s">segundos</option>
+              <option value="min">minutos</option>
+              <option value="h" selected>horas</option>
+              <option value="días">días</option>
+              <option value="sem">semanas</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="field-row"><label>s — número de servidores</label><span class="val mono" id="outS">2</span></div>
+            <input type="range" id="s" min="1" max="15" value="2" step="1">
+          </div>
+          <div class="hint" id="stabHint">Sistema estable: ρ &lt; 100%.</div>
+        </div>
+      </details>
+      <button class="btn ghost" id="resetA">Restablecer valores por defecto</button>
+    </aside>
+
+    <aside class="sidebar" id="sidebarB" hidden>
+      <details class="acc" open>
+        <summary>Parámetros del sistema</summary>
+        <div class="acc-body">
+          <div class="field"><label>λ — tasa de llegadas (Poisson)</label><input type="number" id="lambdaB" value="6" min="0.0001" step="0.1"></div>
+          <div class="field"><label>μ — tasa de servicio (por servidor)</label><input type="number" id="muB" value="4" min="0.0001" step="0.1"></div>
+          <div class="field">
+            <label>Unidad de tiempo de λ y μ</label>
+            <select id="timeUnitB">
+              <option value="s">segundos</option>
+              <option value="min">minutos</option>
+              <option value="h" selected>horas</option>
+              <option value="días">días</option>
+              <option value="sem">semanas</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="field-row"><label>s — número de servidores</label><span class="val mono" id="outSB">2</span></div>
+            <input type="range" id="sB" min="1" max="15" value="2" step="1">
+          </div>
+          <div class="field">
+            <label>Horizonte temporal a simular</label>
+            <input type="number" id="simHorizon" value="20" min="0.1" step="1">
+          </div>
+          <div class="hint" id="simHorizonHint">En las mismas unidades que λ y μ (horas). Duración de tiempo simulado que recorre el diagrama animado — independiente de «Llegadas por réplica», que solo afecta a la validación estadística.</div>
+          <div class="hint">Mismos parámetros que la pestaña Sistema — cambiarlos aquí también los actualiza allí. Pulsa «Simular» para aplicar los cambios a la simulación.</div>
+        </div>
+      </details>
+      <details class="acc" open>
+        <summary>Simulación de eventos discretos</summary>
+        <div class="acc-body">
+          <div class="field">
+            <div class="field-row"><label>Llegadas por réplica</label><span class="val mono" id="outNsimB">20,000</span></div>
+            <input type="range" id="nsimB" min="2000" max="100000" value="20000" step="1000">
+          </div>
+          <div class="field">
+            <div class="field-row"><label>Réplicas (semillas)</label><span class="val mono" id="outReplicasB">8</span></div>
+            <input type="range" id="replicasB" min="3" max="15" value="8" step="1">
+          </div>
+          <div class="hint">Motor de eventos discretos (estilo Gillespie): relojes exponenciales de llegada y servicio, exactos, sin discretizar el tiempo. Rige la validación estadística (KPIs MC frente a teóricos).</div>
+        </div>
+      </details>
+      <div class="btn-row">
+        <button class="btn primary" id="runB">▶ Simular</button>
+      </div>
+      <button class="btn ghost" id="resetB">Restablecer valores por defecto</button>
+    </aside>
+
+    <aside class="sidebar" id="sidebarC" hidden>
+      <details class="acc" open>
+        <summary>Costes</summary>
+        <div class="acc-body">
+          <div class="field"><label id="lblCq">c_q — coste en cola (€ / hora·cliente)</label><input type="number" id="cq" value="10" min="0" step="1"></div>
+          <div class="field"><label id="lblCs">c_s — coste de servicio (€ / hora·servidor)</label><input type="number" id="cs" value="30" min="0" step="1"></div>
+          <div class="hint" id="hintCqCs">Usa las mismas unidades de tiempo que λ y μ.</div>
+        </div>
+      </details>
+      <details class="acc" open>
+        <summary>Dimensionamiento</summary>
+        <div class="acc-body">
+          <div class="field"><label>s máximo a explorar</label><input type="number" id="sMaxSweep" value="8" min="1" step="1"></div>
+          <div class="hint">Se evalúa el coste total para s = 1 … s máximo. Los valores de s con ρ ≥ 100% quedan marcados como inestables (coste infinito).</div>
+        </div>
+      </details>
+      <div class="btn-row">
+        <button class="btn primary" id="runC">▶ Analizar costes</button>
+      </div>
+      <button class="btn ghost" id="resetC">Restablecer valores por defecto</button>
+    </aside>
+
+    <!-- ============ MAIN DECK ============ -->
+    <main class="deck">
+
+      <section id="viewA">
+        <div class="section-title"><h2>Teoría: distribución límite y KPIs</h2><span class="n mono" id="aLabel">M/M/2</span></div>
+
+        <div class="card" style="margin-top:10px;">
+          <h3>Tráfico y estabilidad</h3>
+          <div class="sub">ρ es la carga por servidor (λ/(sμ)). Al no haber límite de capacidad, el sistema solo alcanza un régimen estacionario si ρ &lt; 100%; en caso contrario la cola crece sin límite.</div>
+          <div class="kpi-grid" id="kpiRowA1"></div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>Volumen y tiempo (KPIs principales)</h3>
+          <div class="sub">L, Lq: número medio de clientes. W, Wq: tiempo medio de permanencia (fórmulas de Little, L = λ·W).</div>
+          <div class="kpi-grid" id="kpiRowA2"></div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>Capacidad y servidores</h3>
+          <div class="sub">P0: probabilidad de que el sistema esté vacío. Servidores ocupados: número medio de servidores en uso.</div>
+          <div class="kpi-grid" id="kpiRowA3"></div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <h3>Distribución límite p<sub>n</sub></h3>
+          <div class="sub">Probabilidad de encontrar exactamente n clientes en el sistema (sin límite superior en teoría; la tabla y el gráfico se truncan donde la probabilidad es ya despreciable). En azul, la región de servidores (n &lt; s); en ámbar, la cola (n ≥ s).</div>
+          <canvas id="chartPn" height="260"></canvas>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <h3>Tabla de la distribución límite</h3>
+          <div class="overflow-x scroll-y">
+            <table class="data" id="tablePn"></table>
+          </div>
+        </div>
+
+        <div class="section-title" style="margin-top:22px;"><h2>Cómo funciona el modelo</h2></div>
+        <div class="steps" style="margin-top:10px;">
+          <div class="step">
+            <div class="num">1 · TASAS DE NACIMIENTO-MUERTE</div>
+            <p>Llegadas a tasa constante <span class="f">λ_n = λ</span> para todo n (sin límite de capacidad). Servicio <span class="f">μ_n = nμ</span> si n &lt; s, <span class="f">μ_n = sμ</span> si n ≥ s.</p>
+          </div>
+          <div class="step">
+            <div class="num">2 · NORMALIZAR (P0)</div>
+            <p>Se resuelven las ecuaciones de balance del proceso de nacimiento-muerte y se normaliza para que <span class="f">Σ p_n = 1</span> (solo converge si ρ &lt; 100%), obteniendo P0 y el resto de p_n.</p>
+          </div>
+          <div class="step">
+            <div class="num">3 · DERIVAR KPIS (LITTLE)</div>
+            <p><span class="f">L = Σ n·p_n</span>, y por la Ley de Little <span class="f">W = L/λ</span>, <span class="f">Wq = W − 1/μ</span>.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="viewB" hidden>
+        <div class="section-title"><h2>Validación por simulación de eventos discretos</h2><span class="n mono" id="bLabel">n = 20,000 llegadas × 8 réplicas</span></div>
+        <div class="kpi-grid" id="kpiRowB"></div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>Diagrama de funcionamiento — llegada, espera, servicio y salida</h3>
+          <div class="sub">Sillones ámbar: clientes en espera (cola sin límite de capacidad). Puestos azules: los s servidores. Atendidos: clientes que ya terminaron servicio, a la derecha.</div>
+          <div class="pipeline-stats" id="pipelineStats"></div>
+          <div class="pipeline-canvas-wrap">
+            <canvas id="chartPipeline" height="170"></canvas>
+          </div>
+          <div class="pipeline-controls">
+            <button class="btn ghost" id="btnPlayPause" title="Reproducir / pausar">▶</button>
+            <button class="btn ghost" id="btnRestart" title="Reiniciar">⟲</button>
+            <div class="field">
+              <div class="field-row"><label>Velocidad</label><span class="val mono" id="outSpeed">1.00×</span></div>
+              <input type="range" id="speedSlider" min="25" max="400" value="100" step="25">
+            </div>
+          </div>
+          <div class="hint" id="pipelineReadout" style="margin-top:8px;"></div>
+        </div>
+
+        <div class="charts-row" style="margin-top:14px;">
+          <div class="card">
+            <h3>Trayectoria N(t) — clientes en el sistema</h3>
+            <div class="sub">Fragmento de una réplica de ejemplo. La línea de puntos marca la frontera entre servidores y cola (n = s).</div>
+            <canvas id="chartTrace" height="260"></canvas>
+          </div>
+          <div class="card">
+            <h3>Distribución simulada vs. teórica</h3>
+            <div class="sub">Barras: p_n estimada por simulación (promedio ponderado por tiempo, todas las réplicas). Línea: p_n teórica.</div>
+            <canvas id="chartPnCompare" height="260"></canvas>
+          </div>
+        </div>
+
+        <div class="section-title" style="margin-top:6px;"><h2>Comparación de KPIs</h2></div>
+        <div class="card" style="margin-top:10px;">
+          <h3>Simulación Monte Carlo frente al valor teórico</h3>
+          <div class="sub">El intervalo de confianza al 95% se calcula con la variabilidad entre réplicas (cada réplica = una semilla independiente).</div>
+          <div class="overflow-x">
+            <table class="data" id="tableB"></table>
+          </div>
+          <div class="hint" id="readoutB" style="margin-top:10px;"></div>
+        </div>
+      </section>
+
+      <section id="viewC" hidden>
+        <div class="section-title"><h2>Costes y dimensionamiento</h2><span class="n mono" id="cLabel">sin ejecutar</span></div>
+        <div class="kpi-grid" id="kpiRowC" style="margin-top:10px;"></div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>Desglose de costes por unidad de tiempo</h3>
+          <div class="sub">CTS: coste de servidores ocupados. CTSn: coste de servidores desocupados. CTQ: coste de espera de los clientes.</div>
+          <canvas id="chartCostes" height="240"></canvas>
+        </div>
+
+        <div class="section-title" style="margin-top:6px;"><h2>¿Cuántos servidores conviene tener?</h2></div>
+        <div class="card" style="margin-top:10px;">
+          <h3>Coste total frente al número de servidores</h3>
+          <div class="sub">El punto verde marca el s de menor coste total; el contorno resalta la configuración actual.</div>
+          <canvas id="chartSweepCT" height="280"></canvas>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <h3>Tabla de barrido</h3>
+          <div class="overflow-x">
+            <table class="data" id="tableSweep"></table>
+          </div>
+          <div class="hint" id="readoutC" style="margin-top:10px;"></div>
+        </div>
+      </section>
+
+      <footer>
+        Sistema de colas M/M/s con capacidad infinita: distribución límite (fórmulas de Erlang C), KPIs y análisis de costes calculados de forma exacta a partir del proceso de nacimiento-muerte (CTMC); la pestaña Simulación valida esos resultados con un motor de eventos discretos (relojes exponenciales competitivos, sin discretización del tiempo). Basado en «D-190. Sistemas de Colas», Javier Morales y Asun Martínez Mayoral, equipo IA4LEGOS (CC BY-SA 4.0).
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ========================= RNG ========================= */
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let rnd = mulberry32((Date.now() ^ (Math.random()*1e9)) >>> 0);
+function reseed(){ rnd = mulberry32((Date.now() ^ (Math.random()*1e9)) >>> 0); }
+function expSample(rate){ return -Math.log(1-rnd())/rate; }
+
+/* ========================= STATS HELPERS ========================= */
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function mean(arr){ let s=0; for(let i=0;i<arr.length;i++) s+=arr[i]; return s/arr.length; }
+function variance(arr){ const m=mean(arr); let s=0; for(let i=0;i<arr.length;i++){ const d=arr[i]-m; s+=d*d; } return s/(arr.length-1); }
+function sd(arr){ return Math.sqrt(Math.max(0,variance(arr))); }
+function replicaStats(values){
+  const pooledMean = mean(values);
+  const betweenSD = values.length>1 ? sd(values) : 0;
+  const pooledSE = betweenSD/Math.sqrt(Math.max(1,values.length));
+  return { point:pooledMean, lo:pooledMean-1.96*pooledSE, hi:pooledMean+1.96*pooledSE, sd:betweenSD };
+}
+const fmtNum = (v,d=3)=> v.toLocaleString("es-ES",{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtPct = (v,d=1)=> (v*100).toFixed(d) + "%";
+const fmtEUR = (v)=> v.toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2}) + " €";
+const fmtInt = (v)=> Math.round(v).toLocaleString("es-ES");
+const fmtNumOrInf = (v,d=3)=> isFinite(v) ? fmtNum(v,d) : "∞";
+const fmtEURorInf = (v)=> isFinite(v) ? fmtEUR(v) : "∞ €";
+
+const UNIT_LONG = { s:"segundos", min:"minutos", h:"horas", "días":"días", sem:"semanas" };
+const UNIT_SING = { s:"segundo", min:"minuto", h:"hora", "días":"día", sem:"semana" };
+const unitLong = u => UNIT_LONG[u] || u;
+const unitSing = u => UNIT_SING[u] || u;
+
+/* ========================= TEORÍA: M/M/s (Erlang C, capacidad infinita) ========================= */
+function factorial(n){ let f=1; for(let i=2;i<=n;i++) f*=i; return f; }
+
+/* Modelo M/M/s clásico (sin límite K): carga ofrecida a = λ/μ (Erlangs),
+   ρ = a/s. Fórmulas de Erlang C para P0, la probabilidad de espera y los
+   KPIs derivados por la Ley de Little. El sistema solo es estacionario si
+   ρ < 1 (sμ > λ); si no, la cola crece sin límite y L, Lq, W, Wq son
+   infinitos — se marca explícitamente con stable:false en vez de devolver
+   NaN, para que el resto de la interfaz pueda mostrarlo con claridad. */
+function systemMMs(lambda, mu, s){
+  const a = lambda/mu; // carga ofrecida (Erlangs)
+  const rho = a/s;
+  const stable = rho < 1;
+
+  let sumLow = 0;
+  for(let n=0;n<s;n++) sumLow += Math.pow(a,n)/factorial(n);
+  const factSfull = factorial(s);
+  const termS = Math.pow(a,s)/factSfull;
+
+  if(!stable){
+    return { lambda, mu, s, a, rho, stable, P0:0, Pwait:1, L:Infinity, Lq:Infinity, W:Infinity, Wq:Infinity, busyServers:s, pn:null };
+  }
+
+  const P0 = 1/(sumLow + termS/(1-rho));
+  const Pwait = termS/(1-rho) * P0; // fórmula de Erlang C: C(s,a)
+  const Lq = Pwait * rho/(1-rho);
+  const L = Lq + a;
+  const W = L/lambda;
+  const Wq = Lq/lambda;
+  const busyServers = a; // = L - Lq (no hay bloqueo: λ̄ = λ siempre)
+
+  // La distribución p_n es infinita en teoría; se trunca donde la cola
+  // geométrica ya es despreciable (o en 400 estados como cota de seguridad)
+  // únicamente para poder dibujarla y tabularla.
+  const tailLen = Math.max(20, Math.ceil(Math.log(1e-4)/Math.log(rho)));
+  const nMax = Math.min(400, s + tailLen);
+  const pn = new Array(nMax+1);
+  for(let n=0;n<s;n++) pn[n] = P0*Math.pow(a,n)/factorial(n);
+  for(let n=s;n<=nMax;n++) pn[n] = P0*Math.pow(a,s)*Math.pow(rho,n-s)/factSfull;
+
+  return { lambda, mu, s, a, rho, stable, P0, Pwait, L, Lq, W, Wq, busyServers, pn };
+}
+
+function costsMMs(sys, cq, cs){
+  const ct = cq + cs;
+  const CTS = ct*sys.busyServers;
+  const CTSn = cs*(sys.s - sys.busyServers);
+  const CTQ = sys.stable ? sys.lambda*cq*sys.Wq : Infinity;
+  const CT = sys.stable ? (CTS + CTSn + CTQ) : Infinity;
+  return { ct, CTS, CTSn, CTQ, CT };
+}
+
+function readParams(){
+  const g = id => document.getElementById(id);
+  const lambda = Math.max(1e-6, parseFloat(g("lambda").value) || 0);
+  const mu = Math.max(1e-6, parseFloat(g("mu").value) || 0);
+  const s = clamp(Math.round(parseFloat(g("s").value)), 1, 15);
+  const timeUnit = g("timeUnit").value || "h";
+  return { lambda, mu, s, timeUnit };
+}
+
+/* ========================= TAB A ========================= */
+function renderTabA(){
+  const { lambda, mu, s, timeUnit } = readParams();
+  const sys = systemMMs(lambda, mu, s);
+
+  document.getElementById("aLabel").textContent = `M/M/${s}`;
+  const stabHint = document.getElementById("stabHint");
+  stabHint.textContent = sys.stable
+    ? `Sistema estable: ρ = ${fmtPct(sys.rho)} < 100%. La cola es finita en la práctica (crece y se vacía) y el sistema alcanza un régimen estacionario.`
+    : `⚠ Sistema inestable: ρ = ${fmtPct(sys.rho)} ≥ 100%. La tasa de servicio (sμ) no alcanza a la de llegadas (λ): la cola crece sin límite y L, Lq, W, Wq son infinitos. Añade servidores o reduce λ.`;
+
+  const estado = sys.stable ? "Estable" : "Inestable";
+  const estadoCls = sys.stable ? "good" : "crit";
+
+  const row1 = document.getElementById("kpiRowA1");
+  row1.innerHTML = "";
+  row1.appendChild(tile("ρ — carga por servidor", fmtPct(sys.rho), null, estadoCls, "ρ = λ/(sμ); debe ser < 100% para que el sistema sea estable"));
+  row1.appendChild(tile("a — carga ofrecida", fmtNum(sys.a,3)+" Erlangs", null, "", "a = λ/μ"));
+  row1.appendChild(tile("P(espera) — Erlang C", sys.stable ? fmtPct(sys.Pwait) : "100%", null, "", "probabilidad de que un cliente que llega tenga que esperar"));
+  row1.appendChild(tile("Estado", estado, null, estadoCls, sys.stable ? "demanda por debajo de la capacidad de servicio" : "demanda igual o superior a la capacidad de servicio; la cola no converge"));
+
+  const row2 = document.getElementById("kpiRowA2");
+  row2.innerHTML = "";
+  row2.appendChild(tile("L — clientes en el sistema", fmtNumOrInf(sys.L,3), null, "", null));
+  row2.appendChild(tile("Lq — clientes en cola", fmtNumOrInf(sys.Lq,3), null, "", null));
+  row2.appendChild(tile("W — tiempo en el sistema", sys.stable ? `${fmtNum(sys.W,4)} ${timeUnit}` : "∞", null, "", `en ${unitLong(timeUnit)}, igual que 1/λ, 1/μ`));
+  row2.appendChild(tile("Wq — tiempo en cola", sys.stable ? `${fmtNum(sys.Wq,4)} ${timeUnit}` : "∞", null, "", null));
+
+  const row3 = document.getElementById("kpiRowA3");
+  row3.innerHTML = "";
+  row3.appendChild(tile("P0 — sistema vacío", sys.stable ? fmtPct(sys.P0) : "0%", null, "", null));
+  row3.appendChild(tile("Servidores ocupados (L−Lq)", sys.stable ? fmtNum(sys.busyServers,3) : `${s} (saturados)`, null, "", `de ${s} servidores`));
+
+  if(sys.stable){
+    drawPnChart(document.getElementById("chartPn"), sys.pn, s);
+    let rows = `<tr><th>n</th><th>p_n</th><th>Acumulada</th><th>Región</th></tr>`;
+    let cum = 0;
+    sys.pn.forEach((p,n)=>{
+      cum += p;
+      const region = n<s ? "Servidores" : "Cola";
+      rows += `<tr><td>${n}</td><td>${fmtPct(p,2)}</td><td>${fmtPct(cum,2)}</td><td>${region}</td></tr>`;
+    });
+    document.getElementById("tablePn").innerHTML = rows;
+  } else {
+    const cnv = document.getElementById("chartPn");
+    const cctx = cnv.getContext("2d");
+    cctx.clearRect(0,0,cnv.width,cnv.height);
+    document.getElementById("tablePn").innerHTML = `<tr><td style="padding:14px;color:var(--text-muted);">Sistema inestable (ρ ≥ 100%): la distribución límite no existe.</td></tr>`;
+  }
+}
+
+/* ========================= TAB B: SIMULACIÓN (DES) ========================= */
+/* Sin K no hay una cota superior fija para n, así que el tiempo pasado en
+   cada estado se acumula en un objeto disperso (una entrada por cada n
+   realmente visitado) en vez de en un array de tamaño K+1; al final se
+   compacta en un array denso 0..maxN (todo estado intermedio se visita
+   siempre, al cambiar n de uno en uno, así que no quedan huecos). */
+function simulateOnce(lambda, mu, s, nArrivalsTarget, record){
+  let t = 0, n = 0, arrivals = 0, maxN = 0;
+  let areaN = 0, areaNq = 0;
+  const stateTime = Object.create(null);
+  const trace = record ? [{t:0, n:0}] : null;
+
+  let nextArrival = expSample(lambda);
+  let nextDeparture = Infinity;
+
+  while(arrivals < nArrivalsTarget){
+    const tNext = Math.min(nextArrival, nextDeparture);
+    const dt = tNext - t;
+    areaN += n*dt;
+    areaNq += Math.max(0, n-s)*dt;
+    stateTime[n] = (stateTime[n]||0) + dt;
+    if(n>maxN) maxN = n;
+    t = tNext;
+
+    if(nextArrival <= nextDeparture){
+      arrivals++;
+      n++;
+      nextDeparture = t + expSample(Math.min(n,s)*mu);
+      nextArrival = t + expSample(lambda);
+    } else {
+      n--;
+      nextDeparture = n>0 ? t + expSample(Math.min(n,s)*mu) : Infinity;
+    }
+    if(record && trace.length < record) trace.push({t, n});
+  }
+
+  const T = t;
+  const Lmc = areaN/T;
+  const Lqmc = areaNq/T;
+  const Wmc = Lmc/lambda;
+  const Wqmc = Wmc - 1/mu;
+  const pn = [];
+  for(let i=0;i<=maxN;i++) pn.push((stateTime[i]||0)/T);
+  return { Lmc, Lqmc, Wmc, Wqmc, pn, T, arrivals, maxN, trace };
+}
+
+/* Simulación cliente a cliente (para el diagrama animado): cada servidor es un
+   reloj exponencial(μ) independiente; la cola es un array FIFO de ids. Se
+   registra un "frame" por cada evento (llegada atendida, llegada a cola,
+   bloqueo o salida) para poder reproducir la trayectoria a posteriori. */
+function simulateWithEvents(lambda, mu, s, maxTime){
+  let t = 0, nextId = 1, arrivals = 0, served = 0;
+  const servers = new Array(s).fill(null);
+  const queue = [];
+  const attended = [];
+  let nextArrival = expSample(lambda);
+  const frames = [];
+
+  // Relojes: tiempo medio en cola, de servicio y en el sistema, calculados
+  // como promedios acumulados sobre los clientes que ya han terminado su
+  // servicio. arrivalTime/svcStart sólo se guardan para clientes en el
+  // sistema; se liberan en cuanto el cliente sale, para no acumular memoria.
+  const arrivalTime = Object.create(null), svcStart = Object.create(null);
+  let sumWait = 0, sumService = 0, sumSystem = 0, cntCompleted = 0;
+
+  const snap = (type, id, slot) => frames.push({
+    t,
+    servers: servers.map(x => x ? x.id : null),
+    queue: queue.slice(),
+    attended: attended.slice(),
+    event: { type, id: (id===undefined?null:id), slot: (slot===undefined?null:slot) },
+    arrivals, served,
+    avgWait: cntCompleted>0 ? sumWait/cntCompleted : null,
+    avgService: cntCompleted>0 ? sumService/cntCompleted : null,
+    avgSystem: cntCompleted>0 ? sumSystem/cntCompleted : null
+  });
+  snap("init");
+
+  // El horizonte se expresa en tiempo simulado (mismas unidades que λ, μ):
+  // se aceptan llegadas mientras su instante no supere maxTime, y luego el
+  // sistema "drena" (sirve lo que ya está en servidores/cola) hasta vaciarse.
+  // hardCap es solo una cota de seguridad en nº de eventos para que un
+  // horizonte muy largo combinado con λ alta (o un sistema inestable, donde
+  // la cola no deja de crecer) no genere una animación interminable ni
+  // cuelgue el navegador.
+  const expectedArrivals = Math.max(1, maxTime*lambda);
+  const hardCap = Math.min(3000, Math.max(80, Math.ceil(expectedArrivals*4) + 60));
+  while(frames.length < hardCap){
+    let depIdx = -1, depT = Infinity;
+    for(let i=0;i<s;i++){ if(servers[i] && servers[i].dep < depT){ depT = servers[i].dep; depIdx = i; } }
+    const arrivalsDone = nextArrival > maxTime;
+    if(depIdx===-1 && arrivalsDone) break;
+    const nextArrivalT = arrivalsDone ? Infinity : nextArrival;
+
+    if(nextArrivalT <= depT){
+      t = nextArrivalT;
+      arrivals++;
+      const id = nextId++;
+      const freeIdx = servers.findIndex(x => x===null);
+      if(freeIdx !== -1){
+        arrivalTime[id] = t; svcStart[id] = t;
+        servers[freeIdx] = { id, dep: t + expSample(mu) };
+        snap("arrival_served", id, freeIdx);
+      } else {
+        arrivalTime[id] = t;
+        queue.push(id);
+        snap("arrival_queued", id);
+      }
+      nextArrival = t + expSample(lambda);
+    } else {
+      t = depT;
+      const leavingId = servers[depIdx].id;
+      served++;
+      attended.push(leavingId);
+      servers[depIdx] = null;
+      const aT = arrivalTime[leavingId], sT = svcStart[leavingId];
+      if(aT!==undefined && sT!==undefined){
+        sumWait += (sT-aT); sumService += (t-sT); sumSystem += (t-aT); cntCompleted++;
+        delete arrivalTime[leavingId]; delete svcStart[leavingId];
+      }
+      if(queue.length > 0){
+        const nxt = queue.shift();
+        svcStart[nxt] = t;
+        servers[depIdx] = { id: nxt, dep: t + expSample(mu) };
+      }
+      snap("departure", leavingId, depIdx);
+    }
+  }
+  return { frames, arrivals, served };
+}
+
+let lastB = null;
+
+/* Estado de reproducción del diagrama animado de la pestaña B. El avance es
+   "por evento" (un cliente a la vez, cada PIPELINE_STEP_MS/velocidad
+   milisegundos reales) en lugar de proporcional al tiempo simulado: así
+   nunca se saltan varios clientes de golpe cuando varios eventos ocurren
+   muy seguidos en la simulación, y el tránsito entre círculos se ve
+   siempre como un camino, no como un salto instantáneo. */
+const PIPELINE_STEP_MS = 650;
+const anim = { idx:0, stepAcc:0, playing:false, raf:null, lastTs:null, flashEvent:null, flashUntil:0, transits:[] };
+
+function pipelineReadoutText(){
+  if(!lastB || !lastB.animFrames || !lastB.animFrames.length) return "";
+  const frames = lastB.animFrames;
+  const f = frames[anim.idx];
+  const last = frames.length-1;
+  const ev = f.event || {};
+  const descs = {
+    init: "estado inicial",
+    arrival_served: `cliente ${ev.id} llega y entra directamente a servicio`,
+    arrival_queued: `cliente ${ev.id} llega y pasa a la cola`,
+    departure: `cliente ${ev.id} termina servicio y abandona el sistema`
+  };
+  const fin = anim.idx>=last ? " · fin de la trayectoria — pulsa reiniciar para repetirla" : "";
+  return `Evento ${anim.idx}/${last} · t=${fmtNum(f.t,3)} · ${descs[ev.type]||""} · llegadas: ${f.arrivals} · atendidos: ${f.served}${fin}`;
+}
+
+/* Estado instantáneo de la cola en el fotograma actual: se actualiza en
+   cada paso de la animación (y al pausar/reiniciar) para que los números
+   reflejen siempre lo que se ve dibujado en ese momento. */
+function updatePipelineStats(frame){
+  const el = document.getElementById("pipelineStats");
+  if(!el || !lastB || !frame) return;
+  const s = lastB.cfg.s, tu = lastB.cfg.timeUnit || "";
+  const busy = frame.servers.filter(v=>v!==null).length;
+  const nq = frame.queue.length;
+  const n = busy + nq;
+  const util = s>0 ? busy/s : 0;
+  const fmtClock = v => (v===null || v===undefined) ? "—" : `${fmtNum(v,3)} ${tu}`;
+  el.innerHTML =
+    `<div class="chip"><div class="lbl">En el sistema</div><div class="val mono">${n}</div></div>` +
+    `<div class="chip"><div class="lbl">En espera</div><div class="val mono">${nq}</div></div>` +
+    `<div class="chip"><div class="lbl">Servidores ocupados</div><div class="val mono">${busy} / ${s}</div></div>` +
+    `<div class="chip"><div class="lbl">Utilización</div><div class="val mono">${fmtPct(util,0)}</div></div>` +
+    `<div class="chip"><div class="lbl">Atendidos</div><div class="val mono">${(frame.attended||[]).length}</div></div>` +
+    `<div class="chip"><div class="lbl">Tiempo simulado</div><div class="val mono">${fmtNum(frame.t,3)} ${tu}</div></div>` +
+    `<div class="chip clock"><div class="lbl">⏱ T. cola</div><div class="val mono">${fmtClock(frame.avgWait)}</div></div>` +
+    `<div class="chip clock"><div class="lbl">⏱ T. servicio</div><div class="val mono">${fmtClock(frame.avgService)}</div></div>` +
+    `<div class="chip clock"><div class="lbl">⏱ T. sistema</div><div class="val mono">${fmtClock(frame.avgSystem)}</div></div>`;
+}
+
+function drawCurrentPipelineFrame(){
+  const canvas = document.getElementById("chartPipeline");
+  if(!canvas || !lastB || !lastB.animFrames || !lastB.animFrames.length) return;
+  const frame = lastB.animFrames[anim.idx];
+  const flashing = performance.now() < anim.flashUntil ? anim.flashEvent : null;
+  drawPipeline(canvas, frame, lastB.cfg.s, flashing, anim.transits);
+  updatePipelineStats(frame);
+  const ro = document.getElementById("pipelineReadout");
+  if(ro) ro.textContent = pipelineReadoutText();
+}
+
+function stopPipelineAnim(){
+  if(anim.raf) cancelAnimationFrame(anim.raf);
+  anim.raf = null; anim.playing = false; anim.lastTs = null;
+  const btn = document.getElementById("btnPlayPause");
+  if(btn) btn.textContent = "▶";
+}
+
+function resetPipelineAnim(){
+  stopPipelineAnim();
+  anim.idx = 0; anim.stepAcc = 0;
+  anim.flashEvent = null; anim.flashUntil = 0; anim.transits = [];
+  drawCurrentPipelineFrame();
+}
+
+/* Avanza exactamente un evento (un cliente) y arma sus tránsitos
+   animados; `durMs` es la duración real del camino, acotada por el propio
+   intervalo entre pasos para que nunca se solape con el siguiente. */
+function advancePipelineStep(durMs){
+  const frames = lastB.animFrames;
+  const prevFrame = frames[anim.idx];
+  anim.idx++;
+  const frame = frames[anim.idx];
+  const canvas = document.getElementById("chartPipeline");
+  const layout = pipelineLayout(canvas, lastB.cfg.s);
+  anim.transits = buildTransits(prevFrame, frame, lastB.cfg.s, layout, durMs);
+  anim.flashEvent = frame.event;
+  anim.flashUntil = performance.now() + durMs;
+}
+
+function tickPipeline(ts){
+  if(!anim.playing) return;
+  if(anim.lastTs==null){ anim.lastTs = ts; anim.stepAcc = 0; }
+  const dtReal = ts - anim.lastTs;
+  anim.lastTs = ts;
+  const speedMul = parseFloat(document.getElementById("speedSlider").value)/100;
+  const interval = PIPELINE_STEP_MS / Math.max(0.01, speedMul);
+  anim.stepAcc += dtReal;
+
+  const frames = lastB.animFrames;
+  const durMs = Math.max(120, Math.min(550, interval*0.85));
+  while(anim.stepAcc >= interval && anim.idx < frames.length-1){
+    anim.stepAcc -= interval;
+    advancePipelineStep(durMs);
+  }
+  drawCurrentPipelineFrame();
+
+  if(anim.idx >= frames.length-1){
+    stopPipelineAnim();
+    return;
+  }
+  anim.raf = requestAnimationFrame(tickPipeline);
+}
+
+function startPipelineAnim(){
+  if(!lastB || !lastB.animFrames || !lastB.animFrames.length) return;
+  if(anim.idx >= lastB.animFrames.length-1) resetPipelineAnim();
+  anim.playing = true;
+  anim.lastTs = null; anim.stepAcc = 0;
+  const btn = document.getElementById("btnPlayPause");
+  if(btn) btn.textContent = "⏸";
+  anim.raf = requestAnimationFrame(tickPipeline);
+}
+
+function pausePipelineAnim(){ stopPipelineAnim(); }
+
+function readConfigB(){
+  const g = id => document.getElementById(id);
+  const nsim = Math.round(parseFloat(g("nsimB").value));
+  const replicas = clamp(Math.round(parseFloat(g("replicasB").value)), 3, 15);
+  const simHorizon = Math.max(0.1, parseFloat(g("simHorizon").value) || 20);
+  const { lambda, mu, s, timeUnit } = readParams();
+  return { lambda, mu, s, timeUnit, nsim, replicas, simHorizon };
+}
+
+function runTabB(){
+  const cfg = readConfigB();
+  const sys = systemMMs(cfg.lambda, cfg.mu, cfg.s);
+
+  const Lv=[], Lqv=[], Wv=[], Wqv=[];
+  let vizTrace = null;
+  const replicaResults = [];
+  let maxNAll = 0;
+
+  for(let r=0;r<cfg.replicas;r++){
+    reseed();
+    const rec = (r===0) ? 400 : 0;
+    const res = simulateOnce(cfg.lambda, cfg.mu, cfg.s, cfg.nsim, rec);
+    Lv.push(res.Lmc); Lqv.push(res.Lqmc); Wv.push(res.Wmc); Wqv.push(res.Wqmc);
+    replicaResults.push(res);
+    if(res.maxN>maxNAll) maxNAll = res.maxN;
+    if(r===0) vizTrace = res.trace;
+  }
+  // Las réplicas pueden alcanzar un n máximo distinto (no hay K que las
+  // acote a todas por igual): se combinan ponderando por el tiempo T de
+  // cada una sobre un array común 0..maxNAll (los estados no alcanzados
+  // por una réplica concreta aportan 0 a esa réplica, lo cual es correcto).
+  const pooledStateTime = new Float64Array(maxNAll+1);
+  let pooledT = 0;
+  replicaResults.forEach(res=>{
+    for(let n=0;n<=res.maxN;n++) pooledStateTime[n] += res.pn[n]*res.T;
+    pooledT += res.T;
+  });
+  const pnMc = Array.from(pooledStateTime, v=>v/pooledT);
+
+  reseed();
+  const animRun = simulateWithEvents(cfg.lambda, cfg.mu, cfg.s, cfg.simHorizon);
+  const animFrames = animRun.frames;
+
+  lastB = {
+    cfg, sys,
+    L: replicaStats(Lv), Lq: replicaStats(Lqv), W: replicaStats(Wv), Wq: replicaStats(Wqv),
+    pnMc, vizTrace, animFrames
+  };
+  resetPipelineAnim();
+  renderTabB();
+}
+
+function renderTabB(){
+  const { cfg, sys, L, Lq, W, Wq, pnMc, vizTrace } = lastB;
+  const tu = cfg.timeUnit;
+
+  document.getElementById("bLabel").textContent = `n = ${cfg.nsim.toLocaleString("es-ES")} llegadas × ${cfg.replicas} réplicas`;
+
+  const kpiRow = document.getElementById("kpiRowB");
+  kpiRow.innerHTML = "";
+  kpiRow.appendChild(tile("L — MC", fmtNum(L.point,3), `IC95%: [${fmtNum(L.lo,3)}, ${fmtNum(L.hi,3)}] · teo: ${fmtNumOrInf(sys.L,3)}`, "", null));
+  kpiRow.appendChild(tile("Lq — MC", fmtNum(Lq.point,3), `IC95%: [${fmtNum(Lq.lo,3)}, ${fmtNum(Lq.hi,3)}] · teo: ${fmtNumOrInf(sys.Lq,3)}`, "", null));
+  kpiRow.appendChild(tile("W — MC", `${fmtNum(W.point,4)} ${tu}`, `IC95%: [${fmtNum(W.lo,4)}, ${fmtNum(W.hi,4)}] ${tu} · teo: ${fmtNumOrInf(sys.W,4)} ${tu}`, "", null));
+  kpiRow.appendChild(tile("Wq — MC", `${fmtNum(Wq.point,4)} ${tu}`, `IC95%: [${fmtNum(Wq.lo,4)}, ${fmtNum(Wq.hi,4)}] ${tu} · teo: ${fmtNumOrInf(sys.Wq,4)} ${tu}`, "", null));
+
+  drawTraceChart(document.getElementById("chartTrace"), vizTrace, cfg.s, tu);
+  if(sys.stable && sys.pn){
+    // pnMc (simulación) y sys.pn (teórico) pueden tener longitudes distintas
+    // ahora que no hay K que las acote a ambas por igual: se igualan
+    // rellenando con ceros hasta la mayor de las dos antes de compararlas.
+    const nCompare = Math.max(pnMc.length, sys.pn.length);
+    const pnMcPad = Array.from({length:nCompare}, (_,i)=> pnMc[i]!==undefined ? pnMc[i] : 0);
+    const pnTeoPad = Array.from({length:nCompare}, (_,i)=> sys.pn[i]!==undefined ? sys.pn[i] : 0);
+    drawPnCompareChart(document.getElementById("chartPnCompare"), pnMcPad, pnTeoPad, cfg.s);
+  } else {
+    const canvas = document.getElementById("chartPnCompare");
+    const { ctx, w, h } = setupCanvas(canvas);
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle = cssVar("--text-muted"); ctx.font = "13px "+cssVar("--font-body");
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("Sistema inestable (ρ ≥ 100%): la distribución límite no existe.", w/2, h/2);
+  }
+  drawCurrentPipelineFrame();
+
+  let rows = `<tr><th>Métrica</th><th>MC</th><th>IC95%</th><th>Teórico</th></tr>`;
+  rows += `<tr><td>L</td><td>${fmtNum(L.point,3)}</td><td>[${fmtNum(L.lo,3)}, ${fmtNum(L.hi,3)}]</td><td>${fmtNumOrInf(sys.L,3)}</td></tr>`;
+  rows += `<tr><td>Lq</td><td>${fmtNum(Lq.point,3)}</td><td>[${fmtNum(Lq.lo,3)}, ${fmtNum(Lq.hi,3)}]</td><td>${fmtNumOrInf(sys.Lq,3)}</td></tr>`;
+  rows += `<tr><td>W (${tu})</td><td>${fmtNum(W.point,4)}</td><td>[${fmtNum(W.lo,4)}, ${fmtNum(W.hi,4)}]</td><td>${fmtNumOrInf(sys.W,4)}</td></tr>`;
+  rows += `<tr><td>Wq (${tu})</td><td>${fmtNum(Wq.point,4)}</td><td>[${fmtNum(Wq.lo,4)}, ${fmtNum(Wq.hi,4)}]</td><td>${fmtNumOrInf(sys.Wq,4)}</td></tr>`;
+  document.getElementById("tableB").innerHTML = rows;
+
+  document.getElementById("readoutB").textContent = sys.stable
+    ? `La simulación de eventos discretos (relojes exponenciales exactos, sin aproximar) reproduce las fórmulas teóricas del proceso de nacimiento-muerte: los intervalos de confianza al 95% entre réplicas contienen el valor teórico en todas las métricas.`
+    : `Atención: con ρ = ${fmtPct(sys.rho,1)} ≥ 100% el sistema es inestable (λ > s·μ). La cola crece sin límite; los valores de la simulación reflejan solo la ventana de ${cfg.nsim.toLocaleString("es-ES")} llegadas simuladas, no un estado estacionario (que no existe).`;
+}
+
+/* ========================= TAB C: COSTES Y DIMENSIONAMIENTO ========================= */
+let lastC = null;
+
+function readConfigC(){
+  const g = id => document.getElementById(id);
+  const cq = Math.max(0, parseFloat(g("cq").value) || 0);
+  const cs = Math.max(0, parseFloat(g("cs").value) || 0);
+  const sMaxSweep = clamp(Math.round(parseFloat(g("sMaxSweep").value) || 1), 1, 40);
+  const { lambda, mu, s, timeUnit } = readParams();
+  return { lambda, mu, s, timeUnit, cq, cs, sMaxSweep };
+}
+
+function runSensitivity(){
+  const cfg = readConfigC();
+  const sysCurrent = systemMMs(cfg.lambda, cfg.mu, cfg.s);
+  const costsCurrent = costsMMs(sysCurrent, cfg.cq, cfg.cs);
+
+  const sweep = [];
+  for(let sVal=1; sVal<=cfg.sMaxSweep; sVal++){
+    const sys = systemMMs(cfg.lambda, cfg.mu, sVal);
+    const costs = costsMMs(sys, cfg.cq, cfg.cs);
+    sweep.push({ s:sVal, sys, costs });
+  }
+  const feasible = sweep.filter(pt=>pt.sys.stable);
+  let best = feasible.length ? feasible[0] : null;
+  feasible.forEach(pt=>{ if(pt.costs.CT < best.costs.CT) best = pt; });
+
+  lastC = { cfg, sysCurrent, costsCurrent, sweep, feasible, best };
+  renderSensitivity();
+}
+
+function renderSensitivity(){
+  const { cfg, sysCurrent, costsCurrent, sweep, feasible, best } = lastC;
+
+  document.getElementById("cLabel").textContent = `s = 1…${sweep.length} · capacidad infinita`;
+  const tuSing = unitSing(cfg.timeUnit);
+  document.getElementById("lblCq").textContent = `c_q — coste en cola (€ / ${tuSing}·cliente)`;
+  document.getElementById("lblCs").textContent = `c_s — coste de servicio (€ / ${tuSing}·servidor)`;
+  document.getElementById("hintCqCs").textContent = `Usa las mismas unidades de tiempo que λ y μ (actualmente: ${unitLong(cfg.timeUnit)}).`;
+
+  const kpiRow = document.getElementById("kpiRowC");
+  kpiRow.innerHTML = "";
+  kpiRow.appendChild(tile("c_t — coste unitario total", fmtEUR(costsCurrent.ct), null, "", "c_q + c_s"));
+  kpiRow.appendChild(tile("CTS — servidores ocupados", fmtEUR(costsCurrent.CTS), null, "", null));
+  kpiRow.appendChild(tile("CTSn — servidores desocupados", fmtEUR(costsCurrent.CTSn), null, "", null));
+  kpiRow.appendChild(tile("CTQ — espera de clientes", fmtEURorInf(costsCurrent.CTQ), null, sysCurrent.stable?"":"crit", sysCurrent.stable?null:"sistema inestable (ρ ≥ 100%)"));
+  kpiRow.appendChild(tile("CT — coste total del sistema", fmtEURorInf(costsCurrent.CT), null, sysCurrent.stable?"good":"crit", `con s = ${cfg.s} servidores`));
+
+  drawCostBreakdown(document.getElementById("chartCostes"), costsCurrent);
+  if(best){
+    drawSweepCT(document.getElementById("chartSweepCT"), feasible, cfg.s, best.s);
+  } else {
+    const canvas = document.getElementById("chartSweepCT");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+  }
+
+  let rows = `<tr><th>s</th><th>ρ</th><th>L</th><th>Wq</th><th>CT</th></tr>`;
+  sweep.forEach(pt=>{
+    const isCurrent = pt.s===cfg.s, isBest = best && pt.s===best.s;
+    let style = "";
+    if(isBest) style = ' style="background:var(--surface-2);font-weight:600;"';
+    const estado = pt.sys.stable ? "" : ` <span style="color:var(--critical)">(inestable)</span>`;
+    rows += `<tr${style}><td>${pt.s}${isCurrent?" (actual)":""}${isBest?" ★":""}</td><td>${fmtPct(pt.sys.rho)}</td><td>${fmtNumOrInf(pt.sys.L,2)}</td><td>${fmtNumOrInf(pt.sys.Wq,4)}</td><td>${fmtEURorInf(pt.costs.CT)}${estado}</td></tr>`;
+  });
+  document.getElementById("tableSweep").innerHTML = rows;
+
+  document.getElementById("readoutC").textContent = best
+    ? `Entre los valores de s evaluados, el coste total mínimo (excluyendo los inestables, con ρ ≥ 100% y coste infinito) se obtiene con s = ${best.s} servidores (${fmtEUR(best.costs.CT)}/${unitSing(cfg.timeUnit)})` +
+      (best.s===cfg.s ? `, que coincide con la configuración actual.` : `, frente a ${fmtEURorInf(costsCurrent.CT)} con los s = ${cfg.s} servidores actualmente configurados.`)
+    : `Ningún valor de s entre 1 y ${sweep.length} estabiliza el sistema (ρ ≥ 100% en todos los casos); aumenta el máximo de servidores a evaluar.`;
+}
+
+/* ========================= CHARTS (canvas, no deps) ========================= */
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || name; }
+function resolveColor(c){ return c && c.startsWith("var(") ? cssVar(c.slice(4,-1)) : c; }
+
+function setupCanvas(canvas){
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || canvas.parentElement.clientWidth || 300;
+  const h = canvas.clientHeight || parseInt(canvas.getAttribute("height")) || 220;
+  canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return { ctx, w, h };
+}
+
+function tile(label, valueHTML, ciText, cls, noteText){
+  const d = document.createElement("div");
+  d.className = "tile" + (cls? " "+cls: "");
+  d.innerHTML = `<div class="lbl">${label}</div><div class="val">${valueHTML}</div>` +
+    (ciText? `<div class="ci">${ciText}</div>`:"") + (noteText? `<div class="note">${noteText}</div>`:"");
+  return d;
+}
+
+function roundRectTop(ctx,x,y,width,height,r){
+  r = Math.min(r, width/2, Math.max(0,height));
+  ctx.beginPath();
+  ctx.moveTo(x, y+height);
+  ctx.lineTo(x, y+r);
+  ctx.arcTo(x,y,x+r,y,r);
+  ctx.lineTo(x+width-r,y);
+  ctx.arcTo(x+width,y,x+width,y+r,r);
+  ctx.lineTo(x+width,y+height);
+  ctx.closePath();
+}
+
+function drawPnChart(canvas, pn, s){
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:56, r:14, t:14, b:32};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const maxP = Math.max(...pn, 1e-9);
+  const n = pn.length;
+  const gap = n>25 ? 1 : 3;
+  const barW = (plotW - gap*(n-1))/n;
+  const gridColor = cssVar("--grid"), muted = cssVar("--text-muted"), accent = cssVar("--accent"), accent2 = cssVar("--accent-2");
+
+  ctx.strokeStyle = gridColor; ctx.lineWidth=1; ctx.font="12px "+cssVar("--font-mono"); ctx.fillStyle=muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let i=0;i<=4;i++){
+    const y = pad.t + plotH - (plotH*i/4);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+    ctx.fillText(fmtPct(maxP*i/4,0), pad.l-6, y);
+  }
+  pn.forEach((p,i)=>{
+    const x = pad.l + i*(barW+gap);
+    const bh = plotH*(p/maxP);
+    const color = i<s ? accent : accent2;
+    ctx.fillStyle = color;
+    roundRectTop(ctx, x, pad.t+plotH-bh, barW, bh, 2);
+    ctx.fill();
+  });
+  if(n<=30){
+    ctx.fillStyle = muted; ctx.font="11px "+cssVar("--font-mono"); ctx.textAlign="center"; ctx.textBaseline="top";
+    pn.forEach((p,i)=>{
+      const x = pad.l + i*(barW+gap) + barW/2;
+      if(i%Math.max(1,Math.ceil(n/20))===0 || i===n-1) ctx.fillText(String(i), x, pad.t+plotH+6);
+    });
+  }
+  ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.font="12px "+cssVar("--font-mono");
+  ctx.fillStyle=accent; ctx.fillRect(pad.l,0,10,10); ctx.fillStyle=muted; ctx.fillText("Servidores (n<s)", pad.l+14,5);
+  ctx.fillStyle=accent2; ctx.fillRect(pad.l+150,0,10,10); ctx.fillStyle=muted; ctx.fillText("Cola (n≥s)", pad.l+164,5);
+}
+
+function drawPnCompareChart(canvas, pnMc, pnTeo, s){
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:56, r:14, t:14, b:32};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const maxP = Math.max(...pnMc, ...pnTeo, 1e-9);
+  const n = pnMc.length;
+  const gap = n>25 ? 1 : 3;
+  const barW = (plotW - gap*(n-1))/n;
+  const gridColor = cssVar("--grid"), muted = cssVar("--text-muted"), accent = cssVar("--accent"), text = cssVar("--text");
+
+  ctx.strokeStyle = gridColor; ctx.lineWidth=1; ctx.font="12px "+cssVar("--font-mono"); ctx.fillStyle=muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let i=0;i<=4;i++){
+    const y = pad.t + plotH - (plotH*i/4);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+    ctx.fillText(fmtPct(maxP*i/4,0), pad.l-6, y);
+  }
+  pnMc.forEach((p,i)=>{
+    const x = pad.l + i*(barW+gap);
+    const bh = plotH*(p/maxP);
+    ctx.fillStyle = accent; ctx.globalAlpha=0.85;
+    roundRectTop(ctx, x, pad.t+plotH-bh, barW, bh, 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha=1;
+  ctx.strokeStyle = text; ctx.lineWidth=1.8;
+  ctx.beginPath();
+  pnTeo.forEach((p,i)=>{
+    const x = pad.l + i*(barW+gap) + barW/2;
+    const y = pad.t + plotH - plotH*(p/maxP);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  ctx.fillStyle = text;
+  pnTeo.forEach((p,i)=>{
+    const x = pad.l + i*(barW+gap) + barW/2;
+    const y = pad.t + plotH - plotH*(p/maxP);
+    ctx.beginPath(); ctx.arc(x,y,2.2,0,Math.PI*2); ctx.fill();
+  });
+  if(n<=30){
+    ctx.fillStyle = muted; ctx.font="11px "+cssVar("--font-mono"); ctx.textAlign="center"; ctx.textBaseline="top";
+    pnMc.forEach((p,i)=>{
+      const x = pad.l + i*(barW+gap) + barW/2;
+      if(i%Math.max(1,Math.ceil(n/20))===0 || i===n-1) ctx.fillText(String(i), x, pad.t+plotH+6);
+    });
+  }
+  ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.font="12px "+cssVar("--font-mono");
+  ctx.fillStyle=accent; ctx.fillRect(pad.l,0,10,10); ctx.fillStyle=muted; ctx.fillText("MC", pad.l+14,5);
+  ctx.strokeStyle=text; ctx.beginPath(); ctx.moveTo(pad.l+50,5); ctx.lineTo(pad.l+64,5); ctx.stroke();
+  ctx.fillStyle=muted; ctx.fillText("Teórico", pad.l+70,5);
+}
+
+function drawTraceChart(canvas, trace, s, timeUnit){
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  if(!trace || trace.length<2){ return; }
+  const pad = {l:40, r:14, t:14, b:44};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const tMin = trace[0].t, tMax = trace[trace.length-1].t;
+  const tSpan = (tMax-tMin) || 1;
+  const nPeak = Math.max(s, ...trace.map(p=>p.n));
+  const yMax = nPeak+0.5;
+  const xPix = t => pad.l + plotW*((t-tMin)/tSpan);
+  const yPix = n => pad.t + plotH*(1-(n+0.5)/(yMax+0.5));
+
+  const gridColor = cssVar("--grid"), muted = cssVar("--text-muted"), accent = cssVar("--accent"), text = cssVar("--text");
+  ctx.strokeStyle = gridColor; ctx.lineWidth=1; ctx.font="11px "+cssVar("--font-mono"); ctx.fillStyle=muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  const steps = Math.min(nPeak+1, 6);
+  for(let i=0;i<=steps;i++){
+    const nVal = Math.round(nPeak*i/steps);
+    const y = yPix(nVal);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+    ctx.fillText(String(nVal), pad.l-6, y);
+  }
+  // Rejilla y etiquetas del eje x (tiempo simulado): empieza siempre en 0
+  // (el inicio real de la simulación) y avanza en saltos de 5 unidades de
+  // tiempo. Si el horizonte recorrido es muy largo, el salto se amplía a
+  // un múltiplo de 5 para no amontonar decenas de líneas verticales.
+  const maxXTicks = Math.max(4, Math.floor(plotW/46));
+  const xStepMult = Math.max(1, Math.ceil(tMax / (5*maxXTicks)));
+  const xStep = 5*xStepMult;
+  ctx.strokeStyle = gridColor; ctx.fillStyle = muted; ctx.textAlign="center"; ctx.textBaseline="top";
+  for(let tVal=0; tVal<=tMax+1e-9; tVal+=xStep){
+    const x = xPix(tVal);
+    ctx.beginPath(); ctx.moveTo(x,pad.t); ctx.lineTo(x,pad.t+plotH); ctx.stroke();
+    ctx.fillText(fmtNum(tVal,0), x, pad.t+plotH+5);
+  }
+  // server/queue divider
+  if(s>0 && s<=nPeak){
+    const ys = yPix(s-0.5);
+    ctx.strokeStyle = muted; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(pad.l, ys); ctx.lineTo(w-pad.r, ys); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // step trajectory
+  ctx.strokeStyle = accent; ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  let prevX = xPix(trace[0].t), prevY = yPix(trace[0].n);
+  ctx.moveTo(prevX, prevY);
+  for(let i=1;i<trace.length;i++){
+    const x = xPix(trace[i].t);
+    ctx.lineTo(x, prevY);
+    const y = yPix(trace[i].n);
+    ctx.lineTo(x, y);
+    prevX = x; prevY = y;
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = muted; ctx.textAlign="center"; ctx.textBaseline="top"; ctx.font="11px "+cssVar("--font-mono");
+  ctx.fillText(timeUnit ? `tiempo (${timeUnit}) →` : "tiempo →", pad.l+plotW/2, pad.t+plotH+19);
+}
+
+/* Posiciones (centro + radio) de una rejilla de `count` huecos dentro del
+   rectángulo (x,y,w,h). Se usa tanto para dibujar los asientos/mesas como
+   para calcular los puntos de origen/destino de los tránsitos animados, de
+   modo que ambos coincidan siempre.
+   opts.forceCols fija el número de columnas (1 = una sola columna, una fila
+   por hueco). opts.columnMajor rellena primero cada columna de arriba hacia
+   abajo (sillones "en fila", como butacas de una sala de espera) en lugar
+   de fila a fila. */
+function slotGridPositions(x,y,w,h,count,opts){
+  opts = opts || {};
+  const pad = opts.pad!==undefined ? opts.pad : 3;
+  let cols, rows;
+  if(opts.rowPitch && opts.colPitch){
+    // relleno a caja completa: filas y columnas se calculan a partir del
+    // tamaño de la caja y de la separación deseada (no del nº de datos),
+    // así se generan huecos vacíos hasta completar la ventana entera en
+    // vez de un grupo apretado que deja hueco en blanco alrededor
+    rows = Math.max(1, Math.floor(h/opts.rowPitch));
+    cols = Math.max(1, Math.floor(w/opts.colPitch));
+    count = rows*cols;
+  } else if(opts.rowPitch){
+    // nº de filas fijado por una separación vertical objetivo (en lugar de
+    // derivarlo de columnas/recuento): así una ventana más ancha añade
+    // columnas (más capacidad en horizontal) en vez de separar las filas
+    if(count<=0) return [];
+    rows = Math.max(1, Math.floor(h/opts.rowPitch));
+    cols = Math.max(1, Math.ceil(count/rows));
+  } else {
+    if(count<=0) return [];
+    const cellSize = opts.cellSize || 30;
+    cols = opts.forceCols ? Math.max(1,opts.forceCols) : Math.max(1, Math.min(count, Math.floor(w/cellSize)));
+    rows = Math.ceil(count/cols);
+  }
+  // colPitch fija el ancho de celda (como rowPitch fija el alto) en lugar
+  // de repartir todo el ancho disponible entre las columnas usadas: así
+  // las columnas quedan pegadas entre sí (huecos pequeños y constantes)
+  // en vez de separarse para ocupar el ancho entero de la caja.
+  const cellW = opts.colPitch || (w/cols), cellH = h/rows;
+  const r = Math.max(opts.minR||4, Math.min(cellW,cellH)/2 - pad);
+  const pos = [];
+  for(let i=0;i<count;i++){
+    let col, row;
+    if(opts.columnMajor){ col = Math.floor(i/rows); row = i % rows; }
+    else { col = i%cols; row = Math.floor(i/cols); }
+    pos.push({ x: x+col*cellW+cellW/2, y: y+row*cellH+cellH/2, r });
+  }
+  return pos;
+}
+
+/* La capacidad visible (en huecos individuales) de las salas de
+   acumulación no es una constante fija: se calcula en pipelineLayout a
+   partir del tamaño real de cada caja (queueCap/attendedCap), para que
+   los huecos —vacíos u ocupados— rellenen la ventana entera. */
+
+/* Geometría completa del diagrama de pipeline (zonas + huecos). Calculada
+   una sola vez y compartida entre el renderizado (drawPipeline) y el
+   cálculo de trayectorias de los tránsitos animados (buildTransits), para
+   que el punto de partida/llegada de cada cliente coincida exactamente con
+   el hueco que se dibuja.
+   Una sola fila, de izquierda a derecha: Llegada → Espera (sillones; cola
+   SIN límite de capacidad, se rellena de huecos como la sala de Atendidos
+   y recurre al mismo contador grande cuando se desborda) → Servidores (uno
+   por fila) → Atendidos (clientes que ya terminaron servicio). No hay
+   franja de Rechazados: en M/M/s ningún cliente se rechaza. */
+function pipelineLayout(canvas, s){
+  const w = canvas.clientWidth || (canvas.parentElement && canvas.parentElement.clientWidth) || 300;
+  const h = canvas.clientHeight || parseInt(canvas.getAttribute("height")) || 240;
+  const padX = 6, zoneGap = 8, labelH = 16;
+  const zoneTop = labelH + 6;
+  const rowH = Math.max(70, (h-6) - zoneTop);
+
+  const arrivalW = 56;
+  const remaining = Math.max(120, w - padX*2 - arrivalW - zoneGap*3);
+  const queueW = Math.max(90, Math.round(remaining*0.32));
+  const rem2 = remaining - queueW;
+  const serverW = Math.max(80, Math.round(rem2*0.34));
+  const attendedW = rem2 - serverW;
+
+  let x = padX;
+  const arrivalX = x; x += arrivalW + zoneGap;
+  const queueX = x; x += queueW + zoneGap;
+  const serverX = x; x += serverW + zoneGap;
+  const attendedX = x;
+  const midY = zoneTop + rowH/2;
+
+  // servidores: siempre una única columna (uno por fila), para que el
+  // camino de salida de cada uno nazca en un punto propio, independiente
+  const serverPos = (s>0) ? slotGridPositions(serverX+3, zoneTop+3, serverW-6, rowH-6, s, { forceCols:1 }) : [];
+
+  // sala de espera: sin límite de capacidad — rellena de huecos (vacíos u
+  // ocupados) hasta completar la ventana entera, igual que Atendidos; si la
+  // cola real supera esos huecos, se recurre al contador grande de reserva.
+  const queuePos = slotGridPositions(queueX+3, zoneTop+3, queueW-6, rowH-6, 0, { columnMajor:true, rowPitch:9, colPitch:9, pad:0.75, minR:2 });
+  const queueCap = queuePos.length;
+
+  // sala de atendidos: misma lógica de relleno dinámico
+  const attendedPos = slotGridPositions(attendedX+3, zoneTop+3, attendedW-6, rowH-6, 0, { columnMajor:true, rowPitch:9, colPitch:9, pad:0.75, minR:2 });
+  const attendedCap = attendedPos.length;
+
+  return {
+    w, h, zoneTop, rowH, midY, padX,
+    arrivalX, arrivalW, queueX, queueW, serverX, serverW, attendedX, attendedW, queueCap, attendedCap,
+    arrivalPos: { x: arrivalX+arrivalW/2, y: midY },
+    queueCenter: { x: queueX+queueW/2, y: midY },
+    attendedCenter: { x: attendedX+attendedW/2, y: midY },
+    queuePos, serverPos, attendedPos
+  };
+}
+
+/* Rectángulo con las cuatro esquinas redondeadas (roundRectTop sólo
+   redondea las de arriba, pensado para barras). */
+function roundRectAll(ctx,x,y,w,h,r){
+  r = Math.max(0, Math.min(r, w/2, h/2));
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r);
+  ctx.closePath();
+}
+
+/* Dibuja el icono de un hueco: "chair" (sillón, sala de espera), "desk"
+   (mesa, servidores) o "dot" (rechazados / genérico). */
+function drawSeatIcon(ctx, type, cx, cy, r, filled, fillColor, emptyColor, borderColor){
+  ctx.fillStyle = filled ? fillColor : emptyColor;
+  ctx.strokeStyle = borderColor; ctx.lineWidth = 1;
+  if(type==="chair"){
+    // sillón: respaldo (más estrecho) sobre el asiento (más ancho); el
+    // tamaño crece con el hueco disponible pero se limita para que siga
+    // leyéndose como una butaca y no como un bloque gigante en celdas
+    // holgadas (pocas plazas en la sala de espera)
+    const w = Math.min(r*1.7, 36), h = Math.min(r*1.6, 42);
+    roundRectAll(ctx, cx-w*0.32, cy-h*0.52, w*0.64, h*0.56, 3);
+    ctx.fill(); ctx.stroke();
+    roundRectAll(ctx, cx-w*0.5, cy-h*0.06, w, h*0.46, 4);
+    ctx.fill(); ctx.stroke();
+  } else if(type==="desk"){
+    // mesa: rectángulo ancho y bajo (nunca una barra vertical, aunque la
+    // celda sea muy alta con pocos servidores)
+    const w = Math.min(r*2.0, 62), h = Math.min(r*0.75, 22);
+    roundRectAll(ctx, cx-w/2, cy-h/2, w, h, 4);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx-w/2+3, cy+h/2-3); ctx.lineTo(cx+w/2-3, cy+h/2-3); ctx.stroke();
+  } else {
+    const rr = Math.min(r, 8);
+    ctx.beginPath(); ctx.arc(cx,cy,rr,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  }
+}
+
+function drawSlotRow(ctx, positions, count, occupants, iconType, fillColor, emptyColor, borderColor, hiddenSet, fallbackRect, showLabel){
+  if(count<=0) return;
+  if(showLabel===undefined) showLabel = true;
+  if(positions){
+    for(let i=0;i<count;i++){
+      const { x:cx, y:cy, r } = positions[i];
+      const occ = occupants[i];
+      const hidden = hiddenSet && hiddenSet.has(i);
+      const filled = !hidden && occ!==null && occ!==undefined;
+      drawSeatIcon(ctx, iconType, cx, cy, r, filled, fillColor, emptyColor, borderColor);
+      if(filled && showLabel){
+        ctx.fillStyle = "#fff"; ctx.font = "600 10px "+cssVar("--font-mono");
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(String(occ), cx, cy+0.5);
+      }
+    }
+  } else if(fallbackRect){
+    const { x,y,w,h } = fallbackRect;
+    const occCount = occupants.filter(v => v!==null && v!==undefined).length;
+    const frac = occCount/count;
+    ctx.fillStyle = emptyColor; ctx.fillRect(x,y,w,h);
+    ctx.fillStyle = fillColor; ctx.fillRect(x,y,w*frac,h);
+    ctx.lineWidth = 1; ctx.strokeStyle = borderColor; ctx.strokeRect(x+0.5,y+0.5,w-1,h-1);
+    ctx.fillStyle = "#fff"; ctx.font = "600 13px "+cssVar("--font-mono");
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(`${occCount}/${count}`, x+w/2, y+h/2);
+  }
+}
+
+/* Calcula los tránsitos (caminos animados) que debe recorrer cada cliente
+   implicado en el evento que llevó de `prevFrame` a `frame`: la llegada
+   (servida, a la sala de espera o rechazada), la salida del cliente que
+   termina servicio por el carril de SU mesa y, si procede, el cliente de
+   la sala de espera que asciende a ese mismo puesto. Cada tránsito
+   interpola su posición entre `from` y `to` durante `dur` ms a partir de
+   `start` (reloj real, independiente de la velocidad de reproducción) para
+   que el desplazamiento se vea como un camino, no un salto instantáneo. */
+function buildTransits(prevFrame, frame, s, layout, dur){
+  const ev = (frame && frame.event) || {};
+  const start = performance.now();
+  const transits = [];
+
+  function serverSlotPos(slot){
+    const p = layout.serverPos && layout.serverPos[slot];
+    return p ? { x:p.x, y:p.y } : { x: layout.serverX+layout.serverW/2, y: layout.midY };
+  }
+  function queueSlotPos(qIdx){
+    const p = (qIdx>=0 && qIdx<layout.queueCap) ? layout.queuePos[qIdx] : null;
+    return p ? { x:p.x, y:p.y } : layout.queueCenter;
+  }
+
+  if(ev.type==="arrival_served"){
+    transits.push({ id:ev.id, from:layout.arrivalPos, to:serverSlotPos(ev.slot), color:"good", start, dur, destKind:"server", destIdx:ev.slot });
+  } else if(ev.type==="arrival_queued"){
+    const qIdx = frame.queue.indexOf(ev.id);
+    const inCap = qIdx>=0 && qIdx<layout.queueCap;
+    transits.push({ id:ev.id, from:layout.arrivalPos, to:queueSlotPos(qIdx), color:"good", start, dur, destKind: (inCap?"queue":null), destIdx:qIdx });
+  } else if(ev.type==="departure"){
+    const attIdx = frame.attended.length-1;
+    const attCap = layout.attendedCap;
+    const to = (attIdx>=0 && attIdx<attCap) ? layout.attendedPos[attIdx] : layout.attendedCenter;
+    transits.push({ id:ev.id, from:serverSlotPos(ev.slot), to, color:"accent3", start, dur, destKind: (attIdx<attCap?"attended":null), destIdx:attIdx });
+    const promotedId = frame.servers[ev.slot];
+    if(promotedId!==null && promotedId!==undefined && prevFrame){
+      const qIdx = prevFrame.queue.indexOf(promotedId);
+      if(qIdx!==-1){
+        transits.push({ id:promotedId, from:queueSlotPos(qIdx), to:serverSlotPos(ev.slot), color:"accent", start, dur, destKind:"server", destIdx:ev.slot });
+      }
+    }
+  }
+  return transits;
+}
+
+function drawPipeline(canvas, frame, s, flashEvent, transits){
+  const layout = pipelineLayout(canvas, s);
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  if(!frame) return;
+  const { zoneTop, rowH, midY, arrivalX, arrivalW, queueX, queueW, serverX, serverW, attendedX, attendedW } = layout;
+  const accent = cssVar("--accent"), accent2 = cssVar("--accent-2"), accent3 = cssVar("--accent-3"),
+        good = cssVar("--good"), muted = cssVar("--text-muted"),
+        surface3 = cssVar("--surface-3"), border = cssVar("--border"), borderStrong = cssVar("--border-strong");
+
+  const arrivalFlash = flashEvent && (flashEvent.type==="arrival_served" || flashEvent.type==="arrival_queued");
+  const exitFlash = flashEvent && flashEvent.type==="departure";
+
+  const now = performance.now();
+  const hiddenServer = new Set(), hiddenQueue = new Set(), hiddenAttended = new Set();
+  (transits||[]).forEach(tr=>{
+    const prog = (now-tr.start)/tr.dur;
+    if(prog<1){
+      if(tr.destKind==="server") hiddenServer.add(tr.destIdx);
+      if(tr.destKind==="queue") hiddenQueue.add(tr.destIdx);
+      if(tr.destKind==="attended") hiddenAttended.add(tr.destIdx);
+    }
+  });
+
+  function label(x0, wd, text, y0){
+    const yy = y0===undefined ? 0 : y0;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x0, yy, wd, 18); ctx.clip();
+    ctx.fillStyle = muted; ctx.font = "600 11px "+cssVar("--font-display"); ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+    ctx.fillText(text.toUpperCase(), x0, yy+14);
+    ctx.restore();
+  }
+  function box(x0, wd, y0, hgt){
+    const yy = y0===undefined?zoneTop:y0, hh = hgt===undefined?rowH:hgt;
+    ctx.strokeStyle = border; ctx.lineWidth = 1; ctx.strokeRect(x0+0.5, yy+0.5, wd-1, hh-1);
+  }
+  function glow(x0, wd, color, y0, hgt){
+    const yy = y0===undefined?zoneTop:y0, hh = hgt===undefined?rowH:hgt;
+    ctx.save(); ctx.globalAlpha = 0.20; ctx.fillStyle = color; ctx.fillRect(x0, yy, wd, hh); ctx.restore();
+  }
+  function arrow(x0, x1){
+    if(x1<=x0) return;
+    ctx.strokeStyle = muted; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.moveTo(x0, midY); ctx.lineTo(x1, midY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, midY); ctx.lineTo(x1-6, midY-4); ctx.lineTo(x1-6, midY+4); ctx.closePath();
+    ctx.fillStyle = muted; ctx.fill();
+  }
+
+  // arrows between zones (drawn first, underneath)
+  arrow(arrivalX+arrivalW, queueX);
+  arrow(queueX+queueW, serverX);
+  arrow(serverX+serverW, attendedX);
+
+  // arrival zone (el círculo del cliente ya no se dibuja aquí de forma
+  // estática: el tránsito animado se encarga de mostrarlo saliendo de este
+  // punto)
+  if(arrivalFlash) glow(arrivalX, arrivalW, good);
+  label(arrivalX, arrivalW, "Llegada");
+  box(arrivalX, arrivalW);
+  ctx.beginPath(); ctx.arc(layout.arrivalPos.x, layout.arrivalPos.y, 11, 0, Math.PI*2);
+  ctx.fillStyle = surface3;
+  ctx.fill(); ctx.lineWidth=1; ctx.strokeStyle=borderStrong; ctx.stroke();
+
+  // sala de espera (sillones; sin límite de capacidad — cuando la cola real
+  // supera los huecos dibujables se usa el contador grande de reserva, igual
+  // que en Atendidos)
+  const qu = frame.queue || [];
+  label(queueX, queueW, `Espera ${qu.length}`);
+  box(queueX, queueW);
+  if(qu.length<=layout.queueCap){
+    drawSlotRow(ctx, layout.queuePos, layout.queueCap, qu.slice(), "chair", accent2, surface3, border, hiddenQueue, null, false);
+  } else {
+    ctx.fillStyle = accent2; ctx.font = "700 20px "+cssVar("--font-mono");
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(String(qu.length), queueX+queueW/2, midY);
+  }
+
+  // sala de servidores (s puestos, una fila cada uno, salida independiente
+  // para cada uno ya que cada uno tiene su propia posición)
+  const busy = frame.servers.filter(v=>v!==null).length;
+  label(serverX, serverW, `Servidores ${busy}/${s}`);
+  box(serverX, serverW);
+  drawSlotRow(ctx, layout.serverPos, s, frame.servers, "desk", accent, surface3, border, hiddenServer);
+
+  // sala de atendidos: clientes que ya terminaron servicio
+  const att = frame.attended || [];
+  if(exitFlash) glow(attendedX, attendedW, accent3);
+  label(attendedX, attendedW, "Atendidos");
+  box(attendedX, attendedW);
+  if(att.length<=layout.attendedCap){
+    drawSlotRow(ctx, layout.attendedPos, layout.attendedCap, att.slice(), "dot", accent3, surface3, border, hiddenAttended, null, false);
+  } else {
+    ctx.fillStyle = accent3; ctx.font = "700 20px "+cssVar("--font-mono");
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(String(att.length), attendedX+attendedW/2, midY);
+  }
+
+  // tránsitos animados: el camino visible de cada cliente entre zonas,
+  // dibujado por encima de todo lo demás, con una curva de aceleración
+  // suave (ease-in-out) para que el movimiento se perciba con claridad.
+  (transits||[]).forEach(tr=>{
+    const prog = Math.min(1, Math.max(0, (now-tr.start)/tr.dur));
+    if(prog>=1) return;
+    const e = prog<0.5 ? 2*prog*prog : 1-Math.pow(-2*prog+2,2)/2;
+    const tx = tr.from.x + (tr.to.x-tr.from.x)*e;
+    const ty = tr.from.y + (tr.to.y-tr.from.y)*e;
+    ctx.strokeStyle = muted; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.3; ctx.setLineDash([2,3]);
+    ctx.beginPath(); ctx.moveTo(tr.from.x, tr.from.y); ctx.lineTo(tr.to.x, tr.to.y); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(tx, ty, 12, 0, Math.PI*2);
+    ctx.fillStyle = cssVar("--"+tr.color); ctx.fill();
+    ctx.lineWidth = 1; ctx.strokeStyle = borderStrong; ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.font = "600 10.5px "+cssVar("--font-mono"); ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(String(tr.id), tx, ty+0.5);
+  });
+}
+
+function drawCostBreakdown(canvas, costs){
+  const items = [
+    { label:"CTS", value:costs.CTS, color:"var(--accent)" },
+    { label:"CTSn", value:costs.CTSn, color:"var(--accent-2)" },
+    { label:"CTQ", value:costs.CTQ, color:"var(--critical)" },
+    { label:"CT", value:costs.CT, color:"var(--good)" }
+  ];
+  drawBarChart(canvas, items, { fmt: fmtEUR });
+}
+
+function drawBarChart(canvas, items, opts){
+  opts = opts || {};
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:14, r:14, t:16, b:34};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const vals = items.map(d=>d.value);
+  const minVal = Math.min(0, ...vals), maxVal = Math.max(...vals, 1e-9);
+  const range = (maxVal-minVal) || 1;
+  const n = items.length;
+  const gap = 18;
+  const barW = (plotW - gap*(n-1)) / n;
+  const gridColor = cssVar("--grid"), muted = cssVar("--text-muted"), text = cssVar("--text");
+  const zeroY = pad.t + plotH*(1-(0-minVal)/range);
+  ctx.strokeStyle = gridColor; ctx.beginPath(); ctx.moveTo(pad.l, zeroY); ctx.lineTo(w-pad.r, zeroY); ctx.stroke();
+  items.forEach((it,i)=>{
+    const x = pad.l + i*(barW+gap);
+    const topY = pad.t + plotH*(1-(it.value-minVal)/range);
+    const bh = Math.max(2, zeroY-topY);
+    const color = resolveColor(it.color);
+    ctx.fillStyle = color;
+    roundRectTop(ctx, x, Math.min(topY,zeroY), barW, bh, 4);
+    ctx.fill();
+    ctx.fillStyle = text; ctx.textAlign="center"; ctx.font="600 13px " + cssVar("--font-mono");
+    ctx.fillText(opts.fmt ? opts.fmt(it.value) : it.value, x+barW/2, Math.min(topY,zeroY)-8);
+    ctx.fillStyle = muted; ctx.font="13px " + cssVar("--font-body"); ctx.textBaseline="top";
+    ctx.fillText(String(it.label), x+barW/2, pad.t+plotH+6);
+  });
+}
+
+function drawSweepCT(canvas, sweep, currentS, bestS){
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const pad = {l:66, r:18, t:18, b:34};
+  const plotW = w-pad.l-pad.r, plotH = h-pad.t-pad.b;
+  const vals = sweep.map(pt=>pt.costs.CT);
+  const minV = Math.min(...vals)*0.95, maxV = Math.max(...vals)*1.05;
+  const range = (maxV-minV) || 1;
+  const n = sweep.length;
+  const xPix = i => pad.l + (n<=1 ? plotW/2 : plotW*i/(n-1));
+  const yPix = v => pad.t + plotH*(1-(v-minV)/range);
+
+  const muted = cssVar("--text-muted"), grid = cssVar("--grid"), accent = cssVar("--accent"), good = cssVar("--good"), text = cssVar("--text");
+
+  ctx.strokeStyle = grid; ctx.lineWidth=1; ctx.font="12px "+cssVar("--font-mono"); ctx.fillStyle=muted; ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let i=0;i<=4;i++){
+    const v = minV + range*i/4;
+    const y = yPix(v);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+    ctx.fillText(fmtEUR(v), pad.l-6, y);
+  }
+
+  ctx.strokeStyle = accent; ctx.lineWidth=2.2;
+  ctx.beginPath();
+  sweep.forEach((pt,i)=>{ const x=xPix(i), y=yPix(pt.costs.CT); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+
+  sweep.forEach((pt,i)=>{
+    const x = xPix(i), y = yPix(pt.costs.CT);
+    const isBest = pt.s===bestS, isCurrent = pt.s===currentS;
+    ctx.fillStyle = isBest ? good : accent;
+    ctx.beginPath(); ctx.arc(x,y, isBest?6:4, 0, Math.PI*2); ctx.fill();
+    if(isCurrent){
+      ctx.strokeStyle = text; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(x,y,9,0,Math.PI*2); ctx.stroke();
+    }
+  });
+
+  ctx.fillStyle = muted; ctx.font="12px "+cssVar("--font-mono"); ctx.textAlign="center"; ctx.textBaseline="top";
+  sweep.forEach((pt,i)=> ctx.fillText("s="+pt.s, xPix(i), pad.t+plotH+8));
+}
+
+/* ========================= UI WIRING ========================= */
+function wireLiveReadout(rangeId, outId, suffix, fmt){
+  const el = document.getElementById(rangeId);
+  const out = document.getElementById(outId);
+  el.addEventListener("input", ()=>{ out.textContent = (fmt?fmt(el.value):Number(el.value).toLocaleString("es-ES")) + (suffix||""); });
+}
+
+function withLoading(fn){
+  const overlay = document.getElementById("loadingOverlay");
+  overlay.classList.add("show");
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{
+    try{ fn(); } finally { overlay.classList.remove("show"); }
+  }));
+}
+
+function redrawVisible(){
+  if(!document.getElementById("viewA").hidden) renderTabA();
+  if(!document.getElementById("viewB").hidden && lastB) renderTabB();
+  if(!document.getElementById("viewC").hidden && lastC) renderSensitivity();
+}
+
+function switchTab(which){
+  if(which!=="b") pausePipelineAnim();
+  const tabs = { a:["tabBtnA","sidebarA","viewA"], b:["tabBtnB","sidebarB","viewB"], c:["tabBtnC","sidebarC","viewC"] };
+  Object.keys(tabs).forEach(k=>{
+    const [btnId, sideId, viewId] = tabs[k];
+    const active = k===which;
+    document.getElementById(btnId).classList.toggle("active", active);
+    document.getElementById(sideId).hidden = !active;
+    document.getElementById(viewId).hidden = !active;
+  });
+  if(which==="a") renderTabA();
+  if(which==="b" && !lastB) runTabB();
+  if(which==="c" && lastC) renderSensitivity();
+}
+
+document.getElementById("tabBtnA").addEventListener("click", ()=>switchTab("a"));
+document.getElementById("tabBtnB").addEventListener("click", ()=>switchTab("b"));
+document.getElementById("tabBtnC").addEventListener("click", ()=>switchTab("c"));
+
+document.getElementById("themeToggle").addEventListener("click", ()=>{
+  const root = document.documentElement;
+  const cur = root.getAttribute("data-theme");
+  const sysDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  let next;
+  if(!cur) next = sysDark ? "light" : "dark";
+  else if(cur==="dark") next = "light";
+  else next = "dark";
+  root.setAttribute("data-theme", next);
+  redrawVisible();
+});
+
+wireLiveReadout("s","outS","");
+wireLiveReadout("nsimB","outNsimB","", v=>Number(v).toLocaleString("es-ES"));
+wireLiveReadout("replicasB","outReplicasB","");
+wireLiveReadout("speedSlider","outSpeed","×", v=>(parseFloat(v)/100).toFixed(2));
+
+document.getElementById("btnPlayPause").addEventListener("click", ()=>{
+  if(anim.playing) pausePipelineAnim(); else startPipelineAnim();
+});
+document.getElementById("btnRestart").addEventListener("click", resetPipelineAnim);
+
+/* --- Sincronización de los parámetros del sistema (λ, μ, unidad, s)
+   entre la pestaña A (fuente única: #lambda/#mu/#timeUnit/#s) y sus
+   controles espejo en la pestaña B (#lambdaB/#muB/#timeUnitB/#sB). --- */
+function syncConfigMirror(){
+  const g = id => document.getElementById(id);
+  g("lambdaB").value = g("lambda").value;
+  g("muB").value = g("mu").value;
+  g("timeUnitB").value = g("timeUnit").value;
+  const sVal = g("s").value;
+  g("sB").value = sVal; g("outSB").textContent = sVal;
+  const tu = g("timeUnit").value;
+  g("simHorizonHint").textContent = `En las mismas unidades que λ y μ (${unitLong(tu)}). Duración de tiempo simulado que recorre el diagrama animado — independiente de «Llegadas por réplica», que solo afecta a la validación estadística.`;
+}
+
+document.getElementById("s").addEventListener("input", ()=>{
+  if(!document.getElementById("viewA").hidden) renderTabA();
+  syncConfigMirror();
+});
+["lambda","mu","timeUnit"].forEach(id=>{
+  document.getElementById(id).addEventListener("input", ()=>{
+    if(!document.getElementById("viewA").hidden) renderTabA();
+    syncConfigMirror();
+  });
+});
+
+/* Los controles espejo de la pestaña B escriben en los canónicos de la
+   pestaña A y disparan su propio evento "input", de modo que reutilizan
+   toda la lógica anterior (repintado de A si está visible, y la propia
+   sincronización de vuelta hacia B). */
+function mirrorToCanonical(mirrorId, canonicalId){
+  document.getElementById(mirrorId).addEventListener("input", ()=>{
+    const canonical = document.getElementById(canonicalId);
+    canonical.value = document.getElementById(mirrorId).value;
+    canonical.dispatchEvent(new Event("input"));
+  });
+}
+mirrorToCanonical("lambdaB","lambda");
+mirrorToCanonical("muB","mu");
+mirrorToCanonical("timeUnitB","timeUnit");
+mirrorToCanonical("sB","s");
+
+document.getElementById("runB").addEventListener("click", ()=> withLoading(runTabB));
+document.getElementById("runC").addEventListener("click", ()=> withLoading(runSensitivity));
+
+function set(id,val){ document.getElementById(id).value = val; }
+
+document.getElementById("resetA").addEventListener("click", ()=>{
+  set("lambda",6); set("mu",4); set("timeUnit","h");
+  set("s",2); document.getElementById("outS").textContent="2";
+  syncConfigMirror();
+  renderTabA();
+});
+document.getElementById("resetB").addEventListener("click", ()=>{
+  set("lambda",6); set("mu",4); set("timeUnit","h");
+  set("s",2); document.getElementById("outS").textContent="2";
+  set("nsimB",20000); document.getElementById("outNsimB").textContent="20,000";
+  set("replicasB",8); document.getElementById("outReplicasB").textContent="8";
+  set("simHorizon",20);
+  syncConfigMirror();
+  runTabB();
+});
+document.getElementById("resetC").addEventListener("click", ()=>{
+  set("cq",10); set("cs",30); set("sMaxSweep",8);
+  lastC = null;
+  document.getElementById("kpiRowC").innerHTML = "";
+  document.getElementById("tableSweep").innerHTML = "";
+  document.getElementById("cLabel").textContent = "sin ejecutar";
+  document.getElementById("readoutC").textContent = "";
+  const ctx = document.getElementById("chartCostes").getContext("2d");
+  ctx.clearRect(0,0,document.getElementById("chartCostes").width, document.getElementById("chartCostes").height);
+  const ctx2 = document.getElementById("chartSweepCT").getContext("2d");
+  ctx2.clearRect(0,0,document.getElementById("chartSweepCT").width, document.getElementById("chartSweepCT").height);
+});
+
+window.addEventListener("resize", ()=>{ clearTimeout(window.__rzT); window.__rzT = setTimeout(redrawVisible, 120); });
+
+/* ========================= INIT ========================= */
+function init(){
+  syncConfigMirror();
+  renderTabA();
+  runTabB();
+}
+init();
+
+})();
+</script>
+
+</body>
+</html>
