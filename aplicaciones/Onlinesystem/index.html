@@ -135,8 +135,8 @@ label{ font-size:15px; color: var(--text-2); }
 .icon-btn:hover{ border-color: var(--border-strong); }
 
 /* ---------- shell ---------- */
-.shell{ display:grid; grid-template-columns: 392px 1fr; gap:16px; align-items:start; }
-@media (max-width: 860px){ .shell{ grid-template-columns: 1fr; } }
+.shell{ display:grid; grid-template-columns: 560px 1fr; gap:16px; align-items:start; }
+@media (max-width: 1040px){ .shell{ grid-template-columns: 1fr; } }
 
 .sidebar{
   background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
@@ -164,6 +164,13 @@ label{ font-size:15px; color: var(--text-2); }
 .acc-body{ padding:10px 11px 12px; display:flex; flex-direction:column; gap:10px; border-top:1px solid var(--border); }
 .field{ display:flex; flex-direction:column; gap:4px; }
 .field-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+/* Los selectores sueltos del panel lateral (λ, tiempo de simulación,
+   calentamiento, réplicas, nº de estaciones...) no necesitan ocupar todo el
+   ancho, ahora que la barra lateral se ha ensanchado para que la tabla de
+   estaciones quepa sin desplazamiento horizontal: se limitan a un ancho
+   cómodo de lectura y quedan alineados a la izquierda bajo su etiqueta. La
+   tabla de estaciones (que no usa `.field`) no se ve afectada. */
+.sidebar .field > input[type="number"], .sidebar .field > input[type="text"], .sidebar .field > select{ max-width:200px; }
 .field-row .val{ font-family:var(--font-mono); font-size:15px; color:var(--accent); font-variant-numeric:tabular-nums; min-width:50px; text-align:right; }
 .subcard{ background:var(--surface-3); border:1px solid var(--border); border-radius:7px; padding:8px 9px; }
 .subcard h4{ font-size:15px; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
@@ -189,21 +196,34 @@ label{ font-size:15px; color: var(--text-2); }
 .btn-row .btn{ flex:1; }
 .hint{ font-size:14px; color:var(--text-muted); line-height:1.5; }
 
-/* ---------- estaciones (lista dinámica) ---------- */
-.station-card{ background:var(--surface-3); border:1px solid var(--border); border-radius:7px; padding:8px 9px; position:relative; }
-.station-card + .station-card{ margin-top:8px; }
-.station-head{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
-.station-head .swatch{ width:10px; height:10px; border-radius:3px; flex-shrink:0; }
-.station-head input[type="text"]{ flex:1; font-family:var(--font-display); font-size:14px; padding:4px 6px; }
-.station-head .rm-btn{
-  width:24px; height:24px; border-radius:6px; border:1px solid var(--border); background:var(--surface-2);
-  color:var(--text-muted); font-size:13px; display:grid; place-items:center; flex-shrink:0;
+/* ---------- estaciones (tabla: parámetros en filas × estaciones en columnas) ---------- */
+/* table-layout:fixed + <colgroup> para que el ancho de cada columna de
+   estación lo fije el propio <col> (compacto, pensado para números cortos)
+   en vez de ensancharse para acomodar la cabecera; la tabla ya no se
+   estira al 100% del panel, así que queda compacta y alineada a la
+   izquierda en vez de forzar columnas vacías de más. */
+.st-table-wrap{ overflow-x:auto; border:1px solid var(--border); border-radius:7px; }
+.st-table{ border-collapse:collapse; table-layout:fixed; width:auto; }
+.st-table col.st-col-label{ width:92px; }
+.st-table col.st-col-station{ width:62px; }
+.st-table th, .st-table td{ padding:5px 4px; border-bottom:1px solid var(--border); }
+.st-table tbody tr:last-child th, .st-table tbody tr:last-child td{ border-bottom:none; }
+.st-table thead th{ background:var(--surface-3); border-bottom:1px solid var(--border-strong); vertical-align:top; }
+.st-table th.st-row-label, .st-table th.st-table-corner{
+  position:sticky; left:0; z-index:1; background:var(--surface-3);
+  text-align:left; font-size:11.5px; color:var(--text-2); font-weight:600; white-space:normal; padding-left:7px;
 }
-.station-head .rm-btn:hover{ color:var(--critical); border-color:var(--critical); }
-.station-fields{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:6px; }
-.station-fields .field label{ font-size:11.5px; text-transform:uppercase; letter-spacing:.02em; }
-.station-fields + .station-fields{ margin-top:6px; }
-.sema-hint{ font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.02em; margin:7px 0 4px; }
+.st-table thead th.st-table-corner{ z-index:2; }
+.st-table td input{ width:100%; box-sizing:border-box; text-align:center; padding:4px 2px; font-size:12.5px; }
+.st-col-head{ display:flex; align-items:center; gap:3px; }
+.st-col-head .swatch{ width:8px; height:8px; border-radius:3px; flex-shrink:0; }
+.st-col-head input[type="text"]{ flex:1; min-width:0; font-family:var(--font-display); font-size:11.5px; padding:4px 3px; box-sizing:border-box; }
+.st-col-head .rm-btn{
+  width:18px; height:18px; border-radius:5px; border:1px solid var(--border); background:var(--surface-2);
+  color:var(--text-muted); font-size:11px; display:grid; place-items:center; flex-shrink:0; padding:0;
+}
+.st-col-head .rm-btn:hover{ color:var(--critical); border-color:var(--critical); }
+.st-table tbody tr.sema-row-first th, .st-table tbody tr.sema-row-first td{ border-top:2px solid var(--border-strong); }
 .cap-toggle{ display:flex; align-items:center; gap:5px; font-size:12px; color:var(--text-muted); margin-top:3px; }
 .cap-toggle input{ accent-color:var(--accent); }
 
@@ -332,7 +352,7 @@ footer b{ color:var(--text-2); }
           </div>
           <div id="stationsList"></div>
           <button class="btn small" id="addStation" type="button">+ Añadir estación</button>
-          <p class="hint">Cada estación es M/M/s/K: s servidores y capacidad K (clientes en servicio + en cola). <b>K = 0 significa capacidad infinita</b> (no se rechaza ningún cliente en esa estación). Si una estación tiene capacidad finita y está llena cuando llega un cliente, éste es <b>rechazado</b> y abandona la red. Cada estación tiene además su propia <b>probabilidad de rechazo p</b> (entre 0 y 1): cada cliente que llega a ella, con independencia de la ocupación, tiene una probabilidad p de ser rechazado y desaparecer automáticamente de la cadena de estaciones, sin continuar hacia las siguientes. Por último, cada estación tiene sus propios <b>umbrales de semáforo</b> (verde/ámbar/naranja, en múltiplos de s; rojo por encima del último), configurables en su propia tarjeta.</p>
+          <p class="hint">Cada columna es una estación M/M/s/K: s servidores y capacidad K (clientes en servicio + en cola). <b>K = 0 significa capacidad infinita</b> (no se rechaza ningún cliente en esa estación). Si una estación tiene capacidad finita y está llena cuando llega un cliente, éste es <b>rechazado</b> y abandona la red. El <b>traslado</b> es el tiempo que tarda un cliente en llegar a esa estación por el tubo de conexión (desde la estación anterior, o desde la entrada al sistema si es la primera; 0 = instantáneo). Cada estación tiene además su propia <b>probabilidad de rechazo p</b> (entre 0 y 1): cada cliente que llega a ella, con independencia de la ocupación, tiene una probabilidad p de ser rechazado y desaparecer automáticamente de la cadena de estaciones, sin continuar hacia las siguientes. Por último, cada estación tiene sus propios <b>umbrales de semáforo</b> (verde/ámbar/naranja, en múltiplos de s; rojo por encima del último). Desplaza la tabla horizontalmente para ver todas las estaciones.</p>
         </div>
       </details>
     </aside>
@@ -356,7 +376,7 @@ footer b{ color:var(--text-2); }
 
       <div class="card">
         <h3>Diagrama de funcionamiento</h3>
-        <p class="sub" id="pipelineSub">Clientes recorriendo las estaciones en serie, por los tubos que las conectan. Cada franja es una estación (mesas = servidores), con su semáforo de ocupación encima y su sala de espera justo debajo, unida por su propio tubo (puntos = clientes en cola). El semáforo marca verde/ámbar/naranja/rojo según los clientes en espera respecto al nº de servidores de esa estación, con umbrales propios de cada estación (ajustables en su tarjeta, panel «Estaciones»); un aspa roja indica que el cliente fue rechazado, bien por encontrar la estación llena, bien por la probabilidad de rechazo p configurada en esa estación. Los indicadores de abajo muestran, por estación, el % de clientes que al llegar se la encontraron en naranja o rojo.</p>
+        <p class="sub" id="pipelineSub">Clientes recorriendo las estaciones en serie, por los tubos que las conectan. Cada franja es una estación (mesas = servidores), con su semáforo de ocupación encima y su sala de espera justo debajo, unida por su propio tubo (puntos = clientes en cola). El semáforo marca verde/ámbar/naranja/rojo según los clientes en espera respecto al nº de servidores de esa estación, con umbrales propios de cada estación (ajustables en la tabla del panel «Estaciones»); un aspa roja indica que el cliente fue rechazado, bien por encontrar la estación llena, bien por la probabilidad de rechazo p configurada en esa estación. Los indicadores de abajo muestran, por estación, el % de clientes que al llegar se la encontraron en naranja o rojo.</p>
         <div class="pipeline-stats" id="pipelineStats"></div>
         <div class="pipeline-canvas-wrap"><canvas id="chartPipeline" height="400"></canvas></div>
         <div class="pipeline-controls">
@@ -536,64 +556,89 @@ function replicaStats(values){
 
 /* ========================= CONFIGURACIÓN DE ESTACIONES (UI dinámica) ========================= */
 let stationsCfg = [
-  { name:"Estación 1", mu:1,    s:1, K:6, semaT1:2, semaT2:4, semaT3:6, pReject:0 },
-  { name:"Estación 2", mu:0.75, s:2, K:8, semaT1:2, semaT2:4, semaT3:6, pReject:0 },
-  { name:"Estación 3", mu:0.5,  s:2, K:8, semaT1:2, semaT2:4, semaT3:6, pReject:0 },
+  { name:"Estación 1", mu:1,    s:1, K:6, semaT1:2, semaT2:4, semaT3:6, pReject:0, transit:0 },
+  { name:"Estación 2", mu:0.75, s:2, K:8, semaT1:2, semaT2:4, semaT3:6, pReject:0, transit:0 },
+  { name:"Estación 3", mu:0.5,  s:2, K:8, semaT1:2, semaT2:4, semaT3:6, pReject:0, transit:0 },
 ];
 let stationSeq = stationsCfg.length;
 
 function renderStationsList(){
   const wrap = document.getElementById("stationsList");
-  wrap.innerHTML = "";
-  stationsCfg.forEach((st, i)=>{
-    const card = document.createElement("div");
-    card.className = "station-card";
-    card.dataset.idx = i;
-    card.innerHTML = `
-      <div class="station-head">
-        <span class="swatch" style="background:${stationColor(i)}"></span>
-        <input type="text" class="st-name" value="${st.name}" maxlength="24">
-        <button type="button" class="rm-btn" title="Eliminar estación" ${stationsCfg.length<=1?"disabled":""}>✕</button>
-      </div>
-      <div class="station-fields">
-        <div class="field"><label>μ (servicio)</label><input type="number" class="st-mu" value="${st.mu}" min="0.001" step="0.01"></div>
-        <div class="field"><label>s (servidores)</label><input type="number" class="st-s" value="${st.s}" min="1" max="20" step="1"></div>
-        <div class="field"><label>K (0=∞)</label><input type="number" class="st-K" value="${st.K}" min="0" step="1"></div>
-      </div>
-      <p class="hint sema-hint">Rechazo aleatorio al llegar (independiente de la ocupación)</p>
-      <div class="station-fields">
-        <div class="field"><label>p rechazo (0–1)</label><input type="number" class="st-preject" value="${st.pReject||0}" min="0" max="1" step="0.01"></div>
-      </div>
-      <p class="hint sema-hint">Semáforo (límites ×s)</p>
-      <div class="station-fields">
-        <div class="field"><label>Verde ≤</label><input type="number" class="st-semaT1" value="${st.semaT1}" min="0.1" step="0.5"></div>
-        <div class="field"><label>Ámbar ≤</label><input type="number" class="st-semaT2" value="${st.semaT2}" min="0.1" step="0.5"></div>
-        <div class="field"><label>Naranja ≤</label><input type="number" class="st-semaT3" value="${st.semaT3}" min="0.1" step="0.5"></div>
-      </div>
-    `;
-    wrap.appendChild(card);
+  const n = stationsCfg.length;
 
-    card.querySelector(".st-name").addEventListener("input", e=>{ stationsCfg[i].name = e.target.value || `S${i+1}`; });
-    card.querySelector(".st-mu").addEventListener("input", e=>{ stationsCfg[i].mu = Math.max(1e-6, parseFloat(e.target.value)||0.001); });
-    card.querySelector(".st-s").addEventListener("input", e=>{ stationsCfg[i].s = clamp(Math.round(parseFloat(e.target.value)||1),1,20); });
-    card.querySelector(".st-K").addEventListener("input", e=>{ stationsCfg[i].K = Math.max(0, Math.round(parseFloat(e.target.value)||0)); });
-    card.querySelector(".st-preject").addEventListener("input", e=>{ stationsCfg[i].pReject = clamp(parseFloat(e.target.value)||0, 0, 1); });
-    // Al tocar los umbrales de una estación tras simular, sincroniza la
-    // config ya "congelada" en lastRun (de lo contrario el cambio no se
-    // reflejaría hasta volver a simular) y repinta sin resimular.
-    const refreshSema = ()=>{
-      if(!lastRun || !lastRun.cfg || !lastRun.cfg.stations[i]) return;
-      const th = [stationsCfg[i].semaT1, stationsCfg[i].semaT2, stationsCfg[i].semaT3]
-        .map(v=>Math.max(0.1, parseFloat(v)||0.1)).sort((a,b)=>a-b);
-      Object.assign(lastRun.cfg.stations[i], { semaT1:th[0], semaT2:th[1], semaT3:th[2] });
-      lastRun.stationHotArrivalPct = computeArrivalStatusPercents();
-      drawCurrentPipelineFrame();
-    };
-    card.querySelector(".st-semaT1").addEventListener("input", e=>{ stationsCfg[i].semaT1 = Math.max(0.1, parseFloat(e.target.value)||0.1); refreshSema(); });
-    card.querySelector(".st-semaT2").addEventListener("input", e=>{ stationsCfg[i].semaT2 = Math.max(0.1, parseFloat(e.target.value)||0.1); refreshSema(); });
-    card.querySelector(".st-semaT3").addEventListener("input", e=>{ stationsCfg[i].semaT3 = Math.max(0.1, parseFloat(e.target.value)||0.1); refreshSema(); });
-    const rm = card.querySelector(".rm-btn");
-    rm.addEventListener("click", ()=>{
+  // Filas de parámetros (el nombre de la estación va en la cabecera, no aquí).
+  const ROWS = [
+    { key:"mu",      label:"μ (servicio)",            min:"0.001", step:"0.01" },
+    { key:"s",       label:"s (servidores)",          min:"1",     max:"20", step:"1" },
+    { key:"K",       label:"K (0 = ∞)",                min:"0",     step:"1" },
+    { key:"transit", label:"Traslado (0 = instantáneo)", min:"0",  step:"0.1" },
+    { key:"pReject", label:"p rechazo (0–1)",          min:"0",     max:"1", step:"0.01" },
+    { key:"semaT1",  label:"Semáforo verde ≤",         min:"0.1",   step:"0.5", semaFirst:true },
+    { key:"semaT2",  label:"Semáforo ámbar ≤",         min:"0.1",   step:"0.5" },
+    { key:"semaT3",  label:"Semáforo naranja ≤",       min:"0.1",   step:"0.5" },
+  ];
+
+  let thead = `<tr><th class="st-table-corner">Parámetro</th>`;
+  for(let i=0;i<n;i++){
+    const st = stationsCfg[i];
+    thead += `<th><div class="st-col-head">
+        <span class="swatch" style="background:${stationColor(i)}"></span>
+        <input type="text" class="st-name" data-i="${i}" value="${st.name}" maxlength="24">
+        <button type="button" class="rm-btn" data-i="${i}" title="Eliminar estación" ${n<=1?"disabled":""}>✕</button>
+      </div></th>`;
+  }
+  thead += `</tr>`;
+
+  let tbody = "";
+  ROWS.forEach(r=>{
+    tbody += `<tr${r.semaFirst?' class="sema-row-first"':''}><th class="st-row-label">${r.label}</th>`;
+    for(let i=0;i<n;i++){
+      const val = stationsCfg[i][r.key] ?? 0;
+      tbody += `<td><input type="number" class="st-${r.key}" data-i="${i}" value="${val}"`
+        + (r.min!==undefined?` min="${r.min}"`:``) + (r.max!==undefined?` max="${r.max}"`:``) + (r.step!==undefined?` step="${r.step}"`:``)
+        + `></td>`;
+    }
+    tbody += `</tr>`;
+  });
+
+  const colgroup = `<colgroup><col class="st-col-label">${`<col class="st-col-station">`.repeat(n)}</colgroup>`;
+  // table-layout:fixed con width:auto deja que el navegador encoja las
+  // columnas por debajo de lo declarado en el <colgroup> con tal de no
+  // desbordar el contenedor; fijar aquí el min-width real (92px de la
+  // columna de parámetro + 62px por cada estación, en línea con el CSS)
+  // se lo impide, así que a partir de cierto nº de estaciones desborda de
+  // verdad y aparece el scroll horizontal de `.st-table-wrap` en vez de
+  // apretujar los números hasta hacerlos ilegibles.
+  const tableMinWidth = 92 + n*62;
+  wrap.innerHTML = `<div class="st-table-wrap"><table class="st-table" style="min-width:${tableMinWidth}px">${colgroup}<thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
+
+  const byI = (sel, fn)=>{ wrap.querySelectorAll(sel).forEach(el=>{ const i = +el.dataset.i; el.addEventListener("input", e=>fn(i, e)); }); };
+
+  byI(".st-name",   (i,e)=>{ stationsCfg[i].name = e.target.value || `S${i+1}`; });
+  byI(".st-mu",     (i,e)=>{ stationsCfg[i].mu = Math.max(1e-6, parseFloat(e.target.value)||0.001); });
+  byI(".st-s",      (i,e)=>{ stationsCfg[i].s = clamp(Math.round(parseFloat(e.target.value)||1),1,20); });
+  byI(".st-K",      (i,e)=>{ stationsCfg[i].K = Math.max(0, Math.round(parseFloat(e.target.value)||0)); });
+  byI(".st-transit",(i,e)=>{ stationsCfg[i].transit = Math.max(0, parseFloat(e.target.value)||0); });
+  byI(".st-preject",(i,e)=>{ stationsCfg[i].pReject = clamp(parseFloat(e.target.value)||0, 0, 1); });
+
+  // Al tocar los umbrales de una estación tras simular, sincroniza la
+  // config ya "congelada" en lastRun (de lo contrario el cambio no se
+  // reflejaría hasta volver a simular) y repinta sin resimular.
+  const refreshSema = (i)=>{
+    if(!lastRun || !lastRun.cfg || !lastRun.cfg.stations[i]) return;
+    const th = [stationsCfg[i].semaT1, stationsCfg[i].semaT2, stationsCfg[i].semaT3]
+      .map(v=>Math.max(0.1, parseFloat(v)||0.1)).sort((a,b)=>a-b);
+    Object.assign(lastRun.cfg.stations[i], { semaT1:th[0], semaT2:th[1], semaT3:th[2] });
+    lastRun.stationHotArrivalPct = computeArrivalStatusPercents();
+    drawCurrentPipelineFrame();
+  };
+  byI(".st-semaT1", (i,e)=>{ stationsCfg[i].semaT1 = Math.max(0.1, parseFloat(e.target.value)||0.1); refreshSema(i); });
+  byI(".st-semaT2", (i,e)=>{ stationsCfg[i].semaT2 = Math.max(0.1, parseFloat(e.target.value)||0.1); refreshSema(i); });
+  byI(".st-semaT3", (i,e)=>{ stationsCfg[i].semaT3 = Math.max(0.1, parseFloat(e.target.value)||0.1); refreshSema(i); });
+
+  wrap.querySelectorAll(".rm-btn").forEach(el=>{
+    const i = +el.dataset.i;
+    el.addEventListener("click", ()=>{
       if(stationsCfg.length<=1) return;
       stationsCfg.splice(i,1);
       renderStationsList();
@@ -604,7 +649,7 @@ function renderStationsList(){
 
 function addStation(){
   stationSeq++;
-  stationsCfg.push({ name:`Estación ${stationsCfg.length+1}`, mu:1, s:1, K:8, semaT1:2, semaT2:4, semaT3:6, pReject:0 });
+  stationsCfg.push({ name:`Estación ${stationsCfg.length+1}`, mu:1, s:1, K:8, semaT1:2, semaT2:4, semaT3:6, pReject:0, transit:0 });
   renderStationsList();
   updateStationCountBadge();
 }
@@ -615,7 +660,7 @@ function setStationCount(q){
   q = clamp(Math.round(q)||1, 1, 10);
   if(q > stationsCfg.length){
     while(stationsCfg.length < q){
-      stationsCfg.push({ name:`Estación ${stationsCfg.length+1}`, mu:1, s:1, K:8, semaT1:2, semaT2:4, semaT3:6, pReject:0 });
+      stationsCfg.push({ name:`Estación ${stationsCfg.length+1}`, mu:1, s:1, K:8, semaT1:2, semaT2:4, semaT3:6, pReject:0, transit:0 });
     }
   } else if(q < stationsCfg.length){
     stationsCfg.length = q;
@@ -645,6 +690,7 @@ function readSystemConfig(){
     return {
       name: st.name, mu: st.mu, s: st.s, K: st.K<=0 ? Infinity : Math.max(st.s, st.K),
       pReject: clamp(parseFloat(st.pReject)||0, 0, 1),
+      transit: Math.max(0, parseFloat(st.transit)||0),
       semaT1: th[0], semaT2: th[1], semaT3: th[2]
     };
   });
@@ -696,6 +742,15 @@ function runSimulation(cfg, opts){
   const sServ = cfg.stations.map(s=>s.s);
   const Kcap = cfg.stations.map(s=>s.K);
   const stations_pReject = cfg.stations.map(s=>s.pReject||0);
+  // Tiempo de traslado por el tubo que LLEGA a cada estación (desde la
+  // estación anterior, o desde la entrada al sistema para la primera):
+  // un cliente que termina en una estación (o llega al sistema) no entra
+  // de inmediato en la siguiente, sino que tarda `transit[stIdx]` en
+  // recorrer el tubo — tiempo que cuenta como parte de su estancia total
+  // en el sistema, pero no como tiempo de cola ni de servicio de ninguna
+  // estación.
+  const transitTimes = cfg.stations.map(s=>s.transit||0);
+  const transitCount = cfg.stations.map(()=>0); // clientes actualmente en tránsito hacia cada estación
 
   const stState = cfg.stations.map(s => ({ servers: new Array(s.s).fill(null), queue: [] }));
   const customers = Object.create(null); // id -> record (en curso o terminado)
@@ -802,6 +857,18 @@ function runSimulation(cfg, opts){
     }
   }
 
+  // Encamina a un cliente hacia `stationIdx` dejándolo primero "en tránsito"
+  // por el tubo de entrada de esa estación durante `transit[stationIdx]`
+  // unidades de tiempo (0 = instantáneo, comportamiento previo). La entrada
+  // real a la estación (enterStation, con su posible rechazo) ocurre al
+  // final de ese trayecto, no al llamar a esta función.
+  function scheduleStationEntry(custId, stationIdx, fromTime){
+    const delay = transitTimes[stationIdx];
+    if(delay<=0){ enterStation(custId, stationIdx, fromTime); return; }
+    transitCount[stationIdx]++;
+    heap.push(fromTime+delay, { type:"transit_arrival", stationIdx, custId });
+  }
+
   function processDeparture(now, stIdx, custId, slot){
     const st = stState[stIdx];
     const rec = customers[custId];
@@ -834,12 +901,19 @@ function runSimulation(cfg, opts){
     snapshotFrame(now, { type: (stIdx+1<N ? "departure" : "exit"), stationIdx:stIdx, custId, slot, promotedId });
 
     if(stIdx+1 < N){
-      enterStation(custId, stIdx+1, now);
+      scheduleStationEntry(custId, stIdx+1, now);
     } else {
-      rec.systemTime = 0; rec.systemQueueTime = 0;
+      // Tiempo total en el sistema = instante de salida final menos el
+      // instante de llegada al sistema: incluye así, además del tiempo de
+      // servicio y de cola en cada estación, cualquier traslado por los
+      // tubos de conexión (incluido el de entrada a la primera estación).
+      // El tiempo de cola total, en cambio, sólo suma la espera en cola de
+      // cada estación — el traslado no es "cola", es desplazamiento.
+      rec.systemTime = now - rec.firstArrival;
+      rec.systemQueueTime = 0;
       for(let i=0;i<N;i++){
         const e = rec.perStation[i];
-        if(e && e.tsystem!==null){ rec.systemTime += e.tsystem; rec.systemQueueTime += e.tqueue; }
+        if(e && e.tqueue!==null){ rec.systemQueueTime += e.tqueue; }
       }
       finalizeCustomer(custId);
     }
@@ -849,7 +923,7 @@ function runSimulation(cfg, opts){
   function processArrival(now){
     const id = nextId++;
     customers[id] = { id, perStation:{}, rejectedAt:null, rejectReason:null, systemTime:null, systemQueueTime:null, firstArrival: now };
-    enterStation(id, 0, now);
+    scheduleStationEntry(id, 0, now);
     const t = now + expSample(cfg.lambda);
     if(t <= maxTime) heap.push(t, { type:"arrival" });
   }
@@ -870,7 +944,7 @@ function runSimulation(cfg, opts){
   // `warmup` y no en el instante del primer evento simulado.
   let warmupState = null, warmupSnapshot = null;
   function captureWarmupState(){
-    warmupState = stState.map(st => ({ busy: busyCount(st), queue: st.queue.length }));
+    warmupState = stState.map((st,i) => ({ busy: busyCount(st), queue: st.queue.length, transit: transitCount[i] }));
     warmupSnapshot = stState.map(st => ({ servers: st.servers.slice(), queue: st.queue.slice() }));
   }
   if(warmup<=0) captureWarmupState();
@@ -883,6 +957,10 @@ function runSimulation(cfg, opts){
     }
     if(item.type==="arrival") processArrival(time);
     else if(item.type==="departure") processDeparture(time, item.stationIdx, item.custId, item.slot);
+    else if(item.type==="transit_arrival"){
+      transitCount[item.stationIdx]--;
+      enterStation(item.custId, item.stationIdx, time);
+    }
   }
   if(warmupState===null){
     // No hubo ningún evento a partir de `warmup` (horizonte muy corto o
@@ -1067,7 +1145,7 @@ function percentile(sortedArr, p){
 /* ========================= ORQUESTACIÓN ========================= */
 let lastRun = null;
 const PIPELINE_STEP_MS = 260;
-const anim = { idx:0, playing:false, raf:null, lastTs:null, stepAcc:0, flashEvent:null, flashUntil:0, transits:[], _transitStart:0, _transitDur:1 };
+const anim = { idx:0, playing:false, raf:null, lastTs:null, stepAcc:0, flashEvent:null, flashUntil:0, transits:[], _transitStart:0, _transitDur:1, statsCache:null };
 
 function runAll(){
   const cfg = readSystemConfig();
@@ -1283,14 +1361,20 @@ function buildReportDocxDocument(){
   ];
 
   const stationDescParas = [];
-  cfg.stations.forEach(st=>{
+  cfg.stations.forEach((st,stIdx)=>{
     const th = thresholds(st);
+    const fromName = stIdx>0 ? cfg.stations[stIdx-1].name : "la entrada al sistema";
     stationDescParas.push(heading(st.name, HeadingLevel.HEADING_3, {before:260, after:100, color:TEAL}));
     stationDescParas.push(p([
       { text: `${st.name} se modela como un sistema M/M/${st.s}/${isFinite(st.K)?st.K:"∞"}: ` },
       { text: `atiende con una tasa de servicio por servidor μ = ${fmtNum(st.mu,3)} clientes/${tu}, dispone de s = ${st.s} servidor${st.s>1?"es":""} en paralelo y admite como máximo K = ${isFinite(st.K)?st.K:"∞"} clientes simultáneamente en la estación (incluyendo los que están siendo atendidos); ` },
       { text: `una vez alcanzada esa capacidad, cualquier cliente adicional que llegue a la estación es rechazado.` },
     ]));
+    stationDescParas.push(p(
+      (st.transit>0)
+        ? `El traslado desde ${fromName} hasta ${st.name} por el tubo de conexión tarda ${fmtNum(st.transit,2)} ${tu}: ese tiempo se contabiliza como parte de la estancia total del cliente en el sistema, pero no como tiempo de cola ni de servicio de ninguna estación.`
+        : `El traslado desde ${fromName} hasta ${st.name} se considera instantáneo (0 ${tu}).`
+    ));
     stationDescParas.push(p(
       (st.pReject>0)
         ? `Además, con independencia de la ocupación, cada cliente que llega a ${st.name} tiene una probabilidad p = ${fmtNum(st.pReject,2)} de ser rechazado por política de admisión: desaparece automáticamente de la cadena de estaciones, sin continuar hacia las siguientes.`
@@ -1302,9 +1386,12 @@ function buildReportDocxDocument(){
   });
 
   const hasWarmup = cfg.warmup>0;
+  const anyTransit = cfg.stations.some(s=>s.transit>0);
   const warmupStateRows = hasWarmup ? cfg.stations.map((s,i)=>{
-    const w = (detailed.warmupState && detailed.warmupState[i]) || { busy:0, queue:0 };
-    return [s.name, `${fmtNum(w.busy,0)} / ${s.s}`, fmtNum(w.queue,0), fmtNum(w.busy+w.queue,0)];
+    const w = (detailed.warmupState && detailed.warmupState[i]) || { busy:0, queue:0, transit:0 };
+    const row = [s.name, `${fmtNum(w.busy,0)} / ${s.s}`, fmtNum(w.queue,0), fmtNum(w.busy+w.queue,0)];
+    if(anyTransit) row.push(fmtNum(w.transit||0,0));
+    return row;
   }) : [];
 
   const section1 = [
@@ -1325,12 +1412,17 @@ function buildReportDocxDocument(){
     bullet(`Número de réplicas consideradas: ${cfg.replicas}`),
     bullet(`Número de estaciones en serie: ${cfg.N}`),
     bullet(`Probabilidad de rechazo por política de admisión (p): propia de cada estación, entre 0 y 1 (detalle por estación en el apartado 1.2)`),
+    bullet(`Tiempo de traslado por los tubos de conexión: propio de cada estación, en ${tu} (detalle por estación en el apartado 1.2)`),
     heading("1.2. Descripción de las estaciones", HeadingLevel.HEADING_2, {before:280, after:120, color:NAVY}),
     ...stationDescParas,
     ...(hasWarmup ? [
       heading("1.3. Estado del sistema al empezar a recopilar datos", HeadingLevel.HEADING_2, {before:280, after:120, color:NAVY}),
-      p(`El sistema no se vacía al terminar el periodo de calentamiento: continúa con los clientes que ya tuviera en curso en ese instante (t = ${fmtNum(cfg.warmup,0)} ${tu}), cuyo estado era el siguiente.`),
-      dataTable(["Estación","Servidores ocupados","Clientes en cola","Total en la estación"], warmupStateRows, [28,26,24,22]),
+      p(`El sistema no se vacía al terminar el periodo de calentamiento: continúa con los clientes que ya tuviera en curso en ese instante (t = ${fmtNum(cfg.warmup,0)} ${tu}), cuyo estado era el siguiente.` + (anyTransit ? ` Esto incluye también, en su caso, a los clientes que en ese instante estuvieran en tránsito por el tubo de entrada de alguna estación.` : ``)),
+      dataTable(
+        anyTransit ? ["Estación","Servidores ocupados","Clientes en cola","Total en la estación","En tránsito hacia ella"] : ["Estación","Servidores ocupados","Clientes en cola","Total en la estación"],
+        warmupStateRows,
+        anyTransit ? [22,20,18,18,22] : [28,26,24,22]
+      ),
     ] : []),
     new Paragraph({ children:[new PageBreak()] }),
   ];
@@ -1344,7 +1436,7 @@ function buildReportDocxDocument(){
     p("La siguiente tabla recoge, para cada estación, los indicadores de rendimiento promedio obtenidos a partir de las réplicas simuladas: la intensidad de tráfico (ρ), el número medio de clientes en la estación (L) y en la cola (Lq), el tiempo medio en la estación (W) y el tiempo medio de espera en cola (Wq), así como el porcentaje total de clientes rechazados en cada una (por estación llena o por política de admisión)."),
     dataTable(["Estación","μ","s","K","p","ρ","L","Lq","W","Wq","% rechazo"], tStationsRows, [13,7,5,5,6,7,7,7,7,7,9]),
     new Paragraph({ spacing:{before:160} }),
-    p([{text:"Nota: ", bold:true},{text:`ρ es la utilización de los servidores de la estación; L y Lq son los números medios de clientes en la estación y en cola, respectivamente; W y Wq son los tiempos medios en la estación y en cola, expresados en ${tu}; p es la probabilidad de rechazo por política de admisión configurada en la estación; el desglose del % de rechazo por motivo (estación llena / política p) se presenta en el apartado 6.`}], {size:20}),
+    p([{text:"Nota: ", bold:true},{text:`ρ es la utilización de los servidores de la estación; L y Lq son los números medios de clientes en la estación y en cola, respectivamente; W y Wq son los tiempos medios en la estación y en cola, expresados en ${tu} (no incluyen el tiempo de traslado por los tubos de conexión, que se recoge aparte en el tiempo total del sistema — apartado 7.1); p es la probabilidad de rechazo por política de admisión configurada en la estación; el desglose del % de rechazo por motivo (estación llena / política p) se presenta en el apartado 6.`}], {size:20}),
     new Paragraph({ children:[new PageBreak()] }),
   ];
 
@@ -1430,6 +1522,10 @@ function buildReportDocxDocument(){
       ["W (sistema completo)", `${fmtNum(systemStats.W.point,3)} ${tu}`, `${fmtNum(systemStats.W.lo,3)} – ${fmtNum(systemStats.W.hi,3)} ${tu}`],
       ["Wq (sistema completo)", `${fmtNum(systemStats.Wq.point,3)} ${tu}`, `${fmtNum(systemStats.Wq.lo,3)} – ${fmtNum(systemStats.Wq.hi,3)} ${tu}`],
     ], [30,22,36]),
+    ...(anyTransit ? [
+      new Paragraph({ spacing:{before:120} }),
+      p([{text:"Nota: ", bold:true},{text:`W (sistema completo) incluye, además del tiempo de cola y de servicio en cada estación, el tiempo de traslado por los tubos de conexión configurado en el apartado 1.2; Wq (sistema completo), en cambio, sólo recoge tiempo de espera en cola.`}], {size:20}),
+    ] : []),
     new Paragraph({ spacing:{before:240} }),
     heading("7.2. Métricas por estación", HeadingLevel.HEADING_2, {before:160, after:120, color:NAVY}),
     p([
@@ -1522,12 +1618,13 @@ function renderWarmupState(){
   document.getElementById("warmupSub").textContent =
     `El sistema funciona con normalidad desde t=0, pero sólo se recogen datos para los indicadores a partir de t = ${fmtNum(cfg.warmup,0)} ${tu} (el periodo de calentamiento); todas las tablas, gráficos e indicadores de esta página descartan lo ocurrido antes de ese instante. El sistema no se vacía al llegar ahí: continúa con los clientes que ya tuviera en curso, cuyo estado en ese momento es el siguiente.`;
   const ws = detailed.warmupState || [];
+  const anyTransit = cfg.stations.some(s=>s.transit>0);
   const t = document.getElementById("tableWarmup");
-  let html = `<thead><tr><th>Estación</th><th>Servidores ocupados</th><th>Clientes en cola</th><th>Total en la estación</th></tr></thead><tbody>`;
+  let html = `<thead><tr><th>Estación</th><th>Servidores ocupados</th><th>Clientes en cola</th><th>Total en la estación</th>${anyTransit?"<th>En tránsito hacia ella</th>":""}</tr></thead><tbody>`;
   cfg.stations.forEach((s,i)=>{
-    const w = ws[i] || { busy:0, queue:0 };
+    const w = ws[i] || { busy:0, queue:0, transit:0 };
     html += `<tr><td>${swatchDot(stationColor(i))}${s.name}</td>` +
-      `<td>${fmtInt(w.busy)} / ${s.s}</td><td>${fmtInt(w.queue)}</td><td>${fmtInt(w.busy+w.queue)}</td></tr>`;
+      `<td>${fmtInt(w.busy)} / ${s.s}</td><td>${fmtInt(w.queue)}</td><td>${fmtInt(w.busy+w.queue)}</td>${anyTransit?`<td>${fmtInt(w.transit||0)}</td>`:""}</tr>`;
   });
   html += `</tbody>`;
   t.innerHTML = html;
@@ -1865,7 +1962,7 @@ function drawTube(ctx, x0, y0, x1, y1, color, thickness){
    (ssest ≤ t1·s), 1=ámbar (≤t2·s), 2=naranja (≤t3·s), 3=rojo (>t3·s), con
    ssest = clientes esperando en ESA sala, s = nº de servidores de la
    estación y t1≤t2≤t3 los umbrales propios de esa estación (configurables
-   en su tarjeta, panel «Estaciones»; por defecto 2/4/6). */
+   en la tabla del panel «Estaciones»; por defecto 2/4/6). */
 const SEMA_COLORS = ["#22c55e", "#eab308", "#f97316", "#ef4444"];
 function semaphoreState(ssest, station){
   const sAfe = Math.max(1, station.s);
@@ -2097,6 +2194,41 @@ function pipelineReadoutText(){
   }
 }
 
+/* Estadísticas de la reproducción del diagrama ACUMULADAS SÓLO HASTA EL
+   FRAME `idx` actual (nunca el resultado final de toda la simulación):
+   completados, rechazados, y — por estación — cuántas de las entradas
+   vistas hasta ahora encontraron esa estación ya en naranja o rojo frente
+   al total de entradas vistas hasta ahora. Se recalculan desde cero cada
+   vez que la reproducción salta hacia atrás (o cambia de simulación) y,
+   si no, simplemente se continúan desde el último punto ya calculado —
+   así el % mostrado siempre refleja fielmente lo ocurrido hasta ESE
+   instante de la reproducción, en vez de quedarse fijo en el valor final
+   o arrastrar un recuento que nunca se corrige. */
+function getPipelineStatsUpTo(idx){
+  const frames = lastRun.animFrames, cfg = lastRun.cfg, N = cfg.stations.length;
+  let c = anim.statsCache;
+  if(!c || c.frames !== frames || idx < c.idx){
+    c = { frames, idx:-1, completed:0, rejectedCap:0, rejectedProb:0,
+          arrivals:new Array(N).fill(0), hot:new Array(N).fill(0) };
+  }
+  for(let k=c.idx+1; k<=idx; k++){
+    const e = frames[k].event;
+    if(!e) continue;
+    if(e.type==="exit") c.completed++;
+    else if(e.type==="rejected") c.rejectedCap++;
+    else if(e.type==="rejected_prob") c.rejectedProb++;
+    else if(e.type==="arrival_served" || e.type==="arrival_queued"){
+      const i = e.stationIdx;
+      const preLen = k>0 ? frames[k-1].stations[i].queue.length : 0;
+      c.arrivals[i]++;
+      if(semaphoreState(preLen, cfg.stations[i]) >= 2) c.hot[i]++;
+    }
+  }
+  c.idx = idx;
+  anim.statsCache = c;
+  return c;
+}
+
 function updatePipelineStats(frame){
   const el = document.getElementById("pipelineStats");
   if(!el || !lastRun || !frame) return;
@@ -2104,16 +2236,9 @@ function updatePipelineStats(frame){
   const busyTotal = frame.stations.reduce((a,st)=>a+st.servers.filter(v=>v!==null).length,0);
   const queueTotal = frame.stations.reduce((a,st)=>a+st.queue.length,0);
   const nInSystem = busyTotal+queueTotal;
-  let completed=0, rejectedCap=0, rejectedProb=0;
-  for(let k=0;k<=anim.idx;k++){
-    const e = lastRun.animFrames[k].event;
-    if(!e) continue;
-    if(e.type==="exit") completed++;
-    else if(e.type==="rejected") rejectedCap++;
-    else if(e.type==="rejected_prob") rejectedProb++;
-  }
-  const rejectedTotal = rejectedCap + rejectedProb;
-  const hotPct = lastRun.stationHotArrivalPct || cfg.stations.map(()=>0);
+  const stats = getPipelineStatsUpTo(anim.idx);
+  const { completed, rejectedCap, rejectedProb, arrivals, hot } = stats;
+  const hotPct = cfg.stations.map((st,i)=> arrivals[i]>0 ? hot[i]/arrivals[i]*100 : 0);
   const stationChips = cfg.stations.map((st,i)=>{
     const nameTxt = st.name.length>14 ? st.name.slice(0,13)+"…" : st.name;
     return `<div class="chip" style="border-color:${stationColor(i)}"><div class="lbl">${nameTxt} · naranja/rojo al llegar</div><div class="val mono">${fmtNum(hotPct[i],1)}%</div></div>`;
@@ -2205,7 +2330,7 @@ function pausePipelineAnim(){ stopPipelineAnim(); }
 function updateUnitHint(){
   const tu = document.getElementById("timeUnit").value;
   document.getElementById("unitHint").textContent =
-    `Introduce λ y las μ de cada estación en las mismas unidades que el tiempo de simulación (actualmente: ${unitLong(tu)}).`;
+    `Introduce λ, las μ y los tiempos de traslado de cada estación en las mismas unidades que el tiempo de simulación (actualmente: ${unitLong(tu)}).`;
 }
 
 function withLoading(fn){
@@ -2243,9 +2368,9 @@ document.getElementById("btnGenReport").addEventListener("click", async ()=>{
 });
 document.getElementById("resetBtn").addEventListener("click", ()=>{
   stationsCfg = [
-    { name:"Estación 1", mu:1,    s:1, K:6, semaT1:2, semaT2:4, semaT3:6, pReject:0 },
-    { name:"Estación 2", mu:0.75, s:2, K:8, semaT1:2, semaT2:4, semaT3:6, pReject:0 },
-    { name:"Estación 3", mu:0.5,  s:2, K:8, semaT1:2, semaT2:4, semaT3:6, pReject:0 },
+    { name:"Estación 1", mu:1,    s:1, K:6, semaT1:2, semaT2:4, semaT3:6, pReject:0, transit:0 },
+    { name:"Estación 2", mu:0.75, s:2, K:8, semaT1:2, semaT2:4, semaT3:6, pReject:0, transit:0 },
+    { name:"Estación 3", mu:0.5,  s:2, K:8, semaT1:2, semaT2:4, semaT3:6, pReject:0, transit:0 },
   ];
   renderStationsList(); updateStationCountBadge();
   document.getElementById("lambda").value = 0.6;
