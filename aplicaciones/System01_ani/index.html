@@ -1,0 +1,2035 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Red de colas hospitalaria — 4 escenarios</title>
+<title>Red de colas hospitalaria — 4 escenarios</title>
+<meta name="color-scheme" content="dark light">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: dark;
+  --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232320; --surface-3: #2a2a27;
+  --text: #ffffff; --text-2: #c3c2b7; --text-muted: #898781;
+  --border: rgba(255,255,255,0.16); --border-strong: rgba(255,255,255,0.38);
+  --grid: #2c2c2a;
+  --accent: #1c6cce; --accent-ink: #eaf2ff; --accent-2: #d9972a; --accent-3: #199e70;
+  --good: #0ca30c; --warning: #fab219; --critical: #e66767;
+  --verde:#5fbf5f; --amarillo:#d8c23a; --naranja:#e08a35; --rojo:#e15b5b;
+  --mesa:#9c7a3c; --cama:#3987e5; --box:#b05fd1;
+  --shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35);
+  --radius: 10px;
+  --font-display: "Chakra Petch","Rajdhani",system-ui,sans-serif;
+  --font-body: "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono: "IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme: light;
+    --bg:#f1f0ea; --surface:#fcfcfb; --surface-2:#f2f1ec; --surface-3:#eae8e0;
+    --text:#0b0b0b; --text-2:#52514e; --text-muted:#706f6a;
+    --border:rgba(11,11,11,0.16); --border-strong:rgba(11,11,11,0.40); --grid:#e1e0d9;
+    --accent:#1c72ce; --accent-2:#a9700f; --accent-3:#137a53;
+    --good:#0b7a0b; --warning:#92650a; --critical:#b23232;
+  }
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg:#f1f0ea; --surface:#fcfcfb; --surface-2:#f2f1ec; --surface-3:#eae8e0;
+  --text:#0b0b0b; --text-2:#52514e; --text-muted:#706f6a;
+  --border:rgba(11,11,11,0.16); --border-strong:rgba(11,11,11,0.40); --grid:#e1e0d9;
+  --accent:#1c72ce; --accent-2:#a9700f; --accent-3:#137a53;
+  --good:#0b7a0b; --warning:#92650a; --critical:#b23232;
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0d0d0d; --surface:#1a1a19; --surface-2:#232320; --surface-3:#2a2a27;
+  --text:#ffffff; --text-2:#c3c2b7; --text-muted:#898781;
+  --border:rgba(255,255,255,0.16); --border-strong:rgba(255,255,255,0.38); --grid:#2c2c2a;
+  --accent:#1c6cce; --accent-2:#d9972a; --accent-3:#199e70;
+  --good:#0ca30c; --warning:#fab219; --critical:#e66767;
+}
+*{box-sizing:border-box;}
+body{ background:var(--bg); color:var(--text); font-family:var(--font-body); font-size:16px; margin:0; padding-inline:16px; }
+h1,h2,h3,h4{ font-family:var(--font-display); font-weight:600; letter-spacing:.01em; margin:0; text-wrap:balance; }
+p{ margin:0; }
+.mono{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+button{ font-family:var(--font-body); cursor:pointer; }
+input[type="number"], input[type="text"]{
+  font-family:var(--font-mono); background:var(--surface-3); color:var(--text);
+  border:1.5px solid var(--border-strong); border-radius:6px; padding:4px 6px; width:100%;
+}
+input:focus, select:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+select{ font-family:var(--font-mono); background:var(--surface-3); color:var(--text); border:1.5px solid var(--border-strong); border-radius:6px; padding:5px 6px; width:100%; }
+label{ font-size:13px; color:var(--text-2); }
+.app{ max-width:1900px; margin:0 auto; padding-block:14px 48px; }
+
+.topbar{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:12px 16px; margin-bottom:14px;
+  background:linear-gradient(135deg,var(--surface) 0%,var(--surface-2) 100%);
+  border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow);
+}
+.brand{ display:flex; align-items:baseline; gap:10px; margin-right:auto; flex-wrap:wrap; }
+.brand-mark{ display:inline-grid; place-items:center; width:32px; height:32px; border-radius:8px; background:var(--accent); color:#fff; font-size:16px; font-family:var(--font-display); font-weight:700; flex-shrink:0; }
+.brand h1{ font-size:20px; }
+.brand .brand-sub{ font-size:13px; color:var(--text-muted); font-family:var(--font-body); }
+.variant-toggle{ display:flex; border:1.5px solid var(--border-strong); border-radius:8px; overflow:hidden; flex-wrap:wrap; }
+.variant-toggle button{ border:none; border-left:1px solid var(--border); background:var(--surface-3); color:var(--text-2); padding:8px 12px; font-family:var(--font-display); font-size:12.5px; font-weight:600; white-space:nowrap; }
+.variant-toggle button:first-child{ border-left:none; }
+.variant-toggle button.active{ background:var(--accent); color:#fff; }
+.icon-btn{ width:32px; height:32px; border-radius:8px; border:1px solid var(--border); background:var(--surface-2); color:var(--text); font-size:16px; display:grid; place-items:center; }
+
+.shell{ display:grid; grid-template-columns:360px 1fr; gap:14px; align-items:start; }
+/* Sin min-width:0 aquí, un hijo ancho (el diagrama a tamaño natural) hace
+   crecer toda la columna 1fr y la página entera en vez de quedarse dentro
+   de su hueco con scroll propio (bug clásico de CSS Grid/Flexbox). */
+.shell > .main{ min-width:0; }
+@media (max-width:1200px){ .shell{ grid-template-columns:1fr; } }
+.sidebar{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px; display:flex; flex-direction:column; gap:10px; box-shadow:var(--shadow); position:sticky; top:10px; max-height:calc(100vh - 20px); overflow-y:auto; }
+.card{ background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:10px; }
+.card h3{ font-size:14px; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+.card .hint{ font-size:12px; color:var(--text-muted); margin-top:6px; line-height:1.4; }
+.rowgrid{ display:grid; gap:6px; }
+.paramsGrid{ display:grid; grid-template-columns:1fr 1fr; gap:6px 8px; }
+.paramsGrid label{ font-size:11.5px; }
+.paramsGrid input{ padding:3px 5px; font-size:12.5px; }
+.timesTableWrap{ overflow-x:auto; }
+.timesTable{ width:100%; border-collapse:collapse; margin-top:2px; table-layout:fixed; }
+.timesTable th, .timesTable td{ padding:3px 2px; text-align:center; }
+.timesTable thead th{ font-size:10.5px; font-weight:600; color:var(--text-2); border-bottom:1px solid var(--border); }
+.timesTable thead th.estCol{ text-align:left; }
+.timesTable thead th .dot{ display:inline-block; width:7px; height:7px; border-radius:2px; margin-right:2px; vertical-align:middle; }
+.timesTable tbody th{ text-align:left; font-size:11px; font-weight:500; color:var(--text); line-height:1.2; padding-right:4px; width:30%; }
+.timesTable tbody tr{ border-bottom:1px solid var(--border); }
+.timesTable tbody tr:last-child{ border-bottom:none; }
+.timesTable input{ width:100%; max-width:40px; padding:3px 1px; font-size:11.5px; text-align:center; box-sizing:border-box; }
+.timesTable td.na{ color:var(--text-muted); font-size:12px; }
+.btnrow{ display:flex; gap:8px; flex-wrap:wrap; }
+.btn{ border:1px solid var(--border-strong); background:var(--surface-3); color:var(--text); border-radius:7px; padding:8px 12px; font-size:13px; font-weight:600; }
+.btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn:disabled{ opacity:.5; cursor:default; }
+.progressTrack{ height:8px; border-radius:4px; background:var(--border-strong); overflow:hidden; margin-top:6px; }
+.progressFill{ height:100%; background:var(--accent); width:0%; transition:width .15s; }
+
+.main{ display:flex; flex-direction:column; gap:14px; }
+.panel{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; box-shadow:var(--shadow); min-width:0; }
+.panel h2{ font-size:17px; margin-bottom:10px; }
+/* El diagrama vuelve a reescalarse para caber siempre en pantalla sin
+   necesidad de scroll (pedido explícito de Javier: "ahora el diagrama es
+   demasiado grande y no cabe en pantalla completa" — la versión anterior,
+   a tamaño natural con scroll, resultó ser peor que el encogido). Para que
+   el texto se siga viendo bien a pesar del escalado, el "tamaño lógico"
+   del diagrama (constantes NODE_W/NODE_H_*/huecos más arriba) se redujo en
+   vez de agrandar más los font-size: con escalado automático, un diagrama
+   más grande con letra más grande se reescala más y se ve igual de
+   pequeño en pantalla — lo que de verdad ayuda es que haya menos
+   "espacio lógico" que encoger. */
+#diagramWrap{ width:100%; }
+/* Pedido explícito de Javier (iteración 12): permitir que la ventana de
+   visualización crezca verticalmente aunque rebase la pantalla completa, a
+   cambio de letra más legible — antes el límite de 85vh sólo entraba en
+   juego en diseños "altos" (p. ej. si se reintrodujeran más filas de
+   bloques), ya que desde la iteración 10 el escalado lo fija el ANCHO del
+   diagrama, no el alto; con el desglose de destinos ahora en una línea cada
+   uno (más alto que antes) conviene subir mucho ese límite para que nunca
+   recorte el diagrama — se permite scroll vertical de la página en vez de
+   encajarlo forzosamente en una pantalla. */
+#diagramSvg{ display:block; width:100%; height:auto; max-height:260vh; }
+.legend{ display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--text-2); margin-top:8px; }
+.legend .lg-item{ display:flex; align-items:center; gap:5px; }
+.legend .sw{ width:12px; height:12px; border-radius:3px; display:inline-block; }
+
+.tiles{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; }
+.tile{ background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:9px 10px; }
+.tile .lbl{ font-size:11px; color:var(--text-muted); margin-bottom:3px; }
+.tile .val{ font-size:19px; font-family:var(--font-mono); font-weight:600; }
+.tile .note{ font-size:11px; color:var(--text-muted); margin-top:2px; }
+.tile.good .val{ color:var(--good); } .tile.warn .val{ color:var(--warning); } .tile.bad .val{ color:var(--critical); }
+
+.escTiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:6px; }
+@media (max-width:1000px){ .escTiles{ grid-template-columns:repeat(2,1fr); } }
+.escTile{ background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; }
+.escTile h4{ font-size:12.5px; color:var(--accent-2); margin-bottom:6px; }
+.escTile .row{ display:flex; justify-content:space-between; font-size:12.5px; margin-top:3px; }
+.escTile .row b{ font-family:var(--font-mono); }
+
+table.report{ width:100%; border-collapse:collapse; font-size:12.5px; margin-top:4px; }
+table.report th, table.report td{ padding:5px 7px; border-bottom:1px solid var(--border); text-align:left; }
+table.report th{ color:var(--text-muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; }
+table.report td.num{ font-family:var(--font-mono); text-align:right; white-space:nowrap; }
+table.report tr.best td.num.highlight{ color:var(--good); font-weight:700; }
+table.report tr.worst td.num.highlight{ color:var(--critical); }
+.secTitle{ font-size:13px; font-family:var(--font-display); color:var(--accent-2); margin:16px 0 4px; font-weight:600; }
+.sla-ok{ color:var(--good); font-weight:600; } .sla-bad{ color:var(--critical); font-weight:600; }
+.loading{ font-size:13px; color:var(--text-muted); font-style:italic; }
+.sideNote{ font-size:12px; color:var(--text-muted); background:var(--surface-3); border-radius:6px; padding:8px; line-height:1.4; }
+</style>
+</head>
+<body>
+
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-mark">🏥</span>
+      <h1>Red de colas hospitalaria</h1>
+      <span class="brand-sub">Hospital Universitario Vega del Segura — 4 protocolos comparados</span>
+    </div>
+    <div class="variant-toggle" id="escToggle">
+      <button type="button" data-e="base" class="active">Línea Base</button>
+      <button type="button" data-e="ia">A · IA Diagnóstica</button>
+      <button type="button" data-e="ft">B · Fast-Track</button>
+      <button type="button" data-e="bp">C · Bed-Pool UCI</button>
+    </div>
+    <button type="button" class="icon-btn" id="themeBtn" title="Cambiar tema">🌙</button>
+  </div>
+
+  <div class="shell">
+    <div class="sidebar" id="sidebar"><!-- INSERT:sidebar --></div>
+    <div class="main">
+      <div class="panel">
+        <h2>Diagrama de la red (vista animada) — <span id="escTitleDiagrama">Línea Base</span></h2>
+        <div class="btnrow" id="playControls" style="align-items:center">
+          <button type="button" class="btn primary" id="btnPlay" disabled>▶ Reproducir</button>
+          <button type="button" class="btn" id="btnPause" disabled>⏸ Pausa</button>
+          <button type="button" class="btn" id="btnReset" disabled>⟲ Reiniciar</button>
+          <span class="mono" id="playTime" style="margin-left:6px;color:var(--text-2)">—</span>
+        </div>
+        <p class="sideNote" id="playHint" style="display:none;margin:8px 0 0;background:var(--surface-3);border:1px solid var(--accent)">👉 Pulsa <b>«Reproducir»</b> para ver la animación. Este primer fotograma es el instante inicial (día 0, hospital vacío — sin período de calentamiento): por eso todos los medidores están todavía en gris y todos los envíos en 0%, no es un fallo.</p>
+        <div id="diagramWrap"></div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="panel">
+        <h2>Informe comparativo de KPIs (Monte Carlo, 4 escenarios)</h2>
+        <div id="reportOutput"><p class="loading">Configura las réplicas en el panel lateral y pulsa «Ejecutar Monte Carlo comparativo».</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ====================================================================
+   MOTOR DE EVENTOS DISCRETOS (subconjunto fiel de la API de SimPy)
+   ==================================================================== */
+class MinHeap {
+  constructor(){ this.a = []; this.seq = 0; }
+  push(time, item){ const node={time, seq:this.seq++, item}; this.a.push(node); this._up(this.a.length-1); return node; }
+  pop(){
+    if(!this.a.length) return null;
+    const top = this.a[0];
+    const last = this.a.pop();
+    if(this.a.length){ this.a[0]=last; this._down(0); }
+    return top;
+  }
+  peek(){ return this.a.length ? this.a[0] : null; }
+  _less(i,j){ const a=this.a[i], b=this.a[j]; return a.time!==b.time ? a.time<b.time : a.seq<b.seq; }
+  _up(i){ while(i>0){ const p=(i-1)>>1; if(this._less(i,p)){ [this.a[i],this.a[p]]=[this.a[p],this.a[i]]; i=p; } else break; } }
+  _down(i){
+    for(;;){
+      let l=2*i+1, r=2*i+2, m=i;
+      if(l<this.a.length && this._less(l,m)) m=l;
+      if(r<this.a.length && this._less(r,m)) m=r;
+      if(m===i) break;
+      [this.a[i],this.a[m]]=[this.a[m],this.a[i]]; i=m;
+    }
+  }
+}
+
+class SimEvent {
+  constructor(env){ this.env=env; this.triggered=false; this.processed=false; this.value=undefined; this.callbacks=[]; }
+  trigger(value){ if(this.triggered) return; this.triggered=true; this.value=value; this.env._enqueueCallbacks(this); }
+  addCallback(cb){ if(this.processed){ cb(this); return; } this.callbacks.push(cb); }
+  _fireCallbacks(){ this.processed=true; const cbs=this.callbacks; this.callbacks=[]; for(const cb of cbs) cb(this); }
+}
+
+class SimEnv {
+  constructor(){ this.now = 0; this.heap = new MinHeap(); }
+  timeout(delay, value){ const ev=new SimEvent(this); this.heap.push(this.now+Math.max(0,delay), {kind:'timeoutFire', ev, value}); return ev; }
+  _enqueueCallbacks(ev){ this.heap.push(this.now, {kind:'callbacks', ev}); }
+  process(gen){ const procEvent=new SimEvent(this); this.heap.push(this.now, {kind:'procStart', procEvent, gen}); return procEvent; }
+  run(until){
+    for(;;){
+      const node = this.heap.peek();
+      if(!node || node.time > until) break;
+      this.heap.pop(); this.now = node.time;
+      const item = node.item;
+      if(item.kind==='procStart') this._resumeProc(item.procEvent, item.gen, undefined);
+      else if(item.kind==='timeoutFire'){ item.ev.triggered=true; item.ev.value=item.value; item.ev._fireCallbacks(); }
+      else if(item.kind==='callbacks') item.ev._fireCallbacks();
+    }
+    this.now = until;
+  }
+  _resumeProc(procEvent, gen, sendVal){
+    let res;
+    try{ res = gen.next(sendVal); }
+    catch(e){ console.error(e); procEvent.trigger(undefined); return; }
+    if(res.done){ procEvent.trigger(res.value); return; }
+    res.value.addCallback((ev)=> this._resumeProc(procEvent, gen, ev.value));
+  }
+}
+
+function anyOf(env, events){
+  const result = new SimEvent(env);
+  let done = false;
+  for(const ev of events){
+    ev.addCallback((fired)=>{ if(done) return; done=true; result.trigger(fired); });
+  }
+  return result;
+}
+
+class Resource {
+  constructor(env, capacity){ this.env=env; this.capacity=capacity; this.count=0; this.queue=[]; }
+  request(){
+    const req = new SimEvent(this.env);
+    req._granted = false;
+    req.cancel = () => { if(req._granted) return; const qi=this.queue.indexOf(req); if(qi>=0) this.queue.splice(qi,1); };
+    this.queue.push(req); this._tryAssign(); return req;
+  }
+  release(req){ if(req._granted){ this.count--; req._granted=false; } this._tryAssign(); }
+  _tryAssign(){ while(this.queue.length && this.count<this.capacity){ const req=this.queue.shift(); this.count++; req._granted=true; req.trigger(req); } }
+}
+
+class PriorityResource {
+  constructor(env, capacity){ this.env=env; this.capacity=capacity; this.count=0; this.queue=[]; this._seq=0; }
+  request(priority=0){
+    const req = new SimEvent(this.env);
+    req._granted=false; req._priority=priority; req._seq=this._seq++;
+    req.cancel = () => { if(req._granted) return; const qi=this.queue.indexOf(req); if(qi>=0) this.queue.splice(qi,1); };
+    this.queue.push(req); this.queue.sort((a,b)=> (a._priority-b._priority)||(a._seq-b._seq)); this._tryAssign(); return req;
+  }
+  release(req){ if(req._granted){ this.count--; req._granted=false; } this._tryAssign(); }
+  _tryAssign(){ while(this.queue.length && this.count<this.capacity){ const req=this.queue.shift(); this.count++; req._granted=true; req.trigger(req); } }
+}
+
+/* ---------- RNG determinista (mulberry32) + muestreos ---------- */
+let rnd = Math.random;
+function mulberry32(a){ return function(){ a|=0; a=(a+0x6D2B79F5)|0; let t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
+function reseed(seed){ rnd = (seed===null||seed===undefined) ? Math.random : mulberry32(seed>>>0); }
+function expSample(rate){ return -Math.log(1-rnd())/Math.max(1e-9,rate); }
+function uniform(lo,hi){ if(hi<=lo) return lo; return lo + rnd()*(hi-lo); }
+function choiceWeighted(items, weights){
+  const total = weights.reduce((a,b)=>a+b,0);
+  let r = rnd()*total;
+  for(let i=0;i<items.length;i++){ r -= weights[i]; if(r<=0) return items[i]; }
+  return items[items.length-1];
+}
+
+/* ====================================================================
+   DOMINIO: 4 configuraciones + comportamiento del paciente, portados
+   línea a línea de 01_red_de_colas_hospitalaria.py
+   ==================================================================== */
+const TIPOS = ['Verde','Amarillo','Naranja','Rojo'];
+const LLEGADAS_HORARIAS = [
+  [22, 7,  3.0, [0.15,0.35,0.35,0.15]],
+  [7,  10, 4.5, [0.30,0.30,0.25,0.15]],
+  [10, 14, 6.0, [0.30,0.35,0.30,0.05]],
+  [14, 17, 4.5, [0.40,0.30,0.25,0.05]],
+  [17, 22, 7.0, [0.25,0.30,0.30,0.15]],
+];
+function obtenerPerfilHorario(relojHoras){
+  const horaDia = Math.floor(relojHoras) % 24;
+  for(const [ini,fin,tasa,probs] of LLEGADAS_HORARIAS){
+    if(ini>fin){ if(horaDia>=ini || horaDia<fin) return [tasa,probs]; }
+    else { if(ini<=horaDia && horaDia<fin) return [tasa,probs]; }
+  }
+  throw new Error('Franja horaria no cubierta');
+}
+function generarTiempoServicio(cfg, estacion, tipo){
+  const base = (cfg.TIEMPOS_SERVICIO[estacion]||{})[tipo];
+  if(base===undefined) throw new Error(`Sin tiempo de servicio definido para ${estacion}/${tipo}`);
+  return base * uniform(0.75, 1.25);
+}
+function determinarDestino(cfg, estacion, tipo){
+  const opciones = cfg.PROB_DERIVACION[estacion][tipo];
+  const destinos = Object.keys(opciones);
+  return choiceWeighted(destinos, destinos.map(d=>opciones[d]));
+}
+function verificarFilas(prob){
+  const errores = [];
+  for(const estacion in prob) for(const tipo in prob[estacion]){
+    const s = Object.values(prob[estacion][tipo]).reduce((a,b)=>a+b,0);
+    if(Math.abs(s-1.0) > 1e-9) errores.push([estacion, tipo, s]);
+  }
+  return errores;
+}
+const ESTADOS_FINALES = new Set(['Alta','Fallece']);
+const OBS_ESTACIONES = new Set(['Obs_Verde','Obs_Amarillo','Obs_Naranja','Obs_Rojo']);
+
+class Hospital {
+  constructor(env, cfg){
+    this.env=env; this.cfg=cfg; this.log_datos=[]; this.activos={};
+    this.servidores={};
+    for(const nombre in cfg.SERVIDORES_CAPACIDAD) this.servidores[nombre]=new Resource(env, cfg.SERVIDORES_CAPACIDAD[nombre]);
+    this.camas={};
+    for(const nombre in cfg.CAMAS_CAPACIDAD) this.camas[nombre]=new Resource(env, cfg.CAMAS_CAPACIDAD[nombre]);
+    this.box = new Resource(env, cfg.BOX_CAPACIDAD);
+    if(cfg.UCI_MODE==='pooled') this.uci = { POOL: new PriorityResource(env, cfg.UCI_TOTAL_CAPACIDAD) };
+    else this.uci = { Rojo:new Resource(env,cfg.UCI_ROJO_CAPACIDAD), Naranja:new Resource(env,cfg.UCI_NARANJA_CAPACIDAD), Base:new Resource(env,cfg.UCI_BASE_CAPACIDAD) };
+  }
+  infoCola(resource){ const q=resource.queue.length; return [q, q+resource.count]; }
+  resourceDeCama(nombreLogico){ return this.camas[this.cfg.CAMA_ALIAS[nombreLogico] || nombreLogico]; }
+  poolDeEstacion(estacion){ return this.cfg.POOL_ESTACION[estacion] || estacion; }
+  registrar(idPac, tipo, tIn, estacion, tWait, tServer, idRecurso, sala, qLen, sysLen, destino){
+    this.log_datos.push({ Id_pat:idPac, Pat_type:tipo, T_in:+tIn.toFixed(4), Station_in:estacion,
+      T_wait:+tWait.toFixed(4), T_server:+tServer.toFixed(4), ID_server:idRecurso, Wait_room:sala,
+      Pat_in_queue:qLen, Pat_in_system:sysLen, T_out:+(tIn+tWait+tServer).toFixed(4),
+      Station_out:destino, T_system:+(tWait+tServer).toFixed(4) });
+  }
+  finalizarSimulacion(){
+    const endTime = this.env.now;
+    for(const pacId in this.activos){
+      const data = this.activos[pacId];
+      const t = endTime - data.t_llegada_estacion;
+      this.log_datos.push({ Id_pat:pacId, Pat_type:data.tipo, T_in:+data.t_llegada_estacion.toFixed(4),
+        Station_in:data.estacion, T_wait:+t.toFixed(4), T_server:0.0, ID_server:data.id_recurso||'N/A',
+        Wait_room:data.sala||'N/A', Pat_in_queue:data.q_len||0, Pat_in_system:data.sys_len||0,
+        T_out:+endTime.toFixed(4), Station_out:'Fin_Simulacion', T_system:+t.toFixed(4) });
+    }
+  }
+}
+function liberarCama(hosp, camaPropia){
+  if(!camaPropia) return;
+  const [nombre, req] = camaPropia;
+  if(nombre.startsWith('UCI::')) hosp.uci[nombre.split('::')[1]].release(req);
+  else hosp.camas[nombre].release(req);
+}
+function* comportamientoPaciente(env, hosp, idPaciente, tipoPaciente){
+  const cfg = hosp.cfg;
+  let estacionActual='Admision', miSala='Sala_Espera_Urgencias', boxPropio=null, camaPropia=null, tLlegada=env.now;
+  hosp.activos[idPaciente] = { tipo:tipoPaciente, t_llegada_estacion:tLlegada, estacion:estacionActual, sala:miSala, fase:'esperando' };
+
+  if(cfg.BOX_CAPTURA[tipoPaciente]==='Admision'){
+    const reqBox = hosp.box.request(); yield reqBox; boxPropio=reqBox; miSala='Box_Urgencias';
+  }
+
+  while(!ESTADOS_FINALES.has(estacionActual)){
+    hosp.activos[idPaciente].t_llegada_estacion=tLlegada;
+    hosp.activos[idPaciente].estacion=estacionActual;
+    hosp.activos[idPaciente].sala=miSala;
+    hosp.activos[idPaciente].fase='esperando';
+
+    if(!boxPropio && cfg.BOX_CAPTURA[tipoPaciente]===estacionActual){
+      const reqBox = hosp.box.request(); yield reqBox; boxPropio=reqBox; miSala='Box_Urgencias';
+      hosp.activos[idPaciente].sala=miSala;
+    }
+
+    let tWait=0.0, idRecurso='N/A', qLen=0, sysLen=0, req=null;
+
+    if(OBS_ESTACIONES.has(estacionActual)){
+      idRecurso = miSala; tWait = 0.0;
+    } else if(cfg.CAMAS_CAPACIDAD[estacionActual]!==undefined || cfg.CAMA_ALIAS[estacionActual]!==undefined){
+      const recurso = hosp.resourceDeCama(estacionActual);
+      const alias = cfg.CAMA_ALIAS[estacionActual] || estacionActual;
+      if(camaPropia!==null && camaPropia[0]===alias){ tWait=0.0; }
+      else {
+        [qLen, sysLen] = hosp.infoCola(recurso);
+        const t0 = env.now;
+        const reqCama = recurso.request(); yield reqCama;
+        tWait = env.now - t0;
+        if(camaPropia!==null){ liberarCama(hosp, camaPropia); camaPropia=null; }
+        else if(boxPropio!==null){ hosp.box.release(boxPropio); boxPropio=null; }
+        camaPropia = [alias, reqCama];
+      }
+      idRecurso = alias; miSala = alias;
+      hosp.activos[idPaciente].sala = miSala;
+    } else if(estacionActual==='UCI'){
+      const prioridad = {Rojo:0, Naranja:1, Amarillo:2, Verde:2}[tipoPaciente];
+      let pool, bolsa;
+      if(cfg.UCI_MODE==='pooled'){ pool=hosp.uci.POOL; [qLen,sysLen]=hosp.infoCola(pool); }
+      else { bolsa = (tipoPaciente==='Rojo'||tipoPaciente==='Naranja') ? tipoPaciente : 'Base'; pool=hosp.uci[bolsa]; [qLen,sysLen]=hosp.infoCola(pool); }
+      const t0 = env.now;
+      const reqUci = (cfg.UCI_MODE==='pooled') ? pool.request(prioridad) : pool.request();
+      const winner = yield anyOf(env, [reqUci, env.timeout(cfg.LIMITE_ESPERA_UCI)]);
+      if(winner.value===reqUci){
+        tWait = env.now - t0;
+        if(camaPropia!==null){ liberarCama(hosp, camaPropia); camaPropia=null; }
+        else if(boxPropio!==null){ hosp.box.release(boxPropio); boxPropio=null; }
+        camaPropia = ['UCI::' + (cfg.UCI_MODE!=='pooled' ? bolsa : 'POOL'), reqUci];
+        idRecurso='UCI'; miSala='UCI';
+      } else {
+        reqUci.cancel(); tWait = env.now - t0;
+        hosp.registrar(idPaciente, tipoPaciente, tLlegada, estacionActual, tWait, 0.0, 'Sin_UCI_Disponible', miSala, qLen, sysLen, 'Fallece');
+        estacionActual='Fallece'; break;
+      }
+      hosp.activos[idPaciente].sala = miSala;
+    } else {
+      const poolNombre = hosp.poolDeEstacion(estacionActual);
+      const recurso = hosp.servidores[poolNombre];
+      [qLen, sysLen] = hosp.infoCola(recurso);
+      const t0 = env.now;
+      req = recurso.request(); yield req;
+      tWait = env.now - t0; idRecurso = poolNombre;
+    }
+
+    hosp.activos[idPaciente].fase='sirviendo';
+    hosp.activos[idPaciente].estacion=estacionActual;
+    hosp.activos[idPaciente].sala=miSala;
+    const tServicio = generarTiempoServicio(cfg, estacionActual, tipoPaciente);
+    yield env.timeout(tServicio);
+
+    if(!OBS_ESTACIONES.has(estacionActual) && cfg.CAMAS_CAPACIDAD[estacionActual]===undefined
+       && cfg.CAMA_ALIAS[estacionActual]===undefined && estacionActual!=='UCI'){
+      hosp.servidores[hosp.poolDeEstacion(estacionActual)].release(req);
+    }
+
+    const destino = determinarDestino(cfg, estacionActual, tipoPaciente);
+    if(ESTADOS_FINALES.has(destino)){
+      if(boxPropio!==null){ hosp.box.release(boxPropio); boxPropio=null; }
+      if(camaPropia!==null){ liberarCama(hosp, camaPropia); camaPropia=null; }
+    }
+    hosp.registrar(idPaciente, tipoPaciente, tLlegada, estacionActual, tWait, tServicio, idRecurso, miSala, qLen, sysLen, destino);
+    estacionActual = destino; tLlegada = env.now;
+  }
+  if(hosp.activos[idPaciente]) delete hosp.activos[idPaciente];
+  if(boxPropio!==null) hosp.box.release(boxPropio);
+  if(camaPropia!==null) liberarCama(hosp, camaPropia);
+}
+function* generadorLlegadas(env, hosp, cfg, onArrival){
+  let i=1;
+  for(;;){
+    const [tasa, probs] = obtenerPerfilHorario(env.now);
+    yield env.timeout(expSample(tasa));
+    const tipo = choiceWeighted(TIPOS, probs);
+    const id = `PAC_${i}`;
+    if(onArrival) onArrival(id, tipo);
+    env.process(comportamientoPaciente(env, hosp, id, tipo));
+    i++;
+  }
+}
+function simular(cfg, dias, semilla, warmupHoras){
+  reseed(semilla);
+  const env = new SimEnv();
+  const hosp = new Hospital(env, cfg);
+  const wu = warmupHoras||0;
+  env.process(generadorLlegadas(env, hosp, cfg, null));
+  env.run(wu + dias*24);
+  hosp.finalizarSimulacion();
+  let df = hosp.log_datos;
+  if(wu>0) df = df.filter(r=>r.T_in>=wu).map(r=>({...r, T_in:+(r.T_in-wu).toFixed(4), T_out:+(r.T_out-wu).toFixed(4)}));
+  return df;
+}
+
+function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
+
+function construirConfigBase(){
+  const cfg = {};
+  cfg.nombre = 'Línea Base (protocolo actual)';
+  cfg.SERVIDORES_CAPACIDAD = { Admision:3, Triaje:4, Aislamiento:6, Medicos:7, Pruebas_Basicas:4, Pruebas_Avanzadas:4, Consulta_Especialista:3, Farmacia:3 };
+  cfg.BOX_CAPACIDAD = 55;
+  cfg.CAMAS_CAPACIDAD = { Planta:120, Quirofano:3, Rehabilitacion:43 };
+  cfg.CAMA_ALIAS = { Planta_PostUCI:'Planta' };
+  cfg.POOL_ESTACION = { Diag_Inicial:'Medicos', Diag_Preliminar:'Medicos' };
+  cfg.BOX_CAPTURA = { Rojo:'Admision', Naranja:'Diag_Inicial' };
+  cfg.UCI_MODE = 'partitioned';
+  cfg.UCI_ROJO_CAPACIDAD = 45; cfg.UCI_NARANJA_CAPACIDAD = 30; cfg.UCI_BASE_CAPACIDAD = 4;
+  cfg.UCI_TOTAL_CAPACIDAD = cfg.UCI_ROJO_CAPACIDAD + cfg.UCI_NARANJA_CAPACIDAD + cfg.UCI_BASE_CAPACIDAD;
+  cfg.LIMITE_ESPERA_UCI = 12.0;
+  cfg.TIEMPOS_SERVICIO = {
+    Admision:{Verde:5/60,Amarillo:5/60,Naranja:4/60,Rojo:2/60},
+    Triaje:{Verde:10/60,Amarillo:8/60,Naranja:6/60,Rojo:4/60},
+    Aislamiento:{Verde:20/60,Amarillo:20/60,Naranja:20/60,Rojo:20/60},
+    Diag_Inicial:{Verde:10/60,Amarillo:10/60,Naranja:10/60,Rojo:10/60},
+    Pruebas_Basicas:{Verde:15/60,Amarillo:15/60,Naranja:15/60,Rojo:15/60},
+    Pruebas_Avanzadas:{Verde:45/60,Amarillo:45/60,Naranja:60/60,Rojo:60/60},
+    Consulta_Especialista:{Verde:30/60,Amarillo:30/60,Naranja:30/60,Rojo:30/60},
+    Diag_Preliminar:{Verde:10/60,Amarillo:10/60,Naranja:15/60,Rojo:20/60},
+    Farmacia:{Verde:8/60,Amarillo:8/60,Naranja:8/60,Rojo:8/60},
+    Quirofano:{Naranja:2.5,Rojo:3.5},
+    Planta:{Amarillo:24.0,Naranja:48.0,Rojo:72.0},
+    UCI:{Amarillo:24.0,Naranja:72.0,Rojo:96.0},
+    Planta_PostUCI:{Amarillo:24.0,Naranja:36.0,Rojo:48.0},
+    Rehabilitacion:{Amarillo:48.0,Naranja:72.0,Rojo:96.0},
+    Obs_Verde:{Verde:6.0}, Obs_Amarillo:{Amarillo:6.0}, Obs_Naranja:{Naranja:6.0}, Obs_Rojo:{Rojo:6.0},
+  };
+  cfg.PROB_DERIVACION = {
+    Admision: Object.fromEntries(TIPOS.map(t=>[t,{Triaje:1.0}])),
+    Triaje: {
+      Verde:{Aislamiento:0.05, Diag_Inicial:0.95}, Amarillo:{Aislamiento:0.10, Diag_Inicial:0.90},
+      Naranja:{Aislamiento:0.12, Diag_Inicial:0.88}, Rojo:{Diag_Inicial:1.0},
+    },
+    Aislamiento: Object.fromEntries(['Verde','Amarillo','Naranja'].map(t=>[t,{Diag_Inicial:1.0}])),
+    Diag_Inicial: {
+      Verde:{Farmacia:0.15, Pruebas_Basicas:0.65, Pruebas_Avanzadas:0.20},
+      Amarillo:{Farmacia:0.05, Pruebas_Basicas:0.55, Pruebas_Avanzadas:0.40},
+      Naranja:{Pruebas_Basicas:0.40, Pruebas_Avanzadas:0.42, Consulta_Especialista:0.18},
+      Rojo:{Pruebas_Basicas:0.30, Pruebas_Avanzadas:0.30, Consulta_Especialista:0.15, Planta:0.10, Quirofano:0.15},
+    },
+    Pruebas_Basicas: {
+      Verde:{Diag_Preliminar:0.85, Pruebas_Avanzadas:0.15}, Amarillo:{Diag_Preliminar:0.45, Pruebas_Avanzadas:0.55},
+      Naranja:{Pruebas_Avanzadas:0.60, Diag_Preliminar:0.40}, Rojo:{Pruebas_Avanzadas:0.40, Diag_Preliminar:0.60},
+    },
+    Pruebas_Avanzadas: Object.fromEntries(TIPOS.map(t=>[t,{Diag_Preliminar:1.0}])),
+    Consulta_Especialista: {
+      Amarillo:{Planta:0.60, Farmacia:0.40}, Naranja:{Diag_Preliminar:0.55, Quirofano:0.45},
+      Rojo:{Quirofano:0.55, UCI:0.25, Planta:0.20},
+    },
+    Diag_Preliminar: {
+      Verde:{Farmacia:0.85, Obs_Verde:0.15},
+      Amarillo:{Farmacia:0.35, Obs_Amarillo:0.55, Consulta_Especialista:0.10},
+      Naranja:{Planta:0.30, Obs_Naranja:0.35, Consulta_Especialista:0.15, Quirofano:0.20},
+      Rojo:{UCI:0.25, Planta:0.30, Quirofano:0.20, Obs_Rojo:0.15, Consulta_Especialista:0.10},
+    },
+    Obs_Verde:{Verde:{Farmacia:1.0}},
+    Obs_Amarillo:{Amarillo:{Farmacia:0.60, Obs_Amarillo:0.25, Planta:0.15}},
+    Obs_Naranja:{Naranja:{Farmacia:0.29, Obs_Naranja:0.30, Planta:0.35, UCI:0.06}},
+    Obs_Rojo:{Rojo:{Obs_Rojo:0.10, Planta:0.45, UCI:0.35, Farmacia:0.10}},
+    Quirofano: { Naranja:{UCI:0.35, Planta:0.55, Fallece:0.10}, Rojo:{UCI:0.65, Planta:0.25, Fallece:0.10} },
+    Planta: {
+      Amarillo:{Farmacia:0.65, Planta:0.10, UCI:0.12, Rehabilitacion:0.08, Fallece:0.05},
+      Naranja:{Farmacia:0.45, Planta:0.30, UCI:0.08, Fallece:0.07, Rehabilitacion:0.10},
+      Rojo:{Planta:0.20, UCI:0.35, Farmacia:0.20, Fallece:0.15, Rehabilitacion:0.10},
+    },
+    UCI: {
+      Amarillo:{Planta_PostUCI:0.90, Fallece:0.10}, Naranja:{Planta_PostUCI:0.75, Fallece:0.25}, Rojo:{Planta_PostUCI:0.65, Fallece:0.35},
+    },
+    Planta_PostUCI: {
+      Amarillo:{Farmacia:0.80, Rehabilitacion:0.20}, Naranja:{Farmacia:0.55, Rehabilitacion:0.45}, Rojo:{Farmacia:0.45, Rehabilitacion:0.55},
+    },
+    Rehabilitacion: Object.fromEntries(['Amarillo','Naranja','Rojo'].map(t=>[t,{Farmacia:1.0}])),
+    Farmacia: Object.fromEntries(TIPOS.map(t=>[t,{Alta:1.0}])),
+  };
+  cfg.COSTES_FIJOS = {};
+  return cfg;
+}
+function construirConfigIA(){
+  const cfg = construirConfigBase();
+  cfg.nombre = 'Escenario A - IA Diagnóstica';
+  cfg.TIEMPOS_SERVICIO = deepClone(cfg.TIEMPOS_SERVICIO);
+  for(const t in cfg.TIEMPOS_SERVICIO.Diag_Inicial) cfg.TIEMPOS_SERVICIO.Diag_Inicial[t] *= 0.70;
+  for(const t in cfg.TIEMPOS_SERVICIO.Diag_Preliminar) cfg.TIEMPOS_SERVICIO.Diag_Preliminar[t] *= 0.75;
+  cfg.PROB_DERIVACION = deepClone(cfg.PROB_DERIVACION);
+  cfg.PROB_DERIVACION.Diag_Inicial.Verde    = { Farmacia:0.35, Pruebas_Basicas:0.55, Pruebas_Avanzadas:0.10 };
+  cfg.PROB_DERIVACION.Diag_Inicial.Amarillo = { Farmacia:0.15, Pruebas_Basicas:0.60, Pruebas_Avanzadas:0.25 };
+  cfg.PROB_DERIVACION.Diag_Inicial.Naranja  = { Pruebas_Basicas:0.45, Pruebas_Avanzadas:0.32, Consulta_Especialista:0.23 };
+  cfg.COSTES_FIJOS = { licencia_ia_anual: 480000 };
+  return cfg;
+}
+function construirConfigFasttrack(){
+  const cfg = construirConfigBase();
+  cfg.nombre = 'Escenario B - Circuito Rápido (Fast-Track)';
+  cfg.SERVIDORES_CAPACIDAD = deepClone(cfg.SERVIDORES_CAPACIDAD);
+  cfg.SERVIDORES_CAPACIDAD.Medicos_Rapidos = 3;
+  cfg.TIEMPOS_SERVICIO = deepClone(cfg.TIEMPOS_SERVICIO);
+  cfg.TIEMPOS_SERVICIO.Diag_Rapido = { Verde:6/60, Amarillo:8/60 };
+  cfg.POOL_ESTACION = deepClone(cfg.POOL_ESTACION);
+  cfg.POOL_ESTACION.Diag_Rapido = 'Medicos_Rapidos';
+  cfg.PROB_DERIVACION = deepClone(cfg.PROB_DERIVACION);
+  cfg.PROB_DERIVACION.Triaje = {
+    Verde:{Aislamiento:0.05, Diag_Rapido:0.70, Diag_Inicial:0.25},
+    Amarillo:{Aislamiento:0.10, Diag_Rapido:0.30, Diag_Inicial:0.60},
+    Naranja:{Aislamiento:0.12, Diag_Inicial:0.88}, Rojo:{Diag_Inicial:1.0},
+  };
+  cfg.PROB_DERIVACION.Diag_Rapido = {
+    Verde:{Farmacia:0.75, Pruebas_Basicas:0.25}, Amarillo:{Farmacia:0.45, Pruebas_Basicas:0.50, Diag_Inicial:0.05},
+  };
+  cfg.COSTES_FIJOS = { personal_fasttrack_anual: 310000 };
+  return cfg;
+}
+function construirConfigBedpool(){
+  const cfg = construirConfigBase();
+  cfg.nombre = 'Escenario C - Gestión Dinámica de Camas UCI';
+  cfg.UCI_MODE = 'pooled';
+  cfg.COSTES_FIJOS = { reorganizacion_unica: 45000 };
+  return cfg;
+}
+
+const ESCENARIOS = {
+  base:{ nombre:'Línea Base', sub:'Protocolo actualmente vigente', build:construirConfigBase },
+  ia:  { nombre:'Escenario A · IA Diagnóstica', sub:'Asistente de diagnóstico por IA en Diag. Inicial y Preliminar (−30%/−25% tiempos, menos Pruebas Avanzadas)', build:construirConfigIA },
+  ft:  { nombre:'Escenario B · Fast-Track', sub:'Circuito rápido (70% Verde / 30% Amarillo) con equipo médico propio', build:construirConfigFasttrack },
+  bp:  { nombre:'Escenario C · Bed-Pool UCI', sub:'UCI con bolsa única (79 camas) y prioridad por gravedad en vez de 3 bolsas fijas', build:construirConfigBedpool },
+};
+let escenarioActual = 'base';
+let cfg = ESCENARIOS[escenarioActual].build();
+// Pedido explícito de Javier: quitar el período de calentamiento (antes 7
+// días simulados en silencio antes de la ventana mostrada/contabilizada).
+// `simular()`/`simularVentanaAnimada()` siguen aceptando un warmupHoras>0
+// por si hiciera falta reintroducirlo, pero con 0 no recortan nada y la
+// simulación arranca directamente en el instante mostrado/contabilizado.
+const WARMUP_HORAS = 0;
+
+/* ====================================================================
+   KPIs (operativos, de recursos, clínicos, económicos, SLA)
+   ==================================================================== */
+const BED_ESTACIONES = new Set(['Planta','Quirofano','Rehabilitacion','Planta_PostUCI']);
+const TARIFA_ALTA = { Verde:420, Amarillo:1250, Naranja:6100, Rojo:15200 };
+const COSTE_SERVICIO = { Pruebas_Basicas:40, Pruebas_Avanzadas:220, Consulta_Especialista:95 };
+const COSTE_QUIROFANO_INTERVENCION = 3500;
+const COSTE_DIA = { Planta:550, Planta_PostUCI:550, UCI:2100, Rehabilitacion:380 };
+const PENALIZACION_FALLECIMIENTO = 3000;
+const PENALIZACION_SIN_UCI_EXTRA = 10000;
+
+function margenObjetivo(tasaAlta){
+  if(tasaAlta>0.90) return 0.15;
+  if(tasaAlta>0.80) return 0.10;
+  if(tasaAlta>0.75) return 0.075;
+  return 0.05;
+}
+function timelineOcupacion(intervalos, capacidad, horizonHoras, umbral){
+  if(!intervalos.length || capacidad<=0) return { media:0, pctSobreUmbral:0 };
+  const eventos = [];
+  for(const [a,b] of intervalos){
+    const t0=Math.max(0,a), t1=Math.min(horizonHoras,b);
+    if(t1>t0){ eventos.push([t0,1]); eventos.push([t1,-1]); }
+  }
+  eventos.sort((x,y)=>x[0]-y[0]);
+  let nivel=0, tPrev=0, acumMedia=0, acumSobre=0;
+  for(const [t,delta] of eventos){
+    const dt=t-tPrev;
+    if(dt>0){ acumMedia += (nivel/capacidad)*dt; if(nivel/capacidad>umbral) acumSobre+=dt; }
+    nivel+=delta; tPrev=t;
+  }
+  if(horizonHoras>tPrev) acumMedia += (nivel/capacidad)*(horizonHoras-tPrev);
+  return { media: acumMedia/horizonHoras, pctSobreUmbral: 100*acumSobre/horizonHoras };
+}
+function calcularKPIs(df, cfgEsc, horizonHoras){
+  const k = {};
+  const porPaciente = new Map();
+  for(const r of df){ if(!porPaciente.has(r.Id_pat)) porPaciente.set(r.Id_pat, []); porPaciente.get(r.Id_pat).push(r); }
+  for(const filas of porPaciente.values()) filas.sort((a,b)=>a.T_in-b.T_in);
+  const terminados = [];
+  for(const [id, filas] of porPaciente){
+    const ultima = filas[filas.length-1];
+    if(ultima.Station_out==='Alta' || ultima.Station_out==='Fallece') terminados.push({ id, tipo: filas[0].Pat_type, filas, desenlace: ultima.Station_out });
+  }
+  k.n_pacientes_terminados = terminados.length;
+
+  const sumPorTipo = (campo)=>{
+    const s={}; TIPOS.forEach(t=>s[t]={sum:0,n:0}); let sG={sum:0,n:0};
+    for(const p of terminados){ const v=p.filas.reduce((a,r)=>a+r[campo],0); s[p.tipo].sum+=v; s[p.tipo].n++; sG.sum+=v; sG.n++; }
+    return {s,sG};
+  };
+  const {s:sTsys, sG:sTsysG} = sumPorTipo('T_system');
+  const {s:sTq,   sG:sTqG}   = sumPorTipo('T_wait');
+  k['oper.Tsys_h.global'] = sTsysG.n ? sTsysG.sum/sTsysG.n : 0;
+  k['oper.ratioEspera_pct.global'] = sTsysG.sum>0 ? 100*sTqG.sum/sTsysG.sum : 0;
+  for(const t of TIPOS){
+    k[`oper.Tsys_h.${t}`] = sTsys[t].n ? sTsys[t].sum/sTsys[t].n : 0;
+    k[`oper.ratioEspera_pct.${t}`] = sTsys[t].sum>0 ? 100*sTq[t].sum/sTsys[t].sum : 0;
+  }
+
+  const porEstacion = {};
+  for(const r of df){
+    if(!porEstacion[r.Station_in]) porEstacion[r.Station_in]={carga:0,espera:0,visitas:0};
+    porEstacion[r.Station_in].carga+=r.T_server; porEstacion[r.Station_in].espera+=r.T_wait; porEstacion[r.Station_in].visitas++;
+  }
+  k._porEstacion = porEstacion;
+
+  const servidorBusy = {};
+  for(const r of df) if(cfgEsc.SERVIDORES_CAPACIDAD[r.ID_server]!==undefined) servidorBusy[r.ID_server]=(servidorBusy[r.ID_server]||0)+r.T_server;
+  for(const nombre in cfgEsc.SERVIDORES_CAPACIDAD) k[`rec.rho.${nombre}`] = (servidorBusy[nombre]||0)/(horizonHoras*cfgEsc.SERVIDORES_CAPACIDAD[nombre]);
+
+  const esperaPorRecurso = {};
+  for(const r of df) esperaPorRecurso[r.ID_server]=(esperaPorRecurso[r.ID_server]||0)+r.T_wait;
+  for(const nombre in cfgEsc.SERVIDORES_CAPACIDAD) k[`rec.Lq.${nombre}`] = (esperaPorRecurso[nombre]||0)/horizonHoras;
+  k['rec.Lq.UCI'] = (esperaPorRecurso['UCI']||0)/horizonHoras;
+  for(const nombre in cfgEsc.CAMAS_CAPACIDAD) k[`rec.Lq.${nombre}`] = (esperaPorRecurso[nombre]||0)/horizonHoras;
+
+  const ocupPorSala = {};
+  for(const r of df){ if(r.Wait_room) ocupPorSala[r.Wait_room]=(ocupPorSala[r.Wait_room]||0)+r.T_system; }
+  k['rec.rho.Box'] = (ocupPorSala['Box_Urgencias']||0)/(horizonHoras*cfgEsc.BOX_CAPACIDAD);
+  for(const nombre in cfgEsc.CAMAS_CAPACIDAD) k[`rec.rhoFisico.${nombre}`] = (ocupPorSala[nombre]||0)/(horizonHoras*cfgEsc.CAMAS_CAPACIDAD[nombre]);
+  k['rec.rhoFisico.UCI'] = (ocupPorSala['UCI']||0)/(horizonHoras*cfgEsc.UCI_TOTAL_CAPACIDAD);
+
+  const bedBlocking = {};
+  for(const [, filas] of porPaciente){
+    for(let i=1;i<filas.length;i++){
+      const actual=filas[i], previa=filas[i-1];
+      const esCamaActual = BED_ESTACIONES.has(actual.Station_in) || actual.Station_in==='UCI';
+      const salaPrevEraCama = previa.Wait_room!=='Box_Urgencias' && (BED_ESTACIONES.has(previa.Wait_room) || previa.Wait_room==='UCI' || cfgEsc.CAMAS_CAPACIDAD[previa.Wait_room]!==undefined);
+      if(esCamaActual && actual.T_wait>0 && salaPrevEraCama) bedBlocking[previa.Wait_room]=(bedBlocking[previa.Wait_room]||0)+actual.T_wait;
+    }
+  }
+  k._bedBlocking = bedBlocking;
+  k['rec.bedBlocking_h.total'] = Object.values(bedBlocking).reduce((a,b)=>a+b,0);
+
+  let nSaturados=0, nAltaCongestion=0;
+  for(const key in k) if(key.startsWith('rec.rho.')){ if(k[key]>=1) nSaturados++; else if(k[key]>=0.85) nAltaCongestion++; }
+  k['rec.n_recursos_saturados']=nSaturados; k['rec.n_recursos_alta_congestion']=nAltaCongestion;
+
+  const altas = terminados.filter(p=>p.desenlace==='Alta').length;
+  const fallece = terminados.filter(p=>p.desenlace==='Fallece').length;
+  k['clin.tasaAltas_pct.global'] = terminados.length ? 100*altas/terminados.length : 0;
+  k['clin.mortalidad_pct.global'] = terminados.length ? 100*fallece/terminados.length : 0;
+  for(const t of TIPOS){
+    const sub = terminados.filter(p=>p.tipo===t);
+    k[`clin.mortalidad_pct.${t}`] = sub.length ? 100*sub.filter(p=>p.desenlace==='Fallece').length/sub.length : 0;
+  }
+  const sinUciRows = df.filter(r=>r.ID_server==='Sin_UCI_Disponible');
+  const naranjaRojoTerm = terminados.filter(p=>p.tipo==='Naranja'||p.tipo==='Rojo');
+  k['clin.sinUCI_pct.global'] = terminados.length ? 100*sinUciRows.length/terminados.length : 0;
+  k['clin.sinUCI_pct.naranjaRojo'] = naranjaRojoTerm.length ? 100*sinUciRows.length/naranjaRojoTerm.length : 0;
+  const hospitalizados = terminados.filter(p=> p.filas.some(r=>['Planta','Quirofano','UCI','Planta_PostUCI'].includes(r.Station_in)));
+  k['clin.tasaHospitalizacion_pct'] = terminados.length ? 100*hospitalizados.length/terminados.length : 0;
+  let uciDesdeUrgencias=0, uciDesdePlanta=0;
+  for(const p of terminados){
+    const idxUci = p.filas.findIndex(r=>r.Station_in==='UCI');
+    if(idxUci>0){ const previa=p.filas[idxUci-1]; if(previa.Station_in==='Planta'||previa.Station_in==='Planta_PostUCI') uciDesdePlanta++; else uciDesdeUrgencias++; }
+    else if(idxUci===0) uciDesdeUrgencias++;
+  }
+  k['clin.derivacionUCI_pct.desdeUrgencias'] = terminados.length ? 100*uciDesdeUrgencias/terminados.length : 0;
+  k['clin.derivacionUCI_pct.desdePlanta'] = terminados.length ? 100*uciDesdePlanta/terminados.length : 0;
+
+  let ingresos=0;
+  for(const p of terminados) if(p.desenlace==='Alta') ingresos += TARIFA_ALTA[p.tipo];
+  let costeVariable=0;
+  for(const r of df){
+    if(COSTE_SERVICIO[r.Station_in]!==undefined) costeVariable += COSTE_SERVICIO[r.Station_in];
+    if(r.Station_in==='Quirofano') costeVariable += COSTE_QUIROFANO_INTERVENCION;
+    if(COSTE_DIA[r.Station_in]!==undefined) costeVariable += COSTE_DIA[r.Station_in]*(r.T_server/24);
+  }
+  const costePenalizacion = fallece*PENALIZACION_FALLECIMIENTO + sinUciRows.length*PENALIZACION_SIN_UCI_EXTRA;
+  let costeFijo=0;
+  for(const clave in (cfgEsc.COSTES_FIJOS||{})){ const v=cfgEsc.COSTES_FIJOS[clave]; costeFijo += clave.endsWith('_anual') ? v*(horizonHoras/(365*24)) : v; }
+  const costeTotal = costeVariable + costePenalizacion + costeFijo;
+  k['econ.ingresos']=ingresos; k['econ.costeVariable']=costeVariable; k['econ.costePenalizacion']=costePenalizacion;
+  k['econ.costeFijo']=costeFijo; k['econ.costeTotal']=costeTotal;
+  k['econ.costeMedioPorPaciente'] = terminados.length ? costeTotal/terminados.length : 0;
+  k['econ.margen_pct'] = ingresos>0 ? 100*(ingresos-costeTotal)/ingresos : 0;
+  k['econ.margenObjetivo_pct'] = 100*margenObjetivo(altas/Math.max(1,terminados.length));
+  k['econ.cumpleMargenObjetivo'] = k['econ.margen_pct']>=k['econ.margenObjetivo_pct'] ? 1 : 0;
+
+  const doorToDoctorMin = [];
+  for(const p of terminados){
+    if(p.tipo!=='Naranja' && p.tipo!=='Rojo') continue;
+    const admFila = p.filas.find(r=>r.Station_in==='Admision');
+    const diFila = p.filas.find(r=>r.Station_in==='Diag_Inicial');
+    if(admFila && diFila) doorToDoctorMin.push(((diFila.T_in+diFila.T_wait) - admFila.T_in)*60);
+  }
+  doorToDoctorMin.sort((a,b)=>a-b);
+  const media = arr=> arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+  k['sla.doorToDoctor_min.media'] = media(doorToDoctorMin);
+  k['sla.doorToDoctor_pctCumple'] = doorToDoctorMin.length ? 100*doorToDoctorMin.filter(v=>v<=15).length/doorToDoctorMin.length : 0;
+  const ratiosVA = [];
+  for(const p of terminados){
+    if(p.tipo!=='Verde' && p.tipo!=='Amarillo') continue;
+    const tsys=p.filas.reduce((a,r)=>a+r.T_system,0), tq=p.filas.reduce((a,r)=>a+r.T_wait,0);
+    if(tsys>0) ratiosVA.push(100*tq/tsys);
+  }
+  k['sla.ratioEsperaVA_pct.media'] = media(ratiosVA);
+  k['sla.ratioEsperaVA_cumple'] = k['sla.ratioEsperaVA_pct.media']<25 ? 1 : 0;
+  const intervalosUci = [];
+  for(const [, filas] of porPaciente) for(const r of filas) if(r.Station_in==='UCI' && r.ID_server==='UCI') intervalosUci.push([r.T_in+r.T_wait, r.T_in+r.T_wait+r.T_server]);
+  const ocupUci = timelineOcupacion(intervalosUci, cfgEsc.UCI_TOTAL_CAPACIDAD, horizonHoras, 0.90);
+  k['sla.ocupacionUCI_pct.media'] = 100*ocupUci.media;
+  k['sla.ocupacionUCI_pctTiempoSobre90'] = ocupUci.pctSobreUmbral;
+  k['sla.ocupacionUCI_cumple'] = (ocupUci.pctSobreUmbral<100 && ocupUci.media<0.90) ? 1 : 0;
+  k['sla.mortalidadEvitable_cumple'] = k['clin.sinUCI_pct.naranjaRojo']<2 ? 1 : 0;
+  return k;
+}
+
+/* ====================================================================
+   MONTE CARLO: N réplicas por escenario, agregación media ± IC95%
+   ==================================================================== */
+function agregarMuestras(muestras){
+  const out = {}; const n = muestras.length;
+  const claves = Object.keys(muestras[0]).filter(k=>typeof muestras[0][k]==='number');
+  for(const key of claves){
+    const vals = muestras.map(m=>m[key]);
+    const mean = vals.reduce((a,b)=>a+b,0)/n;
+    const variance = n>1 ? vals.reduce((a,b)=>a+(b-mean)**2,0)/(n-1) : 0;
+    const sd = Math.sqrt(variance);
+    out[key] = { media: mean, sd, ci95: n>1 ? 1.96*sd/Math.sqrt(n) : 0, n };
+  }
+  return out;
+}
+async function ejecutarMonteCarloAsync(cfgEsc, opts, onProgress){
+  const { replicas=20, dias=90, warmupHoras=WARMUP_HORAS, seedBase=1000 } = opts||{};
+  const muestras = [];
+  for(let i=0;i<replicas;i++){
+    const seed = seedBase + i*97 + 1;
+    const df = simular(cfgEsc, dias, seed, warmupHoras);
+    muestras.push(calcularKPIs(df, cfgEsc, dias*24));
+    if(onProgress) onProgress(i+1, replicas);
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  return agregarMuestras(muestras);
+}
+
+/* ====================================================================
+   VISTA ANIMADA: muestreo periódico del estado para reproducir sin
+   volver a ejecutar el motor en vivo.
+   ==================================================================== */
+function snapshotHospital(hosp, t){
+  const cfgEsc = hosp.cfg;
+  const stations = {};
+  for(const pid in hosp.activos){
+    const d = hosp.activos[pid];
+    const sub = d.fase==='sirviendo' ? 'sirviendo' : 'esperando';
+    const name = sub==='sirviendo' ? (cfgEsc.CAMA_ALIAS[d.estacion] || d.estacion) : d.sala;
+    if(!stations[name]) stations[name] = { esperando:[], sirviendo:[] };
+    stations[name][sub].push(d.tipo);
+  }
+  const res = {};
+  for(const nombre in hosp.servidores){ const p=hosp.servidores[nombre]; res[nombre]={busy:p.count,cap:p.capacity,queue:p.queue.length}; }
+  for(const nombre in hosp.camas){ const p=hosp.camas[nombre]; res[nombre]={busy:p.count,cap:p.capacity,queue:p.queue.length}; }
+  { const p=hosp.box; res['Box']={busy:p.count,cap:p.capacity,queue:p.queue.length}; }
+  if(cfgEsc.UCI_MODE==='pooled'){ const p=hosp.uci.POOL; res['UCI']={busy:p.count,cap:p.capacity,queue:p.queue.length}; }
+  else { let busy=0,cap=0,queue=0; ['Rojo','Naranja','Base'].forEach(b=>{const p=hosp.uci[b]; busy+=p.count; cap+=p.capacity; queue+=p.queue.length;}); res['UCI']={busy,cap,queue}; }
+  return { t, stations, res };
+}
+function* muestreador(env, hosp, dt, snapshots){ for(;;){ snapshots.push(snapshotHospital(hosp, env.now)); yield env.timeout(dt); } }
+function simularVentanaAnimada(cfgEsc, horas, seed, dtMuestra, warmupHoras){
+  reseed(seed);
+  const env = new SimEnv();
+  const hosp = new Hospital(env, cfgEsc);
+  const snapshots = [];
+  const wu = warmupHoras||0;
+  env.process(generadorLlegadas(env, hosp, cfgEsc, null));
+  if(wu>0) env.run(wu);
+  env.process(muestreador(env, hosp, dtMuestra||0.1, snapshots));
+  env.run(wu+horas);
+  snapshots.push(snapshotHospital(hosp, wu+horas));
+  let df = hosp.log_datos, snaps = snapshots;
+  if(wu>0){
+    df = df.filter(r=>r.T_in>=wu).map(r=>({...r, T_in:+(r.T_in-wu).toFixed(4), T_out:+(r.T_out-wu).toFixed(4)}));
+    snaps = snapshots.map(s=>({...s, t:s.t-wu}));
+  }
+  return { df, snapshots:snaps, warmupHoras:wu };
+}
+
+/* ====================================================================
+   DIAGRAMA (SVG) — topología dependiente del escenario
+   ==================================================================== */
+const TYPE_COLOR = { Verde:'var(--verde)', Amarillo:'var(--amarillo)', Naranja:'var(--naranja)', Rojo:'var(--rojo)' };
+const STATION_LABELS = {
+  Admision:'Admisión', Triaje:'Triaje', Aislamiento:'Aislamiento', Diag_Rapido:'Diag. Rápido',
+  Diag_Inicial:'Diag. Inicial', Pruebas_Basicas:'Pruebas Básicas', Pruebas_Avanzadas:'Pruebas Avanzadas',
+  Consulta_Especialista:'Consulta Esp.', Diag_Preliminar:'Diag. Preliminar',
+  Sala_Espera_Urgencias:'Sala de espera', Box_Urgencias:'Box urgencias',
+  Obs_Verde:'Obs. Verde', Obs_Amarillo:'Obs. Amarillo', Obs_Naranja:'Obs. Naranja', Obs_Rojo:'Obs. Rojo',
+  Quirofano:'Quirófano', Planta:'Planta', UCI:'UCI', Rehabilitacion:'Rehabilitación', Farmacia:'Farmacia',
+  Alta:'Alta médica', Fallece:'Fallecimiento',
+  // Nombres de pools de recursos (no son estaciones del diagrama, pero
+  // aparecen como claves de SERVIDORES_CAPACIDAD en el panel de parámetros).
+  Medicos:'Médicos (Diag.)', Medicos_Rapidos:'Médicos Fast-Track', Planta_PostUCI:'Planta (post-UCI)',
+};
+
+// ----------------------------------------------------------------------
+// Diagrama reorganizado en bloques temáticos (pastel) en vez de una única
+// fila de columnas: cada bloque agrupa las estaciones que pertenecen a la
+// misma fase clínica, y se dibuja como una zona de fondo con tono pastel
+// y un rótulo. Dentro de cada bloque las estaciones se colocan en una
+// mini-rejilla propia (gcol/grow). Esto además reduce mucho el tamaño
+// total del diagrama (antes ~2700×2500px) para que quepa en pantalla sin
+// necesidad de scroll, combinado con el escalado del SVG por CSS.
+// Pedido explícito de Javier tras ver la versión a tamaño natural de la
+// iteración anterior ("ahora el diagrama es demasiado grande y no cabe en
+// pantalla completa"): se restaura el escalado del SVG por CSS para que
+// vuelva a caber siempre en pantalla (ver #diagramWrap/#diagramSvg), y
+// aquí se reduce el tamaño "de base" de las tarjetas y los huecos entre
+// ellas — con escalado automático, agrandar sólo el font-size no cambiaba
+// nada en pantalla (el navegador reescala TODO el diagrama para que quepa,
+// así que un diagrama más grande con letra más grande se ve igual de
+// pequeño); lo único que de verdad ayuda a que el texto se vea más grande
+// en pantalla es que el diagrama en sí ocupe menos "espacio lógico", para
+// que haga falta encogerlo menos.
+const NODE_W = 196, GAP_X = 10, GAP_Y = 8;
+const GROUP_PAD = 10, GROUP_TITLE_H = 29, GROUP_GAP = 22, ROW_GAP = 30, PAD = 14;
+// Alturas de tarjeta por bloque. Las estaciones "ampliadas" llevan además el
+// desglose de a qué estación(es) siguiente(s) concreta(s) se deriva cada
+// paciente (pedido explícito de Javier, sin límite de cuántos destinos se
+// muestran: "se debe ver todos los porcentajes de envíos en cada estación").
+// Como el número de destinos posibles varía mucho de una estación a otra
+// (p. ej. Diag. Preliminar puede derivar a 9 estaciones distintas según el
+// tipo de paciente, mientras que Rehabilitación sólo deriva a 1), cada
+// bloque "ampliado" tiene su propia altura, calculada para el peor caso real
+// de sus propias estaciones (análisis exhaustivo de PROB_DERIVACION en los
+// 4 escenarios, no una muestra), en vez de limitar artificialmente cuántos
+// destinos se muestran.
+// (NODE_H_SIMPLE quedó sin uso desde que todos los bloques tienen su propia
+// altura "ampliada" — iteración 9 — se deja documentado por si se necesita
+// un bloque sin desglose de destinos en el futuro.)
+const NODE_H_SIMPLE = 146;
+// Alturas recalculadas en la iteración 12: el desglose de destinos pasa a
+// mostrar una estación por línea (antes se envolvían varias por línea), lo
+// que necesita bastante más alto por cada destino adicional, y además el
+// fan-out "peor caso" cambia porque (a) ya no se excluyen Alta médica/
+// Fallecimiento de los destinos listados y (b) Sala de espera/Box de
+// Urgencias pasan a llevar su propio desglose (una línea por cada estación
+// de "mesa" del escenario activo — ver destinoBreakdownSala()), con lo que
+// pasan a ser la estación de mayor fan-out de todo el diagrama. Valores
+// medidos empíricamente (altura real necesaria del contenido + margen) con
+// Playwright sobre los 4 escenarios, no sólo estimados.
+// Desde la iteración 20 estas constantes YA NO fijan la altura final de cada
+// tarjeta: son sólo el valor de RESERVA que se usa mientras no hay ninguna
+// vista generada todavía (justo tras cargar la página o cambiar de
+// escenario, antes de pulsar "Generar vista" — en ese momento las tarjetas
+// están vacías de contenido, así que no hay nada que medir). En cuanto se
+// genera una vista, measureCardHeight()/recomputeNodeHeights() miden la
+// altura real que necesita CADA estación por separado (antes todas las
+// estaciones de un mismo bloque compartían la altura del peor caso de TODO
+// el bloque en los 4 escenarios combinados, dejando mucho hueco en blanco
+// bajo el último destino listado en las estaciones con menos fan-out —
+// pedido explícito de Javier: "menos espacio en la parte inferior desde el
+// último elemento de la lista"). Se dejan sin tocar como reserva razonable
+// para ese estado inicial en blanco.
+const NODE_H_ENTRADA = 300;       // peor caso: Diag_Inicial, hasta 6 destinos
+const NODE_H_DIAGNOSTICO = 368;   // peor caso: Diag_Preliminar, hasta 9 destinos
+const NODE_H_URGENCIAS = 390;     // peor caso: Box_Urgencias, hasta 10 destinos (todas las estaciones de "mesa" del escenario Fast-Track)
+const NODE_H_HOSPITALIZACION = 280; // peor caso: Planta, hasta 5 destinos (incluye ahora Fallecimiento)
+const NODE_H_SALIDA = 198;        // peor caso: Rehabilitación/Farmacia, 1 destino cada una
+// Estaciones de observación: único grupo que se queda sin el desglose %
+// por tipo de paciente (pedido explícito de Javier).
+const OBS_IDS = new Set(['Obs_Verde','Obs_Amarillo','Obs_Naranja','Obs_Rojo']);
+// Altura real medida de cada tarjeta (id de estación → px), recalculada por
+// recomputeNodeHeights() cada vez que se genera una vista nueva; vacío
+// (y por tanto con el valor de reserva NODE_H_* de cada bloque) mientras no
+// se ha generado ninguna vista todavía para el escenario actual.
+let MEASURED_H = {};
+
+// TODOS los bloques (incluido ahora el de espera/observación en Urgencias,
+// pedido explícito de Javier en la iteración 10) llevan, además del medidor
+// de ocupación, el desglose de A QUÉ ESTACIÓN SIGUIENTE concreta se deriva
+// cada paciente que pasa por ellas (pedido explícito de Javier, en
+// sustitución del contador agregado "↳ N a espera/observación" de
+// iteraciones anteriores). Se muestran SIEMPRE todos los destinos posibles
+// de cada estación según el modelo, con 0% si aún no se ha derivado ningún
+// paciente hacia ahí. Se excluye Alta médica y Fallecimiento de ese
+// desglose porque no son destinos de interés aquí — por eso, p. ej.,
+// Farmacia (que sólo deriva a Alta) no muestra ningún chip de destino, y
+// las estaciones sin PROB_DERIVACION propia (Sala de espera, Box de
+// Urgencias: son salas físicas de espera, no estaciones de derivación)
+// tampoco. Las estaciones "big" (Alta/Fallece) no pasan por este desglose
+// en absoluto: renderFrame() las trata aparte con su propio contador
+// acumulado. El desglose % por tipo de paciente (showPct) es independiente
+// de éste: las estaciones de observación siguen sin él (pedido explícito de
+// Javier, iteración 5) pero sí llevan el desglose de destinos. Ver
+// destinoBreakdown() más abajo.
+
+// Tres filas de bloques (pedido explícito de Javier, iteración 10):
+//   fila 0 — Admisión/triaje y primer filtro clínico + Diagnóstico y pruebas,
+//            uno al lado del otro, cada uno en 1 fila × 4 columnas.
+//   fila 1 — Espera y observación en Urgencias, en solitario, 1 fila × 6
+//            columnas; estas estaciones llevan ahora también el desglose de
+//            a qué estación siguiente se deriva cada paciente.
+//   fila 2 — Hospitalización y cuidados críticos (1 fila × 3 columnas) +
+//            Recuperación y salida (1 fila × 4 columnas), uno al lado del
+//            otro.
+// Cada bloque es siempre una ÚNICA fila con tantas columnas como estaciones
+// estén activas (groupGrid() ya no reparte en 2 columnas como en la
+// iteración 6 — ese diseño en rejilla 2×N se sustituye aquí por una sola
+// fila por bloque, tal como pidió Javier explícitamente para cada uno).
+const GROUPS = [
+  { id:'entrada', nombre:'Admisión, triaje y primer filtro clínico', hue:210, brow:0, nodeH:NODE_H_ENTRADA, extended:true, items:[
+    { id:'Admision' },
+    { id:'Triaje' },
+    { id:'Aislamiento' },
+    { id:'Diag_Inicial' },
+    { id:'Diag_Rapido', soloFastTrack:true },
+  ]},
+  { id:'diagnostico', nombre:'Diagnóstico y pruebas complementarias', hue:265, brow:0, nodeH:NODE_H_DIAGNOSTICO, extended:true, items:[
+    { id:'Pruebas_Basicas' },
+    { id:'Diag_Preliminar' },
+    { id:'Pruebas_Avanzadas' },
+    { id:'Consulta_Especialista' },
+  ]},
+  { id:'urgencias', nombre:'Espera y observación en Urgencias', hue:175, brow:1, nodeH:NODE_H_URGENCIAS, extended:true, items:[
+    { id:'Sala_Espera_Urgencias' },
+    { id:'Obs_Verde' },
+    { id:'Obs_Amarillo' },
+    { id:'Obs_Naranja' },
+    { id:'Obs_Rojo' },
+    { id:'Box_Urgencias' },
+  ]},
+  { id:'hospitalizacion', nombre:'Hospitalización y cuidados críticos', hue:330, brow:2, nodeH:NODE_H_HOSPITALIZACION, extended:true, items:[
+    { id:'Planta' },
+    { id:'Quirofano' },
+    { id:'UCI' },
+  ]},
+  { id:'salida', nombre:'Recuperación y salida', hue:45, brow:2, nodeH:NODE_H_SALIDA, extended:true, items:[
+    { id:'Rehabilitacion' },
+    { id:'Farmacia' },
+    { id:'Alta', big:true },
+    { id:'Fallece', big:true },
+  ]},
+];
+// Reparte los "items" de un bloque (ya filtrados a los activos en el
+// escenario actual) en una ÚNICA fila, tantas columnas como estaciones
+// activas (pedido explícito de Javier, iteración 10 — sustituye la rejilla
+// de 2 columnas de la iteración 6). El orden de "items" en GROUPS ya es el
+// orden de columnas deseado de izquierda a derecha.
+function groupGrid(g){
+  const items = g.items.filter(it => !it.soloFastTrack || cfg.SERVIDORES_CAPACIDAD.Medicos_Rapidos!==undefined);
+  const pos = {};
+  items.forEach((it,i)=>{ pos[it.id] = { gcol:i, grow:0 }; });
+  return { grows:1, cols: items.length, pos };
+}
+function activeNodes(){
+  const out = [];
+  GROUPS.forEach(g=>{
+    const { pos } = groupGrid(g);
+    g.items.forEach(it=>{
+      if(it.soloFastTrack && cfg.SERVIDORES_CAPACIDAD.Medicos_Rapidos===undefined) return;
+      const p = pos[it.id];
+      out.push({
+        ...it, grupo:g.id, brow:g.brow, nodeH: MEASURED_H[it.id] || g.nodeH,
+        extended: g.extended || false,
+        showPct: !OBS_IDS.has(it.id),
+        gcol:p.gcol, grow:p.grow,
+      });
+    });
+  });
+  return out;
+}
+
+const ICON_KIND = {
+  Admision:'mesa', Triaje:'mesa', Aislamiento:'mesa', Diag_Rapido:'mesa', Diag_Inicial:'mesa',
+  Pruebas_Basicas:'mesa', Pruebas_Avanzadas:'mesa', Consulta_Especialista:'mesa', Diag_Preliminar:'mesa', Farmacia:'mesa',
+  Sala_Espera_Urgencias:'persona', Obs_Verde:'persona', Obs_Amarillo:'persona', Obs_Naranja:'persona', Obs_Rojo:'persona',
+  Box_Urgencias:'cama', Quirofano:'cama', Planta:'cama', UCI:'cama', Rehabilitacion:'cama',
+};
+const RESOURCE_OF = {
+  Admision:'Admision', Triaje:'Triaje', Aislamiento:'Aislamiento', Diag_Rapido:'Medicos_Rapidos', Diag_Inicial:'Medicos',
+  Pruebas_Basicas:'Pruebas_Basicas', Pruebas_Avanzadas:'Pruebas_Avanzadas', Consulta_Especialista:'Consulta_Especialista',
+  Diag_Preliminar:'Medicos', Farmacia:'Farmacia', Box_Urgencias:'Box', Quirofano:'Quirofano', Planta:'Planta',
+  UCI:'UCI', Rehabilitacion:'Rehabilitacion',
+};
+const CAPACITY_CONSTRAINED = Object.keys(RESOURCE_OF);
+const SALAS_ESPERA = new Set(['Sala_Espera_Urgencias','Box_Urgencias']);
+
+function groupWidth(g){ const { cols } = groupGrid(g); return GROUP_PAD*2 + cols*NODE_W + Math.max(cols-1,0)*GAP_X; }
+// La altura de fondo del bloque ya no asume que todas sus estaciones miden
+// lo mismo (iteración 20): cada estación puede tener ahora su propia altura
+// medida (MEASURED_H), así que el bloque debe ser tan alto como la estación
+// MÁS alta que contenga en este momento (como grows siempre vale 1 en el
+// diseño actual de "una sola fila por bloque", en la práctica es el máximo
+// de las estaciones activas del bloque).
+function groupMaxNodeH(g){
+  const items = g.items.filter(it => !it.soloFastTrack || cfg.SERVIDORES_CAPACIDAD.Medicos_Rapidos!==undefined);
+  return Math.max(...items.map(it => MEASURED_H[it.id] || g.nodeH));
+}
+function groupHeight(g){ const { grows } = groupGrid(g); return GROUP_TITLE_H + GROUP_PAD*2 + grows*groupMaxNodeH(g) + (grows-1)*GAP_Y; }
+function computeLayout(){
+  const byRow = {};
+  GROUPS.forEach(g=>{ (byRow[g.brow] = byRow[g.brow]||[]).push(g); });
+  const rowKeys = Object.keys(byRow).map(Number).sort((a,b)=>a-b);
+  const rows = rowKeys.map(rk=>{
+    const groups = byRow[rk];
+    const widths = groups.map(groupWidth);
+    const h = Math.max(...groups.map(groupHeight));
+    const w = widths.reduce((a,b)=>a+b, 0) + (groups.length-1)*GROUP_GAP;
+    return { groups, widths, h, w };
+  });
+  const maxRowW = Math.max(...rows.map(r=>r.w));
+  const groupPos = {};
+  let y = PAD;
+  rows.forEach(r=>{
+    let x = PAD + (maxRowW - r.w)/2; // cada fila se centra sobre el ancho de la fila más ancha
+    r.groups.forEach((g,i)=>{
+      const w = r.widths[i], h = groupHeight(g);
+      groupPos[g.id] = { x, y: y + (r.h-h)/2, w, h };
+      x += w + GROUP_GAP;
+    });
+    y += r.h + ROW_GAP;
+  });
+  const W = maxRowW + PAD*2;
+  const H = y - ROW_GAP + PAD;
+  return { groupPos, W, H };
+}
+function nodeXY(n, groupPos){
+  const gp = groupPos[n.grupo];
+  return { x: gp.x + GROUP_PAD + n.gcol*(NODE_W+GAP_X), y: gp.y + GROUP_TITLE_H + GROUP_PAD + n.grow*(n.nodeH+GAP_Y) };
+}
+
+function edgesFromConfig(){
+  const vistos = new Set(); const edges = [];
+  for(const est in cfg.PROB_DERIVACION){
+    const estV = cfg.CAMA_ALIAS[est] || est;
+    for(const tipo in cfg.PROB_DERIVACION[est]){
+      for(const dest in cfg.PROB_DERIVACION[est][tipo]){
+        const destV = cfg.CAMA_ALIAS[dest] || dest;
+        if(estV===destV) continue;
+        const key = estV+'→'+destV;
+        if(!vistos.has(key)){ vistos.add(key); edges.push([estV, destV]); }
+      }
+    }
+  }
+  const estacionesServidor = activeNodes().filter(n=>ICON_KIND[n.id]==='mesa').map(n=>n.id);
+  for(const est of estacionesServidor){ edges.push(['Sala_Espera_Urgencias', est, 'espera']); edges.push(['Box_Urgencias', est, 'espera']); }
+  return edges;
+}
+
+function svgIcon(kind, size, color){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="color:${color||'currentColor'};flex:none"><use href="#ic-${kind}"/></svg>`;
+}
+function nivelOcupacion(ratio){ if(ratio<0.30) return 'verde'; if(ratio<0.60) return 'amarillo'; if(ratio<0.90) return 'naranja'; return 'rojo'; }
+function volumenEspera(nodeId, st, res){ if(SALAS_ESPERA.has(nodeId)) return st.esperando.length; return res ? (res.queue||0) : 0; }
+
+// Medidor de ocupación tipo "cuentakilómetros" (semicírculo de 0 al máximo
+// de recursos asignado a la estación), pedido explícito de Javier en vez de
+// la barra lineal anterior. Geometría: ángulo 0°=izquierda, 180°=derecha,
+// barrido pasando por arriba.
+function gaugeArc(ratio, nivel){
+  const R=40, cx=46, cy=43, w=94, h=49;
+  const pt = a => { const rad=a*Math.PI/180; return [cx - R*Math.cos(rad), cy - R*Math.sin(rad)]; };
+  const [x0,y0] = pt(0), [x180,y180] = pt(180);
+  const a = Math.max(0, Math.min(1, ratio)) * 180;
+  const [xv,yv] = pt(a);
+  const bg = `M${x0},${y0} A${R},${R} 0 0 1 ${x180},${y180}`;
+  const fg = `M${x0},${y0} A${R},${R} 0 0 1 ${xv},${yv}`;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;margin:0 auto">
+    <path d="${bg}" fill="none" stroke="var(--border-strong)" stroke-width="8" stroke-linecap="round"/>
+    ${ratio>0?`<path d="${fg}" fill="none" stroke="var(--${nivel})" stroke-width="8" stroke-linecap="round"/>`:''}
+  </svg>`;
+}
+
+function compactNodeBody(nodeId, st, res, extra, showPct, tipoPct){
+  const espera = volumenEspera(nodeId, st, res);
+  const all = (st.sirviendo||[]).concat(st.esperando||[]);
+  const total = all.length;
+  const counts={}; TIPOS.forEach(t=>counts[t]=0);
+  all.forEach(t=>{ if(counts[t]!==undefined) counts[t]++; });
+  const presentes = TIPOS.filter(t=>counts[t]>0);
+
+  let top;
+  if(OBS_IDS.has(nodeId)){
+    // Estaciones de observación: no tienen recurso/capacidad propia en el
+    // modelo (entrada instantánea, sin cola — ver OBS_ESTACIONES en el motor
+    // de simulación), así que "res" es null aquí y el contador genérico de
+    // "esperando" no aplica. Javier pidió explícitamente ver el número de
+    // pacientes que, en el instante mostrado, están en esa estación —
+    // "total" ya es exactamente eso: el recuento instantáneo de la foto
+    // actual (snap.stations[nodeId]), no un acumulado.
+    top = `<div style="display:flex;align-items:baseline;gap:6px">
+        <span class="mono" style="font-size:31px;font-weight:800;color:var(--text)">${total}</span>
+        <span style="font-size:15px;color:var(--text-muted)">en observación</span>
+      </div>`;
+  } else if(res){
+    const ratio = res.cap ? res.busy/res.cap : 0;
+    const nivel = nivelOcupacion(ratio);
+    top = `${gaugeArc(ratio, nivel)}
+      <div style="display:flex;align-items:baseline;justify-content:center;gap:6px;margin-top:3px">
+        <span class="mono" style="font-size:21px;font-weight:700;color:var(--text)">${res.busy}/${res.cap}</span>
+        ${espera>0?`<span class="mono" style="font-size:15px;color:var(--text-muted)">+${espera} esp.</span>`:''}
+      </div>`;
+  } else {
+    top = `<div style="display:flex;align-items:baseline;gap:6px">
+        <span class="mono" style="font-size:31px;font-weight:800;color:var(--text)">${espera}</span>
+        <span style="font-size:15px;color:var(--text-muted)">esperando</span>
+      </div>`;
+  }
+
+  // El desglose % por tipo de paciente (showPct) y el desglose de a qué
+  // estación siguiente se deriva (extra/destinoBreakdown) son INDEPENDIENTES
+  // uno del otro: las estaciones de observación siguen sin desglose % por
+  // tipo (pedido explícito de Javier, iteración 5), pero sí llevan ahora el
+  // desglose de destinos si la estación lo tiene (pedido explícito de
+  // Javier, iteración 10: "en estas estaciones [espera y observación]
+  // integra además los porcentajes de envíos a estaciones sucesivas").
+  let body = top;
+  if(showPct){
+    // Todas las estaciones salvo las de observación: desglose % por tipo de
+    // paciente ACUMULADO desde el inicio de la ventana (pedido explícito de
+    // Javier: "el porcentaje de pacientes de cada tipo que han pasado por
+    // cada estación" — ya no es la foto instantánea de quién está presente
+    // en este fotograma, sino el total histórico, igual criterio que el
+    // desglose de destinos). "tipoPct" llega ya calculado por
+    // tipoBreakdown()/tipoBreakdownSala(), SIEMPRE con los 4 tipos y 0% si
+    // todavía no ha pasado ninguno de ese tipo (pedido explícito de Javier:
+    // "si no tienes datos debes poner un 0%").
+    // Los 4 porcentajes SIEMPRE en una única fila (pedido explícito de
+    // Javier, iteración 17: antes, con `flex-wrap:wrap`, el peor caso —
+    // los 4 tipos con porcentaje de 2 cifras, p. ej. 26/31/29/13 — no cabía
+    // en el ancho de la tarjeta (171.6px de contenido sobre 156px
+    // disponibles con el espaciado anterior) y la fila se partía en dos.
+    // Se redujo el tamaño de la cifra (16→14px), del cuadradito de color
+    // (10→8px) y de los espacios internos (4→3px swatch-cifra, 8→6px entre
+    // tipos) para que el peor caso realista quepa siempre con margen: con
+    // los 4 tipos en dos cifras (el caso más ancho posible salvo que un
+    // único tipo acapare el 100%, que es aún más estrecho) la fila mide
+    // ≈145px de contenido sobre 180px disponibles. `flex-wrap:nowrap` fija
+    // la única fila: no hace falta "permitir" que quepa, se ha verificado
+    // que siempre cabe. El marcado vive en pctRowHtml() (definida más abajo,
+    // junto a tipoBreakdown()), compartida con los nodos "big" de la
+    // iteración 18.
+    body += pctRowHtml(tipoPct);
+  } else {
+    // Estaciones de observación: sin desglose %, sólo la franja de color
+    // sin etiquetar que ya había antes.
+    const mixBar = total ? presentes.map(t=> `<div style="flex:${counts[t]} 0 0;background:${TYPE_COLOR[t]};height:100%"></div>`).join('') : '';
+    body += total ? `<div style="margin-top:6px;height:6px;border-radius:3px;overflow:hidden;display:flex;background:var(--border-strong)">${mixBar}</div>` : '';
+  }
+  // Desglose de a qué estación(es) siguiente(s) concreta(s) se deriva cada
+  // paciente, en %, para toda estación que tenga destinos posibles según el
+  // modelo (pedido explícito de Javier). "extra" ya llega como la lista
+  // {dest,pct} calculada por destinoBreakdown()/destinoBreakdownSala(),
+  // siempre con TODOS los destinos posibles (0% si aún no se ha enviado
+  // ningún paciente ahí) y ordenada con las estaciones "relevantes" primero
+  // y las de espera/observación al final. Una estación de destino por línea
+  // (pedido explícito de Javier, iteración 12: "pon cada estación de destino
+  // en una línea distinta" — antes se envolvían varios por línea con
+  // flex-wrap). Cada bloque "ampliado" tiene su propia altura de tarjeta
+  // (NODE_H_ENTRADA / NODE_H_DIAGNOSTICO / NODE_H_URGENCIAS /
+  // NODE_H_HOSPITALIZACION / NODE_H_SALIDA, arriba) calculada para el número
+  // exacto de destinos posibles de su estación con más fan-out (la de Sala
+  // de espera/Box de Urgencias, con un destino por cada estación de "mesa"
+  // del escenario activo, es ahora la de mayor fan-out del diagrama).
+  if(extra && extra.length){
+    // El nombre de la estación puede truncarse con "…" si no cabe, pero el
+    // porcentaje NUNCA (va en un span aparte de ancho fijo) — es el dato que
+    // importa de verdad en este desglose.
+    body += `<div style="margin-top:4px;display:flex;flex-direction:column;gap:1px">${extra.map(d=>
+      `<div style="display:flex;align-items:baseline;gap:4px;font-size:15px;line-height:1.4;color:var(--text-muted)">
+        <span class="mono" style="flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">↳ ${STATION_LABELS[d.dest]||d.dest}</span>
+        <span class="mono" style="flex:none">${Math.round(d.pct)}%</span>
+      </div>`
+    ).join('')}</div>`;
+  }
+  return body;
+}
+
+// Fila de icono + nombre de cada tarjeta, idéntica en el diagrama real y en
+// la sonda de medición de measureCardHeight() (iteración 20) — extraída a
+// una función para que ambos usos no puedan divergir.
+function nodeHeaderHtml(n){
+  const kind = ICON_KIND[n.id] || 'mesa';
+  const color = n.big ? (n.id==='Alta'?'var(--good)':'var(--critical)') : (kind==='cama'?'var(--cama)':kind==='persona'?'var(--accent)':'var(--mesa)');
+  return `<div style="display:flex;align-items:center;gap:6px">
+            ${svgIcon(kind,19,color)}
+            <span style="font-family:var(--font-display);font-weight:600;font-size:16.5px;line-height:1.2;color:var(--text)">${STATION_LABELS[n.id]||n.id}</span>
+          </div>`;
+}
+
+function buildDiagram(){
+  const nodes = activeNodes();
+  const edges = edgesFromConfig();
+  const { groupPos, W, H } = computeLayout();
+
+  const defs = `<defs>
+    <symbol id="ic-persona" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4" fill="currentColor"/><rect x="6.5" y="12" width="11" height="10" rx="4.5" fill="currentColor"/></symbol>
+    <symbol id="ic-mesa" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="3.4" rx="1" fill="currentColor"/><rect x="4.3" y="10.4" width="2.2" height="9" fill="currentColor"/><rect x="17.5" y="10.4" width="2.2" height="9" fill="currentColor"/></symbol>
+    <symbol id="ic-cama" viewBox="0 0 24 24"><rect x="2.5" y="11" width="19" height="7" rx="1.6" fill="currentColor"/><rect x="2.5" y="7" width="7" height="5" rx="1.3" fill="currentColor" opacity=".75"/><rect x="2" y="17.2" width="2" height="3" fill="currentColor"/><rect x="20" y="17.2" width="2" height="3" fill="currentColor"/></symbol>
+    <marker id="arrow-flujo" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-muted)"/></marker>
+    <marker id="arrow-espera" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--border-strong)"/></marker>
+  </defs>`;
+
+  let groupsHtml = '';
+  GROUPS.forEach(g=>{
+    const gp = groupPos[g.id];
+    groupsHtml += `<g>
+      <rect x="${gp.x}" y="${gp.y}" width="${gp.w}" height="${gp.h}" rx="14" fill="hsla(${g.hue},70%,60%,0.13)" stroke="hsla(${g.hue},60%,65%,0.38)" stroke-width="1"/>
+      <circle cx="${gp.x+18}" cy="${gp.y+19}" r="6.5" fill="hsl(${g.hue},65%,62%)"/>
+      <text x="${gp.x+30}" y="${gp.y+25}" font-family="var(--font-display)" font-weight="700" font-size="18px" fill="var(--text-2)">${g.nombre}</text>
+    </g>`;
+  });
+
+  const pos = {}; const info = {};
+  nodes.forEach(n=>{ pos[n.id]=nodeXY(n, groupPos); info[n.id]=n; });
+  let edgesHtml = '';
+  edges.forEach(([a,b,kind])=>{
+    if(!pos[a] || !pos[b]) return;
+    const p1 = pos[a], p2 = pos[b];
+    const esEspera = kind==='espera';
+    const mismaFila = info[a] && info[b] && info[a].brow === info[b].brow;
+    let path;
+    const h1 = info[a].nodeH, h2 = info[b].nodeH;
+    if(mismaFila){
+      // misma fila de bloques: conector horizontal lado derecho → lado izquierdo
+      const x1 = p1.x+NODE_W, y1 = p1.y+h1/2, x2 = p2.x, y2 = p2.y+h2/2;
+      const midX = (x1+x2)/2;
+      path = `M${x1},${y1} C${midX},${y1} ${midX},${y2} ${x2},${y2}`;
+    } else {
+      // salta de una fila de bloques a otra: conector vertical abajo → arriba
+      const x1 = p1.x+NODE_W/2, y1 = p1.y+h1, x2 = p2.x+NODE_W/2, y2 = p2.y;
+      const midY = (y1+y2)/2;
+      path = `M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`;
+    }
+    edgesHtml += `<path d="${path}" fill="none" stroke="${esEspera?'var(--border-strong)':'var(--text-muted)'}" stroke-width="${esEspera?1.1:1.6}" stroke-dasharray="${esEspera?'4,4':'none'}" opacity="${esEspera?0.5:0.8}" marker-end="url(#${esEspera?'arrow-espera':'arrow-flujo'})"/>`;
+  });
+
+  let nodesHtml = '';
+  nodes.forEach(n=>{
+    const {x,y} = pos[n.id];
+    nodesHtml += `<g class="node" data-id="${n.id}" transform="translate(${x},${y})">
+      <rect width="${NODE_W}" height="${n.nodeH}" rx="10" fill="var(--surface-2)" stroke="var(--border)" stroke-width="1"/>
+      <foreignObject x="0" y="0" width="${NODE_W}" height="${n.nodeH}">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing:border-box;width:100%;height:100%;padding:6px 8px;font-family:var(--font-body);display:flex;flex-direction:column">
+          ${nodeHeaderHtml(n)}
+          <div class="node-body" style="margin-top:4px;flex:1"></div>
+        </div>
+      </foreignObject>
+    </g>`;
+  });
+
+  document.getElementById('diagramWrap').innerHTML = `<svg id="diagramSvg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${defs}<g>${groupsHtml}${edgesHtml}${nodesHtml}</g></svg>`;
+
+  const legend = document.getElementById('legend');
+  legend.innerHTML = TIPOS.map(t=> `<span class="lg-item"><span class="sw" style="background:${TYPE_COLOR[t]}"></span>${t}</span>`).join('')
+    + `<span class="lg-item"><span class="sw" style="background:var(--text-muted)"></span>flujo (pasa a la siguiente estación)</span>`
+    + `<span class="lg-item"><span class="sw" style="background:var(--border-strong);opacity:.6"></span>espera antes de ser atendido (sala / box)</span>`;
+}
+
+function altaFallHasta(t, cual){ if(!animData) return 0; let n=0; for(const r of animData.df){ if(r.T_out<=t && r.Station_out===cual) n++; } return n; }
+// Conjunto de estaciones destino que una estación puede alcanzar según el
+// modelo de derivación del escenario activo (unión de las derivaciones de
+// todos los tipos de paciente que pasan por ella). Incluye Alta médica y
+// Fallecimiento cuando son destino real de la estación (pedido explícito de
+// Javier, iteración 12: antes se excluían porque ya llevan su propio
+// contador acumulado como nodos "big", pero eso dejaba a Farmacia —cuyo
+// único destino es Alta— sin ningún desglose que mostrar). Estaciones que no
+// son un punto de derivación propio en el modelo (Sala de espera / Box de
+// Urgencias: son salas físicas de espera, no estaciones con PROB_DERIVACION)
+// devuelven una lista vacía aquí — para esas dos se usa posiblesDestinosSala()
+// / destinoBreakdownSala() más abajo.
+function posiblesDestinos(stationId){
+  const porTipo = cfg.PROB_DERIVACION[stationId];
+  if(!porTipo) return [];
+  const set = new Set();
+  for(const tipo in porTipo){
+    for(const dest in porTipo[tipo]) set.add(dest);
+  }
+  return [...set];
+}
+// Estaciones de espera/observación: para el orden del desglose de destinos
+// (pedido explícito de Javier: "estaciones relevantes en primer lugar y en
+// último lugar las estaciones de espera y observación").
+const WAIT_OBS_SORT = new Set([...OBS_IDS, 'Sala_Espera_Urgencias', 'Box_Urgencias']);
+// De forma acumulada hasta el instante t, a qué estación siguiente concreta
+// (Station_out) fue derivado cada paciente que pasó por "stationId", en %
+// sobre el total de visitas a esa estación. Se muestran SIEMPRE todos los
+// destinos posibles de la estación según el modelo, incluso con 0% si
+// todavía no se ha derivado ningún paciente hacia ahí (pedido explícito de
+// Javier: "si no hay envíos deben aparecer con un porcentaje de cero") — así
+// el desglose está visible desde el primer fotograma, no sólo tras el primer
+// paciente. Ordenado con las estaciones "relevantes" primero y las de
+// espera/observación al final, y dentro de cada grupo de mayor a menor %.
+function destinoBreakdown(t, stationId){
+  const posibles = posiblesDestinos(stationId);
+  if(!posibles.length) return [];
+  const counts = {}; posibles.forEach(d=>counts[d]=0);
+  let total = 0;
+  if(animData){
+    for(const r of animData.df){
+      if(r.T_out<=t && r.Station_in===stationId){
+        total++;
+        if(counts[r.Station_out]!==undefined) counts[r.Station_out]++;
+      }
+    }
+  }
+  return posibles
+    .map(dest=>({ dest, pct: total ? counts[dest]/total*100 : 0 }))
+    .sort((a,b)=>{
+      const aw = WAIT_OBS_SORT.has(a.dest) ? 1 : 0, bw = WAIT_OBS_SORT.has(b.dest) ? 1 : 0;
+      if(aw!==bw) return aw-bw;
+      return b.pct - a.pct;
+    });
+}
+// Sala de espera / Box de Urgencias (pedido explícito de Javier, iteración
+// 12: "me falta a donde se envían los pacientes que pasan por... la sala de
+// espera, y por el box de urgencias"). Estas dos NO son estaciones de
+// derivación propias (no tienen PROB_DERIVACION: son salas físicas donde el
+// paciente espera/es atendido mientras su estación conceptual real es
+// cualquiera de las de "mesa" — Admisión, Triaje, Diag. Inicial, etc. — tal
+// como ya reflejan las flechas "espera" del propio diagrama, que van de cada
+// sala a todas las estaciones de mesa). Por eso aquí el desglose no es "a qué
+// estación se deriva" (destino tras la atención) sino "para qué estación
+// concreta está siendo atendido/en cola" cada paciente registrado con esa
+// sala (Wait_room) — el mismo concepto que ya dibujan las flechas "espera".
+function posiblesDestinosSala(){
+  return activeNodes().filter(n=>ICON_KIND[n.id]==='mesa').map(n=>n.id);
+}
+function destinoBreakdownSala(t, salaId){
+  const posibles = posiblesDestinosSala();
+  if(!posibles.length) return [];
+  const counts = {}; posibles.forEach(d=>counts[d]=0);
+  let total = 0;
+  if(animData){
+    for(const r of animData.df){
+      if(r.T_out<=t && r.Wait_room===salaId){
+        total++;
+        if(counts[r.Station_in]!==undefined) counts[r.Station_in]++;
+      }
+    }
+  }
+  return posibles
+    .map(dest=>({ dest, pct: total ? counts[dest]/total*100 : 0 }))
+    .sort((a,b)=>b.pct-a.pct);
+}
+// Desglose % por TIPO de paciente (Verde/Amarillo/Naranja/Rojo) de todos los
+// pacientes que han PASADO por la estación de forma acumulada hasta el
+// instante t (pedido explícito de Javier: sustituye el desglose anterior,
+// que era instantáneo — sólo los pacientes presentes en ese fotograma
+// concreto — por uno acumulado desde el inicio de la ventana, igual que
+// destinoBreakdown()). Se muestran SIEMPRE los 4 tipos, con 0% si todavía no
+// ha pasado ninguno de ese tipo (pedido explícito de Javier: "si no tienes
+// datos debes poner un 0%"), en vez de omitir el tipo como antes.
+function tipoBreakdown(t, stationId){
+  const counts = {}; TIPOS.forEach(ti=>counts[ti]=0);
+  let total = 0;
+  if(animData){
+    for(const r of animData.df){
+      if(r.T_out<=t && r.Station_in===stationId){
+        total++;
+        if(counts[r.Pat_type]!==undefined) counts[r.Pat_type]++;
+      }
+    }
+  }
+  return TIPOS.map(tipo=>({ tipo, pct: total ? counts[tipo]/total*100 : 0 }));
+}
+// Misma idea que tipoBreakdown() pero para Sala de espera / Box de Urgencias
+// (salas físicas, no estaciones de derivación): se cuenta por Wait_room en
+// vez de por Station_in, igual que destinoBreakdownSala().
+function tipoBreakdownSala(t, salaId){
+  const counts = {}; TIPOS.forEach(ti=>counts[ti]=0);
+  let total = 0;
+  if(animData){
+    for(const r of animData.df){
+      if(r.T_out<=t && r.Wait_room===salaId){
+        total++;
+        if(counts[r.Pat_type]!==undefined) counts[r.Pat_type]++;
+      }
+    }
+  }
+  return TIPOS.map(tipo=>({ tipo, pct: total ? counts[tipo]/total*100 : 0 }));
+}
+// Misma idea que tipoBreakdown()/tipoBreakdownSala() pero para los nodos
+// "big" (Alta médica / Fallecimiento, desenlaces finales del paciente, no
+// estaciones intermedias): se cuenta por Station_out en vez de por
+// Station_in/Wait_room — igual criterio que altaFallHasta() usa para el
+// contador global de cada uno (pedido explícito de Javier, iteración 18:
+// "además del contador global debe aparecer el porcentaje de cada tipo de
+// paciente que han pasado por esa estación").
+function tipoBreakdownDestino(t, destino){
+  const counts = {}; TIPOS.forEach(ti=>counts[ti]=0);
+  let total = 0;
+  if(animData){
+    for(const r of animData.df){
+      if(r.T_out<=t && r.Station_out===destino){
+        total++;
+        if(counts[r.Pat_type]!==undefined) counts[r.Pat_type]++;
+      }
+    }
+  }
+  return TIPOS.map(tipo=>({ tipo, pct: total ? counts[tipo]/total*100 : 0 }));
+}
+// Marcado de la fila de 4 porcentajes por tipo, en una única línea (pedido
+// explícito de Javier, iteración 17). Se extrae a una función compartida
+// para que los nodos "big" (iteración 18) usen EXACTAMENTE el mismo
+// dimensionado ya verificado (cifra 14px, cuadradito 8px, `flex-wrap:nowrap`)
+// que el resto de estaciones, en vez de duplicar los valores a mano.
+function pctRowHtml(tipoPct){
+  if(!tipoPct) return '';
+  return `<div style="margin-top:5px;display:flex;flex-wrap:nowrap;gap:0 6px">${tipoPct.map(d=>
+    `<span style="display:inline-flex;align-items:center;gap:3px;flex:none"><span style="width:8px;height:8px;border-radius:2px;background:${TYPE_COLOR[d.tipo]};display:inline-block;flex:none"></span><span class="mono" style="font-size:14px;font-weight:600;color:var(--text-2)">${Math.round(d.pct)}%</span></span>`
+  ).join('')}</div>`;
+}
+function fmtHoras(h){ const d=Math.floor(h/24), hh=Math.floor(h%24), mm=Math.round((h%1)*60); return `día ${d} · ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`; }
+
+// Devuelve el HTML del CONTENIDO (".node-body") de un nodo para un
+// fotograma dado — extraído de renderFrame() (iteración 20) para poder
+// reutilizarse también en measureCardHeight()/recomputeNodeHeights(): el
+// número de líneas que ocupa una tarjeta (desglose de destinos, fila de %
+// por tipo, etc.) es determinista para una estación+escenario dados — no
+// depende del instante `t` concreto, sólo de qué destinos son POSIBLES según
+// el modelo — así que el mismo HTML que se usa para pintar también sirve
+// para medir cuánto alto necesita de verdad cada tarjeta.
+function computeNodeBodyHtml(n, snap){
+  if(n.big){
+    const count = altaFallHasta(snap.t, n.id);
+    // Además del contador global (ya existía), el desglose % por tipo de
+    // paciente de TODOS los que han llegado a este desenlace, acumulado
+    // desde el inicio de la ventana (pedido explícito de Javier,
+    // iteración 18) — mismo criterio y mismo marcado de una sola fila
+    // (iteración 17) que ya usa el resto de estaciones vía tipoBreakdown().
+    const tipoPct = tipoBreakdownDestino(snap.t, n.id);
+    return `<div style="font-size:43px;font-weight:800;font-family:var(--font-mono);color:${n.id==='Alta'?'var(--good)':'var(--critical)'}">${count}</div><div style="font-size:14px;color:var(--text-muted)">pacientes acumulados</div>${pctRowHtml(tipoPct)}`;
+  }
+  const st = snap.stations[n.id] || { esperando:[], sirviendo:[] };
+  const res = snap.res[RESOURCE_OF[n.id]] || null;
+  const extra = n.extended ? (SALAS_ESPERA.has(n.id) ? destinoBreakdownSala(snap.t, n.id) : destinoBreakdown(snap.t, n.id)) : null;
+  const tipoPct = n.showPct ? (SALAS_ESPERA.has(n.id) ? tipoBreakdownSala(snap.t, n.id) : tipoBreakdown(snap.t, n.id)) : null;
+  return compactNodeBody(n.id, st, res, extra, n.showPct, tipoPct);
+}
+function renderFrame(snap){
+  const nodes = activeNodes();
+  nodes.forEach(n=>{
+    const g = document.querySelector(`#diagramSvg g.node[data-id="${n.id}"] .node-body`);
+    if(!g) return;
+    g.innerHTML = computeNodeBodyHtml(n, snap);
+  });
+  const tEl = document.getElementById('playTime');
+  if(tEl) tEl.textContent = fmtHoras(snap.t);
+}
+
+// Mide cuánto alto necesita REALMENTE la tarjeta de una estación con un
+// contenido dado, renderizando una copia invisible fuera de pantalla con el
+// mismo ancho/relleno/tipografía que la tarjeta real (misma fila de icono+
+// nombre vía nodeHeaderHtml(), mismo contenido vía computeNodeBodyHtml()) y
+// leyendo la altura que el navegador le da de forma natural (sin el
+// `height:100%` que, en la tarjeta real dentro del `<foreignObject>`, fuerza
+// a la caja a estirarse hasta el alto asignado en vez de encogerse a su
+// contenido). Pedido explícito de Javier, iteración 20: "menos espacio en la
+// parte inferior desde el último elemento de la lista" — en vez de seguir
+// calculando a mano el peor caso de cada bloque (como en las iteraciones 9 y
+// 12), cada tarjeta mide su propio contenido y se ajusta a él.
+function measureCardHeight(n, bodyHtml){
+  const probe = document.createElement('div');
+  probe.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;left:-9999px;top:0;box-sizing:border-box;width:${NODE_W}px;padding:6px 8px;font-family:var(--font-body);`;
+  probe.innerHTML = `${nodeHeaderHtml(n)}<div class="node-body" style="margin-top:4px">${bodyHtml}</div>`;
+  document.body.appendChild(probe);
+  const h = probe.getBoundingClientRect().height;
+  document.body.removeChild(probe);
+  // +6px de margen de seguridad frente a redondeos de sub-píxel; mínimo de
+  // 100px para que ninguna tarjeta quede visualmente demasiado pequeña
+  // aunque su contenido real sea muy corto (p. ej. una sola línea de
+  // destino).
+  return Math.max(100, Math.ceil(h) + 6);
+}
+// Recalcula MEASURED_H para todas las estaciones activas del escenario
+// actual, a partir de un fotograma representativo (el número de líneas de
+// cada tarjeta —desglose de destinos, fila de % por tipo— no depende del
+// instante `t` concreto, sólo de qué destinos son posibles según el modelo,
+// así que CUALQUIER fotograma sirve; se usa el primero por simplicidad).
+// Se llama justo después de generar una vista nueva, antes de reconstruir el
+// diagrama, para que buildDiagram() ya use las alturas reales.
+function recomputeNodeHeights(snap){
+  const next = {};
+  activeNodes().forEach(n=>{
+    next[n.id] = measureCardHeight(n, computeNodeBodyHtml(n, snap));
+  });
+  MEASURED_H = next;
+}
+
+/* ====================================================================
+   ESTADO GLOBAL + REPRODUCCIÓN
+   ==================================================================== */
+let animData = null;
+const play = { playing:false, idx:0, speed:6, simT:undefined };
+
+function generarVista(){
+  stopPlay();
+  // Tope ampliado de 240h (10 días) a 720h (30 días), pedido explícito de
+  // Javier (iteración 19). `dtMuestra` (más abajo) escala con `horas`, así
+  // que el número de fotogramas muestreados se mantiene ~constante
+  // (≈1200) y el rendimiento no se degrada con ventanas más largas.
+  const horas = Math.max(6, Math.min(720, +document.getElementById('cfgHoras').value || 72));
+  const seedStr = document.getElementById('cfgSeed').value.trim();
+  const seed = seedStr===''? Math.floor(Math.random()*1e9) : (+seedStr||1);
+  const dtMuestra = Math.max(0.02, horas/1200);
+  try{ animData = simularVentanaAnimada(cfg, horas, seed, dtMuestra, WARMUP_HORAS); }
+  catch(e){ console.error(e); alert('Error al simular: '+e.message); return; }
+  let maxEsp = 0;
+  for(const snap of animData.snapshots){
+    for(const id in snap.stations){ const n=(snap.stations[id].esperando||[]).length; if(n>maxEsp) maxEsp=n; }
+    for(const name in snap.res){ const q=snap.res[name].queue||0; if(q>maxEsp) maxEsp=q; }
+  }
+  animData.maxEsperando = maxEsp;
+  // Mide la altura real de cada tarjeta ANTES de reconstruir el diagrama
+  // (iteración 20), para que buildDiagram() ya coloque cada estación con su
+  // propio alto ajustado en vez del alto "de reserva" compartido por bloque.
+  recomputeNodeHeights(animData.snapshots[0]);
+  buildDiagram();
+  play.idx = 0; play.simT = undefined;
+  renderFrame(animData.snapshots[0]);
+  updatePlayButtons();
+}
+function stepPlay(){ if(!animData) return; const snaps=animData.snapshots; if(play.idx>=snaps.length-1){ pausePlay(); return; } play.idx++; renderFrame(snaps[play.idx]); updatePlayHint(); }
+let lastTick = 0;
+function playLoop(ts){
+  if(!play.playing) return;
+  if(!lastTick) lastTick = ts;
+  const dtReal = (ts-lastTick)/1000; lastTick = ts;
+  if(!animData){ play.playing=false; return; }
+  const snaps = animData.snapshots;
+  if(play.simT===undefined || play.simT===null) play.simT = snaps[play.idx].t;
+  play.simT += dtReal*play.speed;
+  while(play.idx < snaps.length-1 && snaps[play.idx+1].t <= play.simT) play.idx++;
+  renderFrame(snaps[play.idx]);
+  updatePlayHint();
+  if(play.idx >= snaps.length-1){ pausePlay(); return; }
+  requestAnimationFrame(playLoop);
+}
+function startPlay(){ if(!animData) return; play.playing=true; lastTick=0; play.simT=animData.snapshots[play.idx].t; updatePlayButtons(); requestAnimationFrame(playLoop); }
+function pausePlay(){ play.playing=false; updatePlayButtons(); }
+function stopPlay(){ play.playing=false; play.idx=0; play.simT=undefined; }
+// Aviso "pulsa Reproducir" (pedido explícito de Javier, iteración 13): no
+// es un fallo de los medidores — el primer fotograma de cualquier vista
+// generada es el instante inicial (día 0, hospital vacío, sin período de
+// calentamiento — ver WARMUP_HORAS más arriba), así que todos los
+// medidores están a 0 y por tanto en gris hasta que avanza la animación.
+// Con los tamaños de texto/medidor más grandes de la iteración 12 ese
+// primer fotograma "apagado" se notaba mucho más, así que en vez de
+// cambiar ese comportamiento (Javier prefirió mantenerlo tal cual, fiel a
+// "sin calentamiento") se añade este aviso visible sólo en ese instante:
+// se oculta en cuanto la reproducción avanza del primer fotograma, se
+// pausa a mitad, o se llega al final.
+function updatePlayHint(){
+  const hint = document.getElementById('playHint');
+  if(!hint) return;
+  hint.style.display = (animData && play.idx===0 && !play.playing) ? 'block' : 'none';
+}
+function updatePlayButtons(){
+  const has = !!animData;
+  const b1=document.getElementById('btnPlay'), b2=document.getElementById('btnPause'), b3=document.getElementById('btnReset');
+  if(b1) b1.disabled = !has || play.playing;
+  if(b2) b2.disabled = !has || !play.playing;
+  if(b3) b3.disabled = !has;
+  updatePlayHint();
+}
+
+/* ====================================================================
+   INFORME COMPARATIVO (Monte Carlo, 4 escenarios)
+   ==================================================================== */
+function fmtNum(v, dec){ return v.toLocaleString('es-ES', {minimumFractionDigits:dec, maximumFractionDigits:dec}); }
+function celda(agg, key, dec, sufijo){
+  const m = agg[key];
+  if(!m) return '<span style="color:var(--text-muted)">—</span>';
+  return `${fmtNum(m.media,dec)}${sufijo||''} <span style="color:var(--text-muted);font-size:11px">± ${fmtNum(m.ci95,dec)}</span>`;
+}
+function filaComparativa(titulo, aggs, key, dec, sufijo, menorEsMejor){
+  const vals = aggs.map(a=> a[key] ? a[key].media : null);
+  const validos = vals.filter(v=>v!==null);
+  let bestIdx=-1, worstIdx=-1;
+  if(validos.length>1){
+    const bestVal = menorEsMejor ? Math.min(...validos) : Math.max(...validos);
+    const worstVal = menorEsMejor ? Math.max(...validos) : Math.min(...validos);
+    bestIdx = vals.indexOf(bestVal); worstIdx = vals.indexOf(worstVal);
+    if(bestIdx===worstIdx){ bestIdx=-1; worstIdx=-1; }
+  }
+  const tds = aggs.map((a,i)=> `<td class="num${i===bestIdx?' highlight':''}${i===worstIdx?' highlight':''}">${celda(a,key,dec,sufijo)}</td>`).join('');
+  return `<tr>${['<td>'+titulo+'</td>']}${tds}</tr>`;
+}
+
+async function ejecutarInformeComparativo(){
+  const replicas = Math.max(2, Math.min(100, Math.round(+document.getElementById('mcReplicas').value || 20)));
+  const dias = Math.max(10, Math.min(365, Math.round(+document.getElementById('mcDias').value || 90)));
+  const seedStr = document.getElementById('mcSeed').value.trim();
+  const seedBase = seedStr===''? Math.floor(Math.random()*1e6) : (+seedStr||1000);
+
+  const btn = document.getElementById('btnMonteCarlo');
+  btn.disabled = true;
+  const progWrap = document.getElementById('mcProgressWrap');
+  const progFill = document.getElementById('mcProgressFill');
+  const progText = document.getElementById('mcProgressText');
+  progWrap.style.display = 'block';
+
+  const nombresEsc = Object.keys(ESCENARIOS);
+  const resultados = {};
+  const totalReplicas = replicas * nombresEsc.length;
+  let hechas = 0;
+
+  for(const key of nombresEsc){
+    const cfgEsc = ESCENARIOS[key].build();
+    resultados[key] = await ejecutarMonteCarloAsync(cfgEsc, { replicas, dias, warmupHoras:WARMUP_HORAS, seedBase }, (i)=>{
+      hechas = (nombresEsc.indexOf(key))*replicas + i;
+      const pct = Math.round(100*hechas/totalReplicas);
+      progFill.style.width = pct+'%';
+      progText.textContent = `${ESCENARIOS[key].nombre}: réplica ${i}/${replicas} — ${hechas}/${totalReplicas} en total`;
+    });
+    resultados[key]._cfg = cfgEsc;
+  }
+
+  progText.textContent = `Completado: ${totalReplicas} réplicas (${replicas} × ${dias} días por escenario).`;
+  renderInformeComparativo(resultados, { replicas, dias });
+  btn.disabled = false;
+}
+
+function renderInformeComparativo(resultados, opts){
+  const keys = Object.keys(ESCENARIOS);
+  const aggs = keys.map(k=>resultados[k]);
+  const out = document.getElementById('reportOutput');
+
+  // Tiles de cabecera por escenario
+  let tilesHtml = '<div class="escTiles">';
+  keys.forEach((k,i)=>{
+    const a = aggs[i];
+    const cumpleMargen = a['econ.cumpleMargenObjetivo'].media>=0.5;
+    tilesHtml += `<div class="escTile"><h4>${ESCENARIOS[k].nombre}</h4>
+      <div class="row">Mortalidad global<b>${fmtNum(a['clin.mortalidad_pct.global'].media,2)}%</b></div>
+      <div class="row">Tasa de alta<b>${fmtNum(a['clin.tasaAltas_pct.global'].media,2)}%</b></div>
+      <div class="row">Margen<b style="color:${cumpleMargen?'var(--good)':'var(--critical)'}">${fmtNum(a['econ.margen_pct'].media,1)}%</b></div>
+      <div class="row">Coste medio/paciente<b>${fmtNum(a['econ.costeMedioPorPaciente'].media,0)}€</b></div>
+      <div class="row">Sin UCI (Naranja/Rojo)<b>${fmtNum(a['clin.sinUCI_pct.naranjaRojo'].media,3)}%</b></div>
+    </div>`;
+  });
+  tilesHtml += '</div>';
+
+  const header = `<tr><th>KPI</th>${keys.map(k=>`<th>${ESCENARIOS[k].nombre}</th>`).join('')}</tr>`;
+
+  const operativos = `<table class="report"><thead>${header}</thead><tbody>
+    ${filaComparativa('T. sistema medio global (h)', aggs, 'oper.Tsys_h.global', 2, '', true)}
+    ${filaComparativa('T. sistema medio Verde (h)', aggs, 'oper.Tsys_h.Verde', 2, '', true)}
+    ${filaComparativa('T. sistema medio Amarillo (h)', aggs, 'oper.Tsys_h.Amarillo', 2, '', true)}
+    ${filaComparativa('T. sistema medio Naranja (h)', aggs, 'oper.Tsys_h.Naranja', 2, '', true)}
+    ${filaComparativa('T. sistema medio Rojo (h)', aggs, 'oper.Tsys_h.Rojo', 2, '', true)}
+    ${filaComparativa('Ratio espera/T.sistema global (%)', aggs, 'oper.ratioEspera_pct.global', 1, '%', true)}
+  </tbody></table>`;
+
+  const recursos = `<table class="report"><thead>${header}</thead><tbody>
+    ${filaComparativa('ρ Admisión', aggs, 'rec.rho.Admision', 3, '', true)}
+    ${filaComparativa('ρ Triaje', aggs, 'rec.rho.Triaje', 3, '', true)}
+    ${filaComparativa('ρ Aislamiento', aggs, 'rec.rho.Aislamiento', 3, '', true)}
+    ${filaComparativa('ρ Médicos (Diag. Inicial+Preliminar)', aggs, 'rec.rho.Medicos', 3, '', true)}
+    ${filaComparativa('ρ Médicos Fast-Track (Diag. Rápido)', aggs, 'rec.rho.Medicos_Rapidos', 3, '', true)}
+    ${filaComparativa('ρ Pruebas Básicas', aggs, 'rec.rho.Pruebas_Basicas', 3, '', true)}
+    ${filaComparativa('ρ Pruebas Avanzadas', aggs, 'rec.rho.Pruebas_Avanzadas', 3, '', true)}
+    ${filaComparativa('ρ Consulta Especialista', aggs, 'rec.rho.Consulta_Especialista', 3, '', true)}
+    ${filaComparativa('ρ Farmacia', aggs, 'rec.rho.Farmacia', 3, '', true)}
+    ${filaComparativa('ρ físico Box de urgencias', aggs, 'rec.rho.Box', 3, '', true)}
+    ${filaComparativa('ρ físico Quirófano', aggs, 'rec.rhoFisico.Quirofano', 3, '', true)}
+    ${filaComparativa('ρ físico Planta', aggs, 'rec.rhoFisico.Planta', 3, '', true)}
+    ${filaComparativa('ρ físico UCI', aggs, 'rec.rhoFisico.UCI', 3, '', true)}
+    ${filaComparativa('ρ físico Rehabilitación', aggs, 'rec.rhoFisico.Rehabilitacion', 3, '', true)}
+    ${filaComparativa('Bed-blocking total (h/réplica)', aggs, 'rec.bedBlocking_h.total', 0, '', true)}
+    ${filaComparativa('Recursos saturados (ρ≥1)', aggs, 'rec.n_recursos_saturados', 1, '', true)}
+    ${filaComparativa('Recursos en alta congestión (0.85–1)', aggs, 'rec.n_recursos_alta_congestion', 1, '', true)}
+  </tbody></table>`;
+
+  const clinicos = `<table class="report"><thead>${header}</thead><tbody>
+    ${filaComparativa('Mortalidad global (%)', aggs, 'clin.mortalidad_pct.global', 2, '%', true)}
+    ${filaComparativa('Mortalidad Amarillo (%)', aggs, 'clin.mortalidad_pct.Amarillo', 2, '%', true)}
+    ${filaComparativa('Mortalidad Naranja (%)', aggs, 'clin.mortalidad_pct.Naranja', 2, '%', true)}
+    ${filaComparativa('Mortalidad Rojo (%)', aggs, 'clin.mortalidad_pct.Rojo', 2, '%', true)}
+    ${filaComparativa('Tasa de altas (%)', aggs, 'clin.tasaAltas_pct.global', 2, '%', false)}
+    ${filaComparativa('Tasa de hospitalización (%)', aggs, 'clin.tasaHospitalizacion_pct', 2, '%', null)}
+    ${filaComparativa('Derivación a UCI desde Urgencias (%)', aggs, 'clin.derivacionUCI_pct.desdeUrgencias', 2, '%', null)}
+    ${filaComparativa('Derivación a UCI desde Planta (%)', aggs, 'clin.derivacionUCI_pct.desdePlanta', 2, '%', null)}
+    ${filaComparativa('Mortalidad "Sin UCI disponible" (% global)', aggs, 'clin.sinUCI_pct.global', 3, '%', true)}
+    ${filaComparativa('Mortalidad "Sin UCI disponible" (% Naranja/Rojo)', aggs, 'clin.sinUCI_pct.naranjaRojo', 3, '%', true)}
+  </tbody></table>`;
+
+  const economicos = `<table class="report"><thead>${header}</thead><tbody>
+    ${filaComparativa('Ingresos (€/réplica)', aggs, 'econ.ingresos', 0, '€', false)}
+    ${filaComparativa('Coste variable (€)', aggs, 'econ.costeVariable', 0, '€', true)}
+    ${filaComparativa('Penalizaciones (€)', aggs, 'econ.costePenalizacion', 0, '€', true)}
+    ${filaComparativa('Coste fijo del escenario (€, prorrateado)', aggs, 'econ.costeFijo', 0, '€', true)}
+    ${filaComparativa('Coste total (€)', aggs, 'econ.costeTotal', 0, '€', true)}
+    ${filaComparativa('Coste medio por paciente (€)', aggs, 'econ.costeMedioPorPaciente', 1, '€', true)}
+    ${filaComparativa('Margen operativo (%)', aggs, 'econ.margen_pct', 2, '%', false)}
+    ${filaComparativa('Margen objetivo exigido (%)', aggs, 'econ.margenObjetivo_pct', 1, '%', null)}
+    ${filaComparativa('¿Cumple margen objetivo? (1=sí)', aggs, 'econ.cumpleMargenObjetivo', 2, '', false)}
+  </tbody></table>`;
+
+  const slas = `<table class="report"><thead>${header}</thead><tbody>
+    ${filaComparativa('Door-to-doctor Naranja/Rojo, media (min, SLA≤15)', aggs, 'sla.doorToDoctor_min.media', 2, ' min', true)}
+    ${filaComparativa('% visitas que cumplen door-to-doctor ≤15min', aggs, 'sla.doorToDoctor_pctCumple', 1, '%', false)}
+    ${filaComparativa('Ratio espera clínica V/A, media (SLA<25%)', aggs, 'sla.ratioEsperaVA_pct.media', 2, '%', true)}
+    ${filaComparativa('Ocupación UCI media (%)', aggs, 'sla.ocupacionUCI_pct.media', 1, '%', true)}
+    ${filaComparativa('% tiempo con ocupación UCI >90% (SLA: no sostenido)', aggs, 'sla.ocupacionUCI_pctTiempoSobre90', 1, '%', true)}
+  </tbody></table>`;
+
+  // Periodo de amortización (frente a la Línea Base), usando el coste fijo
+  // "crudo" (no prorrateado) de cada escenario y el margen incremental diario.
+  const baseAgg = resultados.base;
+  const baseMargenDia = (baseAgg['econ.ingresos'].media - baseAgg['econ.costeTotal'].media) / opts.dias;
+  let amortHtml = '<table class="report"><thead><tr><th>Escenario</th><th>Coste fijo (€, total/anual)</th><th>Margen incremental vs línea base (€/día)</th><th>Periodo de amortización</th></tr></thead><tbody>';
+  keys.forEach(k=>{
+    if(k==='base'){ amortHtml += `<tr><td>${ESCENARIOS[k].nombre}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`; return; }
+    const a = resultados[k];
+    const margenDia = (a['econ.ingresos'].media - a['econ.costeTotal'].media) / opts.dias;
+    const incrementoDia = margenDia - baseMargenDia;
+    const costeFijoCrudo = Object.values(a._cfg.COSTES_FIJOS||{}).reduce((x,y)=>x+y,0);
+    let amort = '—';
+    if(incrementoDia>0) amort = fmtNum(costeFijoCrudo/incrementoDia,0)+' días';
+    else if(costeFijoCrudo>0) amort = '<span class="sla-bad">no se amortiza (margen incremental ≤ 0)</span>';
+    amortHtml += `<tr><td>${ESCENARIOS[k].nombre}</td><td class="num">${fmtNum(costeFijoCrudo,0)}€</td><td class="num">${fmtNum(incrementoDia,1)}€/día</td><td class="num">${amort}</td></tr>`;
+  });
+  amortHtml += '</tbody></table>';
+
+  out.innerHTML = `
+    <p class="sideNote">Monte Carlo: ${opts.replicas} réplicas de ${opts.dias} días por escenario, sin período de calentamiento (se contabiliza desde el instante inicial). El intervalo mostrado (±) es el IC95% de la media ENTRE réplicas, no un error de medición de una corrida única. Las celdas resaltadas en verde/rojo marcan el mejor/peor escenario de esa fila (cuando hay diferencia apreciable).</p>
+    ${tilesHtml}
+    <div class="secTitle">Operativos y temporales</div>${operativos}
+    <div class="secTitle">Recursos</div>${recursos}
+    <div class="secTitle">Clínicos</div>${clinicos}
+    <div class="secTitle">Económicos</div>${economicos}
+    <div class="secTitle">SLAs (Sección A.08)</div>${slas}
+    <div class="secTitle">Viabilidad económica frente a la Línea Base</div>${amortHtml}
+  `;
+}
+
+/* ====================================================================
+   UI: sidebar, selector de escenario, tema
+   ==================================================================== */
+// Campo de parámetro reutilizable para la tarjeta de configuración.
+function paramField(id, label, value, step){
+  return `<label>${label}<input type="number" id="${id}" min="0" step="${step||1}" value="${value}"></label>`;
+}
+function renderParamsFields(){
+  let html = '<p class="hint" style="margin:0 0 6px">Personal / mesas (nº de puestos simultáneos)</p><div class="paramsGrid">';
+  for(const nombre in cfg.SERVIDORES_CAPACIDAD){
+    html += paramField(`param_srv_${nombre}`, STATION_LABELS[nombre]||nombre, cfg.SERVIDORES_CAPACIDAD[nombre]);
+  }
+  html += paramField('param_box', 'Box urgencias', cfg.BOX_CAPACIDAD);
+  html += '</div><p class="hint" style="margin:10px 0 6px">Camas por bloque</p><div class="paramsGrid">';
+  for(const nombre in cfg.CAMAS_CAPACIDAD){
+    html += paramField(`param_cama_${nombre}`, STATION_LABELS[nombre]||nombre, cfg.CAMAS_CAPACIDAD[nombre]);
+  }
+  html += '</div><p class="hint" style="margin:10px 0 6px">UCI</p><div class="paramsGrid">';
+  if(cfg.UCI_MODE==='pooled'){
+    html += paramField('param_uci_pool', 'UCI (bolsa única)', cfg.UCI_TOTAL_CAPACIDAD);
+  } else {
+    html += paramField('param_uci_rojo', 'UCI · Rojo', cfg.UCI_ROJO_CAPACIDAD);
+    html += paramField('param_uci_naranja', 'UCI · Naranja', cfg.UCI_NARANJA_CAPACIDAD);
+    html += paramField('param_uci_base', 'UCI · Base', cfg.UCI_BASE_CAPACIDAD);
+  }
+  html += paramField('param_limite_uci', 'Límite espera UCI (h)', cfg.LIMITE_ESPERA_UCI, 0.5);
+  html += '</div>';
+  html += '<p class="hint" style="margin:14px 0 2px;font-weight:600">⏱ Tiempos de servicio (minutos)</p>';
+  html += renderTiemposFields();
+  return html;
+}
+// Gestor de tiempos: tabla con una fila por estación y una columna por tipo
+// de paciente (pedido explícito de Javier), en vez de un campo suelto por
+// estación. Las estaciones que no atienden un tipo de paciente concreto
+// (p. ej. Quirófano no recibe Verde/Amarillo, Obs_Verde sólo recibe Verde)
+// muestran un guión en esa celda en lugar de un campo editable. Organizado
+// por los mismos 5 bloques del diagrama para que sea fácil de localizar.
+function renderTiemposFields(){
+  let html = '';
+  GROUPS.forEach(g=>{
+    const ids = g.items.map(it=>it.id).filter(id=>cfg.TIEMPOS_SERVICIO[id]);
+    if(g.id==='hospitalizacion' && cfg.TIEMPOS_SERVICIO.Planta_PostUCI) ids.push('Planta_PostUCI');
+    if(!ids.length) return;
+    html += `<p class="hint" style="margin:10px 0 4px">${g.nombre}</p>`;
+    html += `<div class="timesTableWrap"><table class="timesTable"><thead><tr><th class="estCol">Estación</th>${
+      TIPOS.map(t=>`<th><span class="dot" style="background:${TYPE_COLOR[t]}"></span>${t}</th>`).join('')
+    }</tr></thead><tbody>`;
+    ids.forEach(est=>{
+      const tiempos = cfg.TIEMPOS_SERVICIO[est];
+      const labelEst = STATION_LABELS[est] || est;
+      html += `<tr><th>${labelEst}</th>${
+        TIPOS.map(t=> t in tiempos
+          ? `<td><input type="number" id="param_t_${est}_${t}" min="0" step="0.5" value="${+(tiempos[t]*60).toFixed(1)}"></td>`
+          : `<td class="na">—</td>`
+        ).join('')
+      }</tr>`;
+    });
+    html += '</tbody></table></div>';
+  });
+  return html;
+}
+function aplicarTiempos(){
+  for(const est in cfg.TIEMPOS_SERVICIO){
+    const tiempos = cfg.TIEMPOS_SERVICIO[est];
+    TIPOS.forEach(t=>{
+      if(!(t in tiempos)) return;
+      const el = document.getElementById(`param_t_${est}_${t}`);
+      if(el && el.value!=='') tiempos[t] = Math.max(0, +el.value)/60;
+    });
+  }
+}
+function aplicarParametros(){
+  for(const nombre in cfg.SERVIDORES_CAPACIDAD){
+    const el = document.getElementById(`param_srv_${nombre}`);
+    if(el && el.value!=='') cfg.SERVIDORES_CAPACIDAD[nombre] = Math.max(1, Math.round(+el.value));
+  }
+  const boxEl = document.getElementById('param_box');
+  if(boxEl && boxEl.value!=='') cfg.BOX_CAPACIDAD = Math.max(1, Math.round(+boxEl.value));
+  for(const nombre in cfg.CAMAS_CAPACIDAD){
+    const el = document.getElementById(`param_cama_${nombre}`);
+    if(el && el.value!=='') cfg.CAMAS_CAPACIDAD[nombre] = Math.max(1, Math.round(+el.value));
+  }
+  if(cfg.UCI_MODE==='pooled'){
+    const el = document.getElementById('param_uci_pool');
+    if(el && el.value!=='') cfg.UCI_TOTAL_CAPACIDAD = Math.max(1, Math.round(+el.value));
+  } else {
+    const rEl=document.getElementById('param_uci_rojo'), nEl=document.getElementById('param_uci_naranja'), bEl=document.getElementById('param_uci_base');
+    if(rEl && rEl.value!=='') cfg.UCI_ROJO_CAPACIDAD = Math.max(0, Math.round(+rEl.value));
+    if(nEl && nEl.value!=='') cfg.UCI_NARANJA_CAPACIDAD = Math.max(0, Math.round(+nEl.value));
+    if(bEl && bEl.value!=='') cfg.UCI_BASE_CAPACIDAD = Math.max(0, Math.round(+bEl.value));
+    cfg.UCI_TOTAL_CAPACIDAD = cfg.UCI_ROJO_CAPACIDAD + cfg.UCI_NARANJA_CAPACIDAD + cfg.UCI_BASE_CAPACIDAD;
+  }
+  const limEl = document.getElementById('param_limite_uci');
+  if(limEl && limEl.value!=='') cfg.LIMITE_ESPERA_UCI = Math.max(0, +limEl.value);
+  aplicarTiempos();
+
+  stopPlay(); animData = null; updatePlayButtons();
+  buildDiagram();
+  const status = document.getElementById('paramsStatus');
+  if(status) status.textContent = 'Cambios aplicados a este escenario (recursos y tiempos). Pulsa «Generar vista» o «Ejecutar Monte Carlo comparativo» para simular con los nuevos valores.';
+}
+
+function renderSidebar(){
+  const wrap = document.getElementById('sidebar');
+  const esc = ESCENARIOS[escenarioActual];
+  const costesTxt = Object.keys(cfg.COSTES_FIJOS||{}).length
+    ? Object.entries(cfg.COSTES_FIJOS).map(([k,v])=> `${k.replace(/_/g,' ')}: ${v.toLocaleString('es-ES')}€`).join(' · ')
+    : 'sin coste fijo adicional';
+  wrap.innerHTML = `
+    <div class="card">
+      <h3>🏥 Escenario seleccionado</h3>
+      <p style="font-size:13px;color:var(--text-2);line-height:1.4">${esc.sub}</p>
+      <p class="hint">Coste: ${costesTxt}</p>
+    </div>
+    <div class="card">
+      <h3>📊 Informe Monte Carlo comparativo</h3>
+      <div class="rowgrid">
+        <label>Réplicas por escenario <input type="number" id="mcReplicas" min="2" max="100" step="1" value="20"></label>
+        <label>Días por réplica <input type="number" id="mcDias" min="10" max="365" step="10" value="90"></label>
+        <label>Semilla base (vacío = aleatoria) <input type="text" id="mcSeed" placeholder="p. ej. 1000"></label>
+      </div>
+      <div class="btnrow" style="margin-top:8px"><button type="button" class="btn primary" id="btnMonteCarlo">Ejecutar Monte Carlo comparativo</button></div>
+      <div id="mcProgressWrap" style="display:none">
+        <div class="progressTrack"><div class="progressFill" id="mcProgressFill"></div></div>
+        <p class="hint" id="mcProgressText" style="margin-top:4px"></p>
+      </div>
+      <p class="sideNote">Corre los 4 escenarios (Línea Base, A, B, C) con N réplicas independientes cada uno y agrega media ± IC95% entre réplicas. Con los valores por defecto (20×90d×4) suele tardar entre 30s y 1min; subir a 50×180d (la cifra exacta del enunciado) puede tardar varios minutos. Usa los parámetros del sistema vigentes en cada escenario en el momento de pulsar el botón.</p>
+    </div>
+    <div class="card">
+      <h3>▶ Vista animada</h3>
+      <div class="rowgrid">
+        <label>Ventana a simular (horas, máx. 720 = 30 días) <input type="number" id="cfgHoras" min="6" max="720" step="6" value="72"></label>
+        <label>Semilla (vacío = aleatoria) <input type="text" id="cfgSeed" placeholder="p. ej. 1"></label>
+        <label>Velocidad (h simuladas / s)
+          <select id="cfgSpeed">
+            <option value="1">1 h/s</option><option value="2">2 h/s</option><option value="3">3 h/s</option>
+            <option value="6" selected>6 h/s</option><option value="12">12 h/s</option><option value="24">24 h/s</option><option value="48">48 h/s</option>
+          </select></label>
+      </div>
+      <div class="btnrow" style="margin-top:8px"><button type="button" class="btn primary" id="btnGenVista">Generar vista</button></div>
+      <p class="sideNote">El medidor de cada estación con capacidad limitada va de 0 al máximo de recursos asignado y se colorea en 4 niveles (verde&lt;30%, amarillo 30–60%, naranja 60–90%, rojo&gt;90%). Las estaciones están agrupadas por fase clínica (fondo de color pastel); se añade además, en toda estación salvo las de observación, el % de pacientes de cada tipo (Verde/Amarillo/Naranja/Rojo) que han pasado por ella, acumulado desde el inicio de la ventana y siempre con los 4 tipos aunque alguno esté a 0%; y, en todas, el % de pacientes derivados a cada estación siguiente concreta, una por línea (también acumulado desde el inicio de la ventana). Las estaciones de observación (Obs. Verde/Amarillo/Naranja/Rojo) no tienen capacidad limitada en el modelo, así que en su lugar muestran el número de pacientes que, en el instante mostrado, están en observación ahí mismo. En Sala de espera y Box de Urgencias ese desglose indica para qué estación está siendo atendido cada paciente mientras espera allí. La simulación arranca sin período de calentamiento: la ventana mostrada empieza con el hospital vacío.</p>
+    </div>
+    <div class="card">
+      <h3>⚙️ Parámetros del sistema</h3>
+      ${renderParamsFields()}
+      <div class="btnrow" style="margin-top:8px"><button type="button" class="btn primary" id="btnAplicarParams">Aplicar cambios</button></div>
+      <p class="sideNote" id="paramsStatus">Capacidades y tiempos de servicio del escenario actual (${esc.nombre}). Se restablecen a sus valores por defecto si cambias de escenario. Afectan a la próxima vista animada o informe Monte Carlo que generes, no a los ya calculados.</p>
+    </div>
+  `;
+  document.getElementById('cfgSpeed').addEventListener('change', e=>{ play.speed = Math.round(+e.target.value)||1; });
+  document.getElementById('btnAplicarParams').addEventListener('click', aplicarParametros);
+  document.getElementById('btnGenVista').addEventListener('click', generarVista);
+  document.getElementById('btnMonteCarlo').addEventListener('click', ejecutarInformeComparativo);
+}
+
+function setEscenario(key){
+  escenarioActual = key;
+  cfg = ESCENARIOS[key].build();
+  document.querySelectorAll('#escToggle button').forEach(b=> b.classList.toggle('active', b.dataset.e===key));
+  document.getElementById('escTitleDiagrama').textContent = ESCENARIOS[key].nombre;
+  animData = null;
+  // Las alturas medidas son propias del escenario anterior (nº de destinos
+  // distinto según PROB_DERIVACION de cada escenario): se descartan aquí y
+  // el diagrama vuelve al alto "de reserva" por bloque hasta la próxima vez
+  // que se genere una vista, que las recalculará para el nuevo escenario.
+  MEASURED_H = {};
+  renderSidebar();
+  buildDiagram();
+  updatePlayButtons();
+}
+
+document.getElementById('escToggle').addEventListener('click', e=>{
+  const btn = e.target.closest('button[data-e]');
+  if(btn) setEscenario(btn.dataset.e);
+});
+document.getElementById('btnPlay').addEventListener('click', startPlay);
+document.getElementById('btnPause').addEventListener('click', pausePlay);
+document.getElementById('btnReset').addEventListener('click', ()=>{ stopPlay(); if(animData){ renderFrame(animData.snapshots[0]); updatePlayButtons(); } });
+document.getElementById('themeBtn').addEventListener('click', ()=>{
+  const root = document.documentElement;
+  const cur = root.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+  root.setAttribute('data-theme', cur==='dark' ? 'light' : 'dark');
+});
+
+renderSidebar();
+buildDiagram();
+</script>
+
+</body>
+</html>
