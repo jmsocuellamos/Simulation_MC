@@ -2263,7 +2263,7 @@ function aplicarParametros(){
   stopPlay(); animData = null; updatePlayButtons();
   buildDiagram();
   const status = document.getElementById('paramsStatus');
-  if(status) status.textContent = 'Cambios aplicados a este escenario (recursos y tiempos). Pulsa «Generar vista» o «Ejecutar Monte Carlo comparativo» para simular con los nuevos valores.';
+  if(status){ status.textContent = '✅ Cambios aplicados a este escenario.'; status.style.display = ''; }
 }
 
 function renderSidebar(){
@@ -2290,7 +2290,6 @@ function renderSidebar(){
           </select></label>
         <label>Período de calentamiento (${unidadAbrev()}, 0 = sin calentamiento) <input type="number" id="cfgCalentamiento" min="0" step="${pasoFino()}" value="${redondeaUnidad(deHoras(CALENTAMIENTO_HORAS))}"></label>
       </div>
-      <p class="sideNote">La unidad elegida se usa en todos los campos de tiempo de esta barra lateral: ventana a simular, período por réplica, límite de espera UCI y tiempos de servicio (el motor de simulación sigue calculando internamente en horas; sólo cambia cómo se leen y muestran los valores). El período de calentamiento es compartido entre el informe Monte Carlo y la vista animada: ambos descartan lo ocurrido durante ese tiempo inicial y, tras él, el informe cuenta sólo los valores posteriores y el reloj de la animación arranca de nuevo en 0. Por defecto es 0 (sin calentamiento), igual que hasta ahora.</p>
     </div>
     <div class="card">
       <h3>📊 Informe Monte Carlo comparativo</h3>
@@ -2304,7 +2303,6 @@ function renderSidebar(){
         <div class="progressTrack"><div class="progressFill" id="mcProgressFill"></div></div>
         <p class="hint" id="mcProgressText" style="margin-top:4px"></p>
       </div>
-      <p class="sideNote">Corre los 4 escenarios (Línea Base, A, B, C) con N réplicas independientes cada uno y agrega media ± IC95% entre réplicas. Con los valores por defecto (20×90d×4) suele tardar entre 30s y 1min; subir a 50×180d (la cifra exacta del enunciado) puede tardar varios minutos. Usa los parámetros del sistema vigentes en cada escenario en el momento de pulsar el botón. Si el período de calentamiento (tarjeta superior) es mayor que 0, cada réplica lo simula primero y las métricas sólo se calculan con lo ocurrido después.</p>
     </div>
     <div class="card">
       <h3>▶ Vista animada</h3>
@@ -2315,13 +2313,12 @@ function renderSidebar(){
           <select id="cfgSpeed">${speedOptionsHtml(6)}</select></label>
       </div>
       <div class="btnrow" style="margin-top:8px"><button type="button" class="btn primary" id="btnGenVista">Generar vista</button></div>
-      <p class="sideNote">El medidor de cada estación con capacidad limitada va de 0 al máximo de recursos asignado y se colorea en 4 niveles (verde&lt;30%, amarillo 30–60%, naranja 60–90%, rojo&gt;90%). Las estaciones están agrupadas por fase clínica (fondo de color pastel); se añade además, en toda estación salvo las de observación, el % de pacientes de cada tipo (Verde/Amarillo/Naranja/Rojo) que han pasado por ella, acumulado desde el inicio de la ventana y siempre con los 4 tipos aunque alguno esté a 0%; y, en todas, el % de pacientes derivados a cada estación siguiente concreta, una por línea (también acumulado desde el inicio de la ventana). Las estaciones de observación (Obs. Verde/Amarillo/Naranja/Rojo) no tienen capacidad limitada en el modelo, así que en su lugar muestran el número de pacientes que, en el instante mostrado, están en observación ahí mismo. En Sala de espera y Box de Urgencias ese desglose indica para qué estación está siendo atendido cada paciente mientras espera allí. Si el período de calentamiento (tarjeta superior) es 0, la ventana mostrada empieza con el hospital vacío; si es mayor que 0, el hospital se simula primero durante ese tiempo y el reloj de la animación arranca en 0 justo después, ya con el sistema en marcha.</p>
     </div>
     <div class="card">
       <h3>⚙️ Parámetros del sistema</h3>
       ${renderParamsFields()}
       <div class="btnrow" style="margin-top:8px"><button type="button" class="btn primary" id="btnAplicarParams">Aplicar cambios</button></div>
-      <p class="sideNote" id="paramsStatus">Capacidades y tiempos de servicio del escenario actual (${esc.nombre}). Se restablecen a sus valores por defecto si cambias de escenario. Afectan a la próxima vista animada o informe Monte Carlo que generes, no a los ya calculados.</p>
+      <p class="sideNote" id="paramsStatus" style="display:none;margin-top:8px"></p>
     </div>
   `;
   document.getElementById('cfgUnidadTiempo').addEventListener('change', e=>{ UNIDAD_TIEMPO = e.target.value; renderSidebar(); });
