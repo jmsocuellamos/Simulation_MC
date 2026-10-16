@@ -1,9 +1,4 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Red de colas hospitalaria — 4 escenarios</title>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Red de colas hospitalaria — 4 escenarios</title>
 <meta name="color-scheme" content="dark light">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,6 +15,15 @@
   --good: #0ca30c; --warning: #fab219; --critical: #e66767;
   --verde:#5fbf5f; --amarillo:#d8c23a; --naranja:#e08a35; --rojo:#e15b5b;
   --mesa:#9c7a3c; --cama:#3987e5; --box:#b05fd1;
+  /* Paleta categórica para el gráfico de sectores de destinos (iteración 21):
+     8 hues categóricas validadas con el validador de la skill de
+     visualización de datos (lightness band, chroma floor, separación CVD
+     protan/deutan >=8, suelo de visión normal >=15, contraste vs
+     var(--surface-2)) — se usan sólo los 6 primeros slots por tarjeta (el
+     resto se pliega en --series-otros, siguiendo el límite de la skill de
+     "7-8 series: techo; a partir de ahí, pliega la cola en 'Otros'"). */
+  --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-4:#c98500;
+  --series-5:#d55181; --series-6:#9085e9; --series-otros:#817e77;
   --shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35);
   --radius: 10px;
   --font-display: "Chakra Petch","Rajdhani",system-ui,sans-serif;
@@ -34,6 +38,8 @@
     --border:rgba(11,11,11,0.16); --border-strong:rgba(11,11,11,0.40); --grid:#e1e0d9;
     --accent:#1c72ce; --accent-2:#a9700f; --accent-3:#137a53;
     --good:#0b7a0b; --warning:#92650a; --critical:#b23232;
+    --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; --series-4:#eda100;
+    --series-5:#e87ba4; --series-6:#6250d6; --series-otros:#87857d;
   }
 }
 :root[data-theme="light"]{
@@ -43,11 +49,15 @@
   --border:rgba(11,11,11,0.16); --border-strong:rgba(11,11,11,0.40); --grid:#e1e0d9;
   --accent:#1c72ce; --accent-2:#a9700f; --accent-3:#137a53;
   --good:#0b7a0b; --warning:#92650a; --critical:#b23232;
+  --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; --series-4:#eda100;
+  --series-5:#e87ba4; --series-6:#6250d6; --series-otros:#87857d;
 }
 :root[data-theme="dark"]{
   color-scheme: dark;
   --bg:#0d0d0d; --surface:#1a1a19; --surface-2:#232320; --surface-3:#2a2a27;
   --text:#ffffff; --text-2:#c3c2b7; --text-muted:#898781;
+  --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-4:#c98500;
+  --series-5:#d55181; --series-6:#9085e9; --series-otros:#817e77;
   --border:rgba(255,255,255,0.16); --border-strong:rgba(255,255,255,0.38); --grid:#2c2c2a;
   --accent:#1c6cce; --accent-2:#d9972a; --accent-3:#199e70;
   --good:#0ca30c; --warning:#fab219; --critical:#e66767;
@@ -137,7 +147,7 @@ label{ font-size:13px; color:var(--text-2); }
    uno (más alto que antes) conviene subir mucho ese límite para que nunca
    recorte el diagrama — se permite scroll vertical de la página en vez de
    encajarlo forzosamente en una pantalla. */
-#diagramSvg{ display:block; width:100%; height:auto; max-height:260vh; }
+#diagramSvg{ display:block; width:100%; height:auto; max-height:360vh; }
 .legend{ display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--text-2); margin-top:8px; }
 .legend .lg-item{ display:flex; align-items:center; gap:5px; }
 .legend .sw{ width:12px; height:12px; border-radius:3px; display:inline-block; }
@@ -167,9 +177,6 @@ table.report tr.worst td.num.highlight{ color:var(--critical); }
 .loading{ font-size:13px; color:var(--text-muted); font-style:italic; }
 .sideNote{ font-size:12px; color:var(--text-muted); background:var(--surface-3); border-radius:6px; padding:8px; line-height:1.4; }
 </style>
-</head>
-<body>
-
 
 <div class="app">
   <div class="topbar">
@@ -199,6 +206,7 @@ table.report tr.worst td.num.highlight{ color:var(--critical); }
           <span class="mono" id="playTime" style="margin-left:6px;color:var(--text-2)">—</span>
         </div>
         <p class="sideNote" id="playHint" style="display:none;margin:8px 0 0;background:var(--surface-3);border:1px solid var(--accent)">👉 Pulsa <b>«Reproducir»</b> para ver la animación. Este primer fotograma es el instante inicial (día 0, hospital vacío — sin período de calentamiento): por eso todos los medidores están todavía en gris y todos los envíos en 0%, no es un fallo.</p>
+
         <div id="diagramWrap"></div>
         <div class="legend" id="legend"></div>
       </div>
@@ -645,12 +653,102 @@ const ESCENARIOS = {
 };
 let escenarioActual = 'base';
 let cfg = ESCENARIOS[escenarioActual].build();
-// Pedido explícito de Javier: quitar el período de calentamiento (antes 7
-// días simulados en silencio antes de la ventana mostrada/contabilizada).
-// `simular()`/`simularVentanaAnimada()` siguen aceptando un warmupHoras>0
-// por si hiciera falta reintroducirlo, pero con 0 no recortan nada y la
-// simulación arranca directamente en el instante mostrado/contabilizado.
-const WARMUP_HORAS = 0;
+
+// ----------------------------------------------------------------------
+// Unidad de tiempo del sistema (iteración 24, pedido explícito de Javier:
+// "añade un parámetro seleccionable para indicar la unidad de tiempo en
+// que trabaja el sistema (segundos, minutos, horas, días)"). El motor de
+// simulación sigue calculando internamente en horas sin ningún cambio (las
+// distribuciones de tiempos de servicio, las tasas de llegada y el reloj
+// de SimEnv no se han tocado: reescribir el motor para que calcule en otra
+// base habría sido mucho más arriesgado, sin ningún beneficio real, ya que
+// la unidad sólo importa para LO QUE SE LEE/ESCRIBE, no para la propia
+// simulación) — lo que cambia con `UNIDAD_TIEMPO` es en qué unidad se
+// introducen y se muestran los valores de tiempo en TODA la interfaz:
+// ventana a simular, período de calentamiento, días por réplica del Monte
+// Carlo, límite de espera a UCI, la tabla de tiempos de servicio por
+// estación, el reloj de la reproducción y el selector de velocidad. Cada
+// valor se convierte a horas al leerlo (`aHoras()`) y de horas a la unidad
+// elegida al mostrarlo (`deHoras()`); `cfg` y el resto del motor siguen
+// viendo siempre horas, exactamente igual que antes de esta iteración.
+// (La única excepción deliberada son las propias tablas del INFORME Monte
+// Carlo comparativo — "T. sistema medio (h)", "Door-to-doctor (min)",
+// etc. —, que mantienen su unidad fija actual: Javier pidió un parámetro
+// para introducir/ver tiempos, no cambiar las unidades ya elegidas por
+// legibilidad clínica/estadística en las tablas de resultados.)
+const UNIDADES_TIEMPO = {
+  seg:  { horas: 1/3600, nombre:'segundos', unica:'segundo', abrev:'s' },
+  min:  { horas: 1/60,   nombre:'minutos',  unica:'minuto',  abrev:'min' },
+  hora: { horas: 1,      nombre:'horas',    unica:'hora',    abrev:'h' },
+  dia:  { horas: 24,     nombre:'días',     unica:'día',     abrev:'d' },
+};
+let UNIDAD_TIEMPO = 'hora';
+function horasPorUnidad(u){ return UNIDADES_TIEMPO[u||UNIDAD_TIEMPO].horas; }
+// Convierte un valor expresado en la unidad actual a horas (para pasarlo al motor).
+function aHoras(valor, u){ return valor * horasPorUnidad(u); }
+// Convierte un valor en horas a la unidad actual (para mostrarlo en la UI).
+function deHoras(horas, u){ return horas / horasPorUnidad(u); }
+function unidadAbrev(u){ return UNIDADES_TIEMPO[u||UNIDAD_TIEMPO].abrev; }
+function unidadNombre(u){ return UNIDADES_TIEMPO[u||UNIDAD_TIEMPO].nombre; }
+// Redondea un valor ya convertido a la unidad elegida a un nº de decimales
+// razonable para esa unidad (los segundos/minutos no necesitan decimales,
+// las horas/días sí, para no perder precisión al convertir ventanas largas).
+function redondeaUnidad(valor, u){
+  const dec = (u||UNIDAD_TIEMPO)==='seg' ? 0 : 2;
+  const f = Math.pow(10, dec);
+  return Math.round(valor*f)/f;
+}
+// Paso ("step") razonable para un campo numérico fino (límite UCI, tiempos de
+// servicio, calentamiento) en la unidad elegida: 1 segundo, una décima de
+// minuto/hora o una centésima de día. Los campos "gruesos" (ventana a
+// simular, período por réplica) calculan su propio paso a partir de horas
+// convertidas, no usan esto.
+function pasoFino(u){
+  u = u||UNIDAD_TIEMPO;
+  return u==='seg' ? 1 : (u==='min' ? 0.1 : 0.01);
+}
+// Opciones del selector de velocidad de reproducción: el valor interno
+// (horas simuladas por segundo real) no cambia con la unidad elegida — sólo
+// la etiqueta visible se convierte, para que el usuario lea la velocidad en
+// la unidad en que está pensando.
+function speedOptionsHtml(seleccionadaHoras){
+  const opciones = [1,2,3,6,12,24,48];
+  return opciones.map(h=>{
+    const etiqueta = `${redondeaUnidad(deHoras(h))} ${unidadAbrev()}/s`;
+    return `<option value="${h}"${h===seleccionadaHoras?' selected':''}>${etiqueta}</option>`;
+  }).join('');
+}
+
+// Período de calentamiento del sistema (iteración 24, pedido explícito de
+// Javier: "quiero...un parámetro con el periodo de calentamiento del
+// sistema, de forma que el informe trabajara solo con los valores
+// obtenidos tras el periodo de calentamiento y el diagrama animado se debe
+// inicializar tras el periodo de calentamiento. Por defecto el periodo de
+// calentamiento debe ser de cero"). Vuelve a exponer como campo editable
+// (compartido entre el informe Monte Carlo y la vista animada) lo que
+// desde la iteración 7 era la constante `WARMUP_HORAS=0`: el motor
+// (`simular()`/`simularVentanaAnimada()`) YA soportaba un calentamiento
+// positivo desde entonces — descarta en silencio los pacientes que pasan
+// por el sistema durante el calentamiento y reinicia el reloj a 0 al
+// terminar, tanto para el informe como para la vista animada — así que
+// aquí sólo hace falta sustituir la constante fija por una variable que la
+// UI pueda cambiar. Se mantiene en horas internamente (como el resto del
+// motor); la UI la convierte desde/hacia la unidad elegida.
+let CALENTAMIENTO_HORAS = 0;
+// Lee el campo compartido #cfgCalentamiento (en la unidad elegida) y lo
+// convierte a horas, con 0 como valor por defecto si está vacío — se lee
+// en vivo del DOM en vez de depender sólo de la variable de arriba, para
+// que tanto generarVista() como ejecutarInformeComparativo() usen siempre
+// el valor que el campo muestra en ese momento, sin tener que mantenerlos
+// sincronizados a mano.
+function leerCalentamientoHoras(){
+  const el = document.getElementById('cfgCalentamiento');
+  if(!el || el.value==='') return 0;
+  const v = +el.value;
+  if(isNaN(v)) return 0;
+  CALENTAMIENTO_HORAS = Math.max(0, aHoras(v));
+  return CALENTAMIENTO_HORAS;
+}
 
 /* ====================================================================
    KPIs (operativos, de recursos, clínicos, económicos, SLA)
@@ -838,7 +936,7 @@ function agregarMuestras(muestras){
   return out;
 }
 async function ejecutarMonteCarloAsync(cfgEsc, opts, onProgress){
-  const { replicas=20, dias=90, warmupHoras=WARMUP_HORAS, seedBase=1000 } = opts||{};
+  const { replicas=20, dias=90, warmupHoras=CALENTAMIENTO_HORAS, seedBase=1000 } = opts||{};
   const muestras = [];
   for(let i=0;i<replicas;i++){
     const seed = seedBase + i*97 + 1;
@@ -928,8 +1026,28 @@ const STATION_LABELS = {
 // pequeño); lo único que de verdad ayuda a que el texto se vea más grande
 // en pantalla es que el diagrama en sí ocupe menos "espacio lógico", para
 // que haga falta encogerlo menos.
-const NODE_W = 196, GAP_X = 10, GAP_Y = 8;
-const GROUP_PAD = 10, GROUP_TITLE_H = 29, GROUP_GAP = 22, ROW_GAP = 30, PAD = 14;
+// Iteración 23 (pedido explícito de Javier: "el bloque de diagnóstico y
+// pruebas complementarias debemos extenderlo más horizontalmente para que
+// el rótulo de pruebas avanzadas quede en una línea. Amplía todas las
+// estaciones horizontalmente para que los porcentajes de reparto por tipo
+// de paciente sean algo más grandes"): NODE_W sube de 196 a 252px (todas
+// las estaciones comparten la misma anchura, no sólo las del bloque de
+// Diagnóstico) — con el nombre de estación más largo que existe, "Pruebas
+// Avanzadas", que a fuente 19px necesita 211px de ancho (icono+nombre),
+// quedaba por encima de los 180px disponibles con el ancho anterior y se
+// partía en dos líneas; con 252px el ancho disponible sube a 236px, margen
+// de sobra. OJO con el mismo principio de "escalado limitado por el ancho"
+// de las iteraciones 10-12: el bloque de Urgencias (6 columnas, el más
+// ancho de los 5) es el que fija el ancho lógico total del diagrama, así
+// que ensancharlo ensancha TODO el diagrama y reduce un poco el factor de
+// escala general (de ≈0.79 a ≈0.71 a 1440px de ancho de ventana, un
+// -11% aprox.) — el resto del texto (nombres, iconos, cifras grandes) se
+// ve por tanto algo más pequeño que en la iteración 22, no más grande; sólo
+// la fila de porcentajes por tipo de paciente se agranda explícitamente
+// más abajo (en pctRowHtml) para que, descontado ese -11%, el resultado
+// neto siga siendo más grande que antes, no sólo "no más pequeño".
+const NODE_W = 252, GAP_X = 10, GAP_Y = 8;
+const GROUP_PAD = 10, GROUP_TITLE_H = 32, GROUP_GAP = 22, ROW_GAP = 30, PAD = 14;
 // Alturas de tarjeta por bloque. Las estaciones "ampliadas" llevan además el
 // desglose de a qué estación(es) siguiente(s) concreta(s) se deriva cada
 // paciente (pedido explícito de Javier, sin límite de cuántos destinos se
@@ -967,12 +1085,18 @@ const NODE_H_SIMPLE = 146;
 // bajo el último destino listado en las estaciones con menos fan-out —
 // pedido explícito de Javier: "menos espacio en la parte inferior desde el
 // último elemento de la lista"). Se dejan sin tocar como reserva razonable
-// para ese estado inicial en blanco.
-const NODE_H_ENTRADA = 300;       // peor caso: Diag_Inicial, hasta 6 destinos
-const NODE_H_DIAGNOSTICO = 368;   // peor caso: Diag_Preliminar, hasta 9 destinos
-const NODE_H_URGENCIAS = 390;     // peor caso: Box_Urgencias, hasta 10 destinos (todas las estaciones de "mesa" del escenario Fast-Track)
-const NODE_H_HOSPITALIZACION = 280; // peor caso: Planta, hasta 5 destinos (incluye ahora Fallecimiento)
-const NODE_H_SALIDA = 198;        // peor caso: Rehabilitación/Farmacia, 1 destino cada una
+// para ese estado inicial en blanco — desde que el desglose de destinos se
+// dibuja como un gráfico de sectores compacto en vez de una lista de texto
+// (iteración 21), la altura real medida tras generar una vista es muy
+// inferior a estos valores de reserva en casi todos los casos (el tamaño
+// del gráfico ya no depende del número de destinos posibles), así que se
+// mantienen deliberadamente generosos: sólo se ven, y sólo brevemente,
+// antes del primer "Generar vista".
+const NODE_H_ENTRADA = 300;       // peor caso (reserva, pre-iteración 21): Diag_Inicial, hasta 6 destinos
+const NODE_H_DIAGNOSTICO = 368;   // peor caso (reserva, pre-iteración 21): Diag_Preliminar, hasta 9 destinos
+const NODE_H_URGENCIAS = 390;     // peor caso (reserva, pre-iteración 21): Box_Urgencias, hasta 10 destinos (todas las estaciones de "mesa" del escenario Fast-Track)
+const NODE_H_HOSPITALIZACION = 280; // peor caso (reserva, pre-iteración 21): Planta, hasta 5 destinos (incluye ahora Fallecimiento)
+const NODE_H_SALIDA = 198;        // peor caso (reserva, pre-iteración 21): Rehabilitación/Farmacia, 1 destino cada una
 // Estaciones de observación: único grupo que se queda sin el desglose %
 // por tipo de paciente (pedido explícito de Javier).
 const OBS_IDS = new Set(['Obs_Verde','Obs_Amarillo','Obs_Naranja','Obs_Rojo']);
@@ -1001,19 +1125,28 @@ let MEASURED_H = {};
 // Javier, iteración 5) pero sí llevan el desglose de destinos. Ver
 // destinoBreakdown() más abajo.
 
-// Tres filas de bloques (pedido explícito de Javier, iteración 10):
-//   fila 0 — Admisión/triaje y primer filtro clínico + Diagnóstico y pruebas,
-//            uno al lado del otro, cada uno en 1 fila × 4 columnas.
-//   fila 1 — Espera y observación en Urgencias, en solitario, 1 fila × 6
-//            columnas; estas estaciones llevan ahora también el desglose de
-//            a qué estación siguiente se deriva cada paciente.
-//   fila 2 — Hospitalización y cuidados críticos (1 fila × 3 columnas) +
-//            Recuperación y salida (1 fila × 4 columnas), uno al lado del
-//            otro.
-// Cada bloque es siempre una ÚNICA fila con tantas columnas como estaciones
-// estén activas (groupGrid() ya no reparte en 2 columnas como en la
-// iteración 6 — ese diseño en rejilla 2×N se sustituye aquí por una sola
-// fila por bloque, tal como pidió Javier explícitamente para cada uno).
+// Cinco filas de bloques, una por bloque, en el orden exacto pedido por
+// Javier (iteración 22, sustituye el reparto en 3 filas de la iteración 10
+// — entonces Admisión/Diagnóstico y luego Hospitalización/Salida compartían
+// fila dos a dos; ahora cada bloque ocupa su propia fila completa, de arriba
+// a abajo): Admisión/triaje y primer filtro clínico → Espera y observación
+// en Urgencias → Diagnóstico y pruebas complementarias → Hospitalización y
+// cuidados críticos → Recuperación y salida. Petición explícita de Javier
+// ("aunque para ello deba ampliar la ventana verticalmente"): al apilar 5
+// bloques en vertical en vez de 3, el diagrama crece sustancialmente en
+// alto (ver el aumento de `max-height` del `<svg>` más abajo), pero se
+// estrecha en ancho (antes el ancho venía determinado por dos bloques
+// lado a lado — hasta ~1690-1896px lógicos —, ahora por el bloque más ancho
+// en solitario, el de Urgencias con 6 columnas, ~1246px) — esto es
+// precisamente lo que Javier pidió aprovechar para agrandar la letra: con
+// menos ancho lógico que "encoger" para caber en pantalla, el factor de
+// escala efectivo del `<svg>` sube, y sobre esa base se han aumentado
+// también los `font-size` de código dentro de cada tarjeta (mismo
+// principio ya validado en las iteraciones 11/12: mientras el ancho lógico
+// no limite más que antes, un `font-size` mayor se traduce directamente en
+// texto más grande en pantalla). Cada bloque sigue siendo siempre una ÚNICA
+// fila con tantas columnas como estaciones activas (`groupGrid()`, sin
+// cambios desde la iteración 10).
 const GROUPS = [
   { id:'entrada', nombre:'Admisión, triaje y primer filtro clínico', hue:210, brow:0, nodeH:NODE_H_ENTRADA, extended:true, items:[
     { id:'Admision' },
@@ -1021,12 +1154,6 @@ const GROUPS = [
     { id:'Aislamiento' },
     { id:'Diag_Inicial' },
     { id:'Diag_Rapido', soloFastTrack:true },
-  ]},
-  { id:'diagnostico', nombre:'Diagnóstico y pruebas complementarias', hue:265, brow:0, nodeH:NODE_H_DIAGNOSTICO, extended:true, items:[
-    { id:'Pruebas_Basicas' },
-    { id:'Diag_Preliminar' },
-    { id:'Pruebas_Avanzadas' },
-    { id:'Consulta_Especialista' },
   ]},
   { id:'urgencias', nombre:'Espera y observación en Urgencias', hue:175, brow:1, nodeH:NODE_H_URGENCIAS, extended:true, items:[
     { id:'Sala_Espera_Urgencias' },
@@ -1036,12 +1163,18 @@ const GROUPS = [
     { id:'Obs_Rojo' },
     { id:'Box_Urgencias' },
   ]},
-  { id:'hospitalizacion', nombre:'Hospitalización y cuidados críticos', hue:330, brow:2, nodeH:NODE_H_HOSPITALIZACION, extended:true, items:[
+  { id:'diagnostico', nombre:'Diagnóstico y pruebas complementarias', hue:265, brow:2, nodeH:NODE_H_DIAGNOSTICO, extended:true, items:[
+    { id:'Pruebas_Basicas' },
+    { id:'Diag_Preliminar' },
+    { id:'Pruebas_Avanzadas' },
+    { id:'Consulta_Especialista' },
+  ]},
+  { id:'hospitalizacion', nombre:'Hospitalización y cuidados críticos', hue:330, brow:3, nodeH:NODE_H_HOSPITALIZACION, extended:true, items:[
     { id:'Planta' },
     { id:'Quirofano' },
     { id:'UCI' },
   ]},
-  { id:'salida', nombre:'Recuperación y salida', hue:45, brow:2, nodeH:NODE_H_SALIDA, extended:true, items:[
+  { id:'salida', nombre:'Recuperación y salida', hue:45, brow:4, nodeH:NODE_H_SALIDA, extended:true, items:[
     { id:'Rehabilitacion' },
     { id:'Farmacia' },
     { id:'Alta', big:true },
@@ -1165,7 +1298,7 @@ function volumenEspera(nodeId, st, res){ if(SALAS_ESPERA.has(nodeId)) return st.
 // la barra lineal anterior. Geometría: ángulo 0°=izquierda, 180°=derecha,
 // barrido pasando por arriba.
 function gaugeArc(ratio, nivel){
-  const R=40, cx=46, cy=43, w=94, h=49;
+  const R=44, cx=50, cy=46, w=102, h=53;
   const pt = a => { const rad=a*Math.PI/180; return [cx - R*Math.cos(rad), cy - R*Math.sin(rad)]; };
   const [x0,y0] = pt(0), [x180,y180] = pt(180);
   const a = Math.max(0, Math.min(1, ratio)) * 180;
@@ -1173,8 +1306,8 @@ function gaugeArc(ratio, nivel){
   const bg = `M${x0},${y0} A${R},${R} 0 0 1 ${x180},${y180}`;
   const fg = `M${x0},${y0} A${R},${R} 0 0 1 ${xv},${yv}`;
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;margin:0 auto">
-    <path d="${bg}" fill="none" stroke="var(--border-strong)" stroke-width="8" stroke-linecap="round"/>
-    ${ratio>0?`<path d="${fg}" fill="none" stroke="var(--${nivel})" stroke-width="8" stroke-linecap="round"/>`:''}
+    <path d="${bg}" fill="none" stroke="var(--border-strong)" stroke-width="9" stroke-linecap="round"/>
+    ${ratio>0?`<path d="${fg}" fill="none" stroke="var(--${nivel})" stroke-width="9" stroke-linecap="round"/>`:''}
   </svg>`;
 }
 
@@ -1196,21 +1329,21 @@ function compactNodeBody(nodeId, st, res, extra, showPct, tipoPct){
     // "total" ya es exactamente eso: el recuento instantáneo de la foto
     // actual (snap.stations[nodeId]), no un acumulado.
     top = `<div style="display:flex;align-items:baseline;gap:6px">
-        <span class="mono" style="font-size:31px;font-weight:800;color:var(--text)">${total}</span>
-        <span style="font-size:15px;color:var(--text-muted)">en observación</span>
+        <span class="mono" style="font-size:35px;font-weight:800;color:var(--text)">${total}</span>
+        <span style="font-size:17px;color:var(--text-muted)">en observación</span>
       </div>`;
   } else if(res){
     const ratio = res.cap ? res.busy/res.cap : 0;
     const nivel = nivelOcupacion(ratio);
     top = `${gaugeArc(ratio, nivel)}
       <div style="display:flex;align-items:baseline;justify-content:center;gap:6px;margin-top:3px">
-        <span class="mono" style="font-size:21px;font-weight:700;color:var(--text)">${res.busy}/${res.cap}</span>
-        ${espera>0?`<span class="mono" style="font-size:15px;color:var(--text-muted)">+${espera} esp.</span>`:''}
+        <span class="mono" style="font-size:24px;font-weight:700;color:var(--text)">${res.busy}/${res.cap}</span>
+        ${espera>0?`<span class="mono" style="font-size:17px;color:var(--text-muted)">+${espera} esp.</span>`:''}
       </div>`;
   } else {
     top = `<div style="display:flex;align-items:baseline;gap:6px">
-        <span class="mono" style="font-size:31px;font-weight:800;color:var(--text)">${espera}</span>
-        <span style="font-size:15px;color:var(--text-muted)">esperando</span>
+        <span class="mono" style="font-size:35px;font-weight:800;color:var(--text)">${espera}</span>
+        <span style="font-size:17px;color:var(--text-muted)">esperando</span>
       </div>`;
   }
 
@@ -1255,32 +1388,148 @@ function compactNodeBody(nodeId, st, res, extra, showPct, tipoPct){
     body += total ? `<div style="margin-top:6px;height:6px;border-radius:3px;overflow:hidden;display:flex;background:var(--border-strong)">${mixBar}</div>` : '';
   }
   // Desglose de a qué estación(es) siguiente(s) concreta(s) se deriva cada
-  // paciente, en %, para toda estación que tenga destinos posibles según el
-  // modelo (pedido explícito de Javier). "extra" ya llega como la lista
-  // {dest,pct} calculada por destinoBreakdown()/destinoBreakdownSala(),
-  // siempre con TODOS los destinos posibles (0% si aún no se ha enviado
-  // ningún paciente ahí) y ordenada con las estaciones "relevantes" primero
-  // y las de espera/observación al final. Una estación de destino por línea
-  // (pedido explícito de Javier, iteración 12: "pon cada estación de destino
-  // en una línea distinta" — antes se envolvían varios por línea con
-  // flex-wrap). Cada bloque "ampliado" tiene su propia altura de tarjeta
-  // (NODE_H_ENTRADA / NODE_H_DIAGNOSTICO / NODE_H_URGENCIAS /
-  // NODE_H_HOSPITALIZACION / NODE_H_SALIDA, arriba) calculada para el número
-  // exacto de destinos posibles de su estación con más fan-out (la de Sala
-  // de espera/Box de Urgencias, con un destino por cada estación de "mesa"
-  // del escenario activo, es ahora la de mayor fan-out del diagrama).
+  // paciente, para toda estación que tenga destinos posibles según el modelo
+  // (pedido explícito de Javier). "extra" ya llega como la lista {dest,pct}
+  // calculada por destinoBreakdown()/destinoBreakdownSala(), siempre con
+  // TODOS los destinos posibles (0% si aún no se ha enviado ningún paciente
+  // ahí) y ordenada con las estaciones "relevantes" primero y las de
+  // espera/observación al final.
+  // Iteración 21 (pedido explícito de Javier: "cambiar los porcentajes de
+  // derivación... en formato texto a un gráfico de sectores... Podrias
+  // animar dicho gráfico para que al pinchar sobre él aparezcan los
+  // porcentajes de derivación a cada estación?"): la lista vertical de
+  // chips se sustituye por un gráfico de sectores compacto (destinoPie());
+  // el detalle completo en % sigue disponible, pero ahora bajo demanda, al
+  // pinchar sobre el gráfico — ver toggleDestDetail() más abajo. Esto
+  // también libera mucho espacio vertical en las tarjetas de mayor
+  // "fan-out" (Diag. Preliminar, Sala de espera/Box de Urgencias), que
+  // antes necesitaban hasta 390px sólo para la lista de texto.
+  // Iteración 25 (pedido explícito de Javier: "una versión sin los
+  // diagramas de reparto pero dejando un icono para visualizar los
+  // porcentajes de envíos a cada estación"): el gráfico de sectores de la
+  // iteración 21, que se dibujaba siempre visible con los datos reales de
+  // ese fotograma, se sustituye por un icono fijo pequeño (`destinoIcon()`,
+  // NO representa datos — es sólo el botón de acceso). El detalle completo
+  // (lista de estaciones + % exacto, con la pastilla del mismo color que
+  // tendría su porción en el gráfico) sigue abriéndose igual al pinchar,
+  // sin ningún cambio en `toggleDestDetail()`/`EXPANDED_DEST` ni en el
+  // cálculo de colores por identidad — sólo cambia qué se dibuja en el
+  // estado "cerrado". Efecto secundario esperado: las tarjetas con mayor
+  // "fan-out" se hacen todavía más compactas (el icono, 22px, pesa mucho
+  // menos que el gráfico de 62px que sustituye).
   if(extra && extra.length){
-    // El nombre de la estación puede truncarse con "…" si no cabe, pero el
-    // porcentaje NUNCA (va en un span aparte de ancho fijo) — es el dato que
-    // importa de verdad en este desglose.
-    body += `<div style="margin-top:4px;display:flex;flex-direction:column;gap:1px">${extra.map(d=>
-      `<div style="display:flex;align-items:baseline;gap:4px;font-size:15px;line-height:1.4;color:var(--text-muted)">
-        <span class="mono" style="flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">↳ ${STATION_LABELS[d.dest]||d.dest}</span>
-        <span class="mono" style="flex:none">${Math.round(d.pct)}%</span>
-      </div>`
-    ).join('')}</div>`;
+    // El color de cada porción se asigna por IDENTIDAD de la estación
+    // destino (orden alfabético de sus ids, SIEMPRE el mismo conjunto para
+    // una estación+escenario dados) y no por su porcentaje en este
+    // fotograma, para que cada porción mantenga su color de un fotograma a
+    // otro aunque las proporciones cambien — criterio de la skill de
+    // visualización de datos: el color sigue a la entidad, nunca a su
+    // posición/rango. Máximo 6 colores directos; a partir de ahí se pliegan
+    // en una única porción "Otros" en gris (techo de serie de la misma
+    // skill: "7-8 series, a partir de ahí pliega la cola en Otros") — pero
+    // SÓLO en el gráfico: la lista completa, sin plegar, sigue disponible
+    // al pinchar, con el mismo color de "Otros" en su pastilla para las
+    // estaciones que quedaron plegadas.
+    const idsOrdenados = extra.map(d=>d.dest).slice().sort((a,b)=>a.localeCompare(b));
+    const destColorOf = {};
+    idsOrdenados.forEach((id,i)=>{ destColorOf[id] = i<6 ? `var(--series-${i+1})` : 'var(--series-otros)'; });
+    const pctOf = {}; extra.forEach(d=>{ pctOf[d.dest]=d.pct; });
+    const sliceData = [];
+    let otrosPct = 0, hayOtros = false;
+    idsOrdenados.forEach((id,i)=>{
+      if(i<6) sliceData.push({ pct:pctOf[id], color:destColorOf[id] });
+      else { otrosPct += pctOf[id]; hayOtros = true; }
+    });
+    if(hayOtros) sliceData.push({ pct:otrosPct, color:'var(--series-otros)' });
+
+    const expandido = EXPANDED_DEST.has(nodeId);
+    body += `<div style="margin-top:4px;display:flex;justify-content:center">
+      <div style="cursor:pointer;display:flex;align-items:center;gap:4px" onclick="toggleDestDetail('${nodeId}',event)" title="Pulsa para ver el detalle de a qué estación se deriva">
+        ${destinoIcon(22)}
+        <span style="font-size:11px;color:var(--text-2);line-height:1">destinos</span>
+      </div>
+    </div>`;
+    if(expandido){
+      // Panel de detalle superpuesto (no afecta a la altura medida de la
+      // tarjeta — es "position:absolute" dentro del contenedor ya
+      // posicionado .node-body, ver buildDiagram()): lista completa, sin
+      // plegar, de cada estación destino con su % exacto, con la misma
+      // pastilla de color que su porción en el gráfico (o la de "Otros" si
+      // quedó plegada). El nombre puede truncarse con "…", el porcentaje
+      // nunca. Con scroll propio por si el número de destinos (hasta 10 en
+      // Sala de espera/Box de Urgencias en Fast-Track) no cupiera entero.
+      body += `<div style="position:absolute;inset:0;z-index:5;background:var(--surface-2);border:1.5px solid var(--border-strong);border-radius:7px;padding:5px 6px;overflow-y:auto;cursor:pointer" onclick="toggleDestDetail('${nodeId}',event)" title="Pulsa para cerrar el detalle">
+        <div style="display:flex;flex-direction:column;gap:1px">${extra.map(d=>
+          `<div style="display:flex;align-items:baseline;gap:5px;font-size:15px;line-height:1.5;color:var(--text-2)">
+            <span style="width:8px;height:8px;border-radius:2px;background:${destColorOf[d.dest]};display:inline-block;flex:none"></span>
+            <span class="mono" style="flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${STATION_LABELS[d.dest]||d.dest}</span>
+            <span class="mono" style="flex:none;font-weight:600">${Math.round(d.pct)}%</span>
+          </div>`
+        ).join('')}</div>
+      </div>`;
+    }
   }
   return body;
+}
+
+// Gráfico de sectores (pie) compacto del desglose de destinos (iteración
+// 21). YA NO SE LLAMA desde compactNodeBody() tras la iteración 25, que lo
+// sustituyó por el icono fijo `destinoIcon()` de más abajo — se deja aquí
+// completa, sin tocar, por si Javier prefiere volver a verla siempre
+// visible en vez del icono bajo demanda. "slices" llega ya resuelto a
+// {pct,color}, con como mucho 7 elementos (6 + "Otros"). Empieza arriba
+// (ángulo -90°) y recorre en sentido horario, como cualquier gráfico de
+// sectores convencional. Cuando aún no hay ningún dato (total=0, p. ej. en
+// el fotograma t=0 antes de que pase el primer paciente) dibuja un anillo
+// discontinuo neutro en vez de un círculo de un solo color, para no sugerir
+// que el 100% de los pacientes ya fue a un destino concreto.
+function destinoPie(slices, size){
+  const total = slices.reduce((a,d)=>a+d.pct,0);
+  const r = size/2 - 1, cx = size/2, cy = size/2;
+  if(!total){
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border-strong)" stroke-width="1.5" stroke-dasharray="3,3"/>
+    </svg>`;
+  }
+  let angle = -90, paths = '';
+  slices.forEach(d=>{
+    if(d.pct<=0) return;
+    const sweep = d.pct/total*360;
+    if(sweep>=359.9){
+      paths += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${d.color}"/>`;
+    } else {
+      const a0 = angle*Math.PI/180, a1 = (angle+sweep)*Math.PI/180;
+      const x0 = (cx+r*Math.cos(a0)).toFixed(2), y0 = (cy+r*Math.sin(a0)).toFixed(2);
+      const x1 = (cx+r*Math.cos(a1)).toFixed(2), y1 = (cy+r*Math.sin(a1)).toFixed(2);
+      const largeArc = sweep>180 ? 1 : 0;
+      // El trazo en var(--surface-2) entre porciones hace de "hueco de
+      // superficie" (equivalente radial al gap de 2px entre barras de la
+      // skill de visualización): separa visualmente las porciones sin
+      // añadir un borde de otro color que no sea dato.
+      paths += `<path d="M${cx},${cy} L${x0},${y0} A${r},${r} 0 ${largeArc} 1 ${x1},${y1} Z" fill="${d.color}" stroke="var(--surface-2)" stroke-width="1"/>`;
+    }
+    angle += sweep;
+  });
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block">${paths}</svg>`;
+}
+
+// Icono fijo de "gráfico de sectores" (iteración 25, pedido explícito de
+// Javier: "una versión sin los diagramas de reparto pero dejando un icono
+// para visualizar los porcentajes de envíos a cada estación") — a
+// diferencia de destinoPie(), NO representa ningún dato real: es siempre
+// el mismo dibujo (un círculo con un cuarto resaltado en el color de
+// acento), usado sólo como botón de acceso al panel de detalle. El tamaño
+// pequeño (22px por defecto, frente a los 62px del gráfico que sustituye)
+// es justo lo que libera espacio vertical en las tarjetas.
+function destinoIcon(size){
+  size = size || 22;
+  const r = size/2 - 1, cx = size/2, cy = size/2;
+  const topX = cx.toFixed(2), topY = (cy-r).toFixed(2);
+  const rightX = (cx+r).toFixed(2), rightY = cy.toFixed(2);
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;flex:none">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--text-muted)" stroke-width="1.5"/>
+    <path d="M${cx},${cy} L${topX},${topY} A${r},${r} 0 0 1 ${rightX},${rightY} Z" fill="var(--accent)"/>
+  </svg>`;
 }
 
 // Fila de icono + nombre de cada tarjeta, idéntica en el diagrama real y en
@@ -1289,9 +1538,9 @@ function compactNodeBody(nodeId, st, res, extra, showPct, tipoPct){
 function nodeHeaderHtml(n){
   const kind = ICON_KIND[n.id] || 'mesa';
   const color = n.big ? (n.id==='Alta'?'var(--good)':'var(--critical)') : (kind==='cama'?'var(--cama)':kind==='persona'?'var(--accent)':'var(--mesa)');
-  return `<div style="display:flex;align-items:center;gap:6px">
-            ${svgIcon(kind,19,color)}
-            <span style="font-family:var(--font-display);font-weight:600;font-size:16.5px;line-height:1.2;color:var(--text)">${STATION_LABELS[n.id]||n.id}</span>
+  return `<div style="display:flex;align-items:center;gap:7px">
+            ${svgIcon(kind,22,color)}
+            <span style="font-family:var(--font-display);font-weight:600;font-size:19px;line-height:1.2;color:var(--text)">${STATION_LABELS[n.id]||n.id}</span>
           </div>`;
 }
 
@@ -1313,8 +1562,8 @@ function buildDiagram(){
     const gp = groupPos[g.id];
     groupsHtml += `<g>
       <rect x="${gp.x}" y="${gp.y}" width="${gp.w}" height="${gp.h}" rx="14" fill="hsla(${g.hue},70%,60%,0.13)" stroke="hsla(${g.hue},60%,65%,0.38)" stroke-width="1"/>
-      <circle cx="${gp.x+18}" cy="${gp.y+19}" r="6.5" fill="hsl(${g.hue},65%,62%)"/>
-      <text x="${gp.x+30}" y="${gp.y+25}" font-family="var(--font-display)" font-weight="700" font-size="18px" fill="var(--text-2)">${g.nombre}</text>
+      <circle cx="${gp.x+19}" cy="${gp.y+20}" r="7.5" fill="hsl(${g.hue},65%,62%)"/>
+      <text x="${gp.x+33}" y="${gp.y+26}" font-family="var(--font-display)" font-weight="700" font-size="21px" fill="var(--text-2)">${g.nombre}</text>
     </g>`;
   });
 
@@ -1350,7 +1599,7 @@ function buildDiagram(){
       <foreignObject x="0" y="0" width="${NODE_W}" height="${n.nodeH}">
         <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing:border-box;width:100%;height:100%;padding:6px 8px;font-family:var(--font-body);display:flex;flex-direction:column">
           ${nodeHeaderHtml(n)}
-          <div class="node-body" style="margin-top:4px;flex:1"></div>
+          <div class="node-body" style="margin-top:4px;flex:1;position:relative;min-height:0"></div>
         </div>
       </foreignObject>
     </g>`;
@@ -1512,10 +1761,18 @@ function tipoBreakdownDestino(t, destino){
 // para que los nodos "big" (iteración 18) usen EXACTAMENTE el mismo
 // dimensionado ya verificado (cifra 14px, cuadradito 8px, `flex-wrap:nowrap`)
 // que el resto de estaciones, en vez de duplicar los valores a mano.
+// Fila de % por tipo de paciente agrandada en la iteración 23 (pedido
+// explícito de Javier: "amplía todas las estaciones horizontalmente para
+// que los porcentajes de reparto por tipo de paciente sean algo más
+// grandes"). Cifra 15px→20px, cuadradito 8px→10px, huecos 3/6px→4/7px.
+// Verificado (ver comentario sobre NODE_W, más arriba) que el peor caso
+// real — los 4 tipos con dos cifras, p. ej. 26/31/29/13 — necesita 222px
+// de ancho con estos tamaños, frente a los 236px disponibles ahora en
+// cada tarjeta (antes 180px disponibles con 15px/8px/3·6px, ya ajustado).
 function pctRowHtml(tipoPct){
   if(!tipoPct) return '';
-  return `<div style="margin-top:5px;display:flex;flex-wrap:nowrap;gap:0 6px">${tipoPct.map(d=>
-    `<span style="display:inline-flex;align-items:center;gap:3px;flex:none"><span style="width:8px;height:8px;border-radius:2px;background:${TYPE_COLOR[d.tipo]};display:inline-block;flex:none"></span><span class="mono" style="font-size:14px;font-weight:600;color:var(--text-2)">${Math.round(d.pct)}%</span></span>`
+  return `<div style="margin-top:6px;display:flex;flex-wrap:nowrap;gap:0 7px">${tipoPct.map(d=>
+    `<span style="display:inline-flex;align-items:center;gap:4px;flex:none"><span style="width:10px;height:10px;border-radius:2px;background:${TYPE_COLOR[d.tipo]};display:inline-block;flex:none"></span><span class="mono" style="font-size:20px;font-weight:600;color:var(--text-2)">${Math.round(d.pct)}%</span></span>`
   ).join('')}</div>`;
 }
 function fmtHoras(h){ const d=Math.floor(h/24), hh=Math.floor(h%24), mm=Math.round((h%1)*60); return `día ${d} · ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`; }
@@ -1537,7 +1794,7 @@ function computeNodeBodyHtml(n, snap){
     // iteración 18) — mismo criterio y mismo marcado de una sola fila
     // (iteración 17) que ya usa el resto de estaciones vía tipoBreakdown().
     const tipoPct = tipoBreakdownDestino(snap.t, n.id);
-    return `<div style="font-size:43px;font-weight:800;font-family:var(--font-mono);color:${n.id==='Alta'?'var(--good)':'var(--critical)'}">${count}</div><div style="font-size:14px;color:var(--text-muted)">pacientes acumulados</div>${pctRowHtml(tipoPct)}`;
+    return `<div style="font-size:48px;font-weight:800;font-family:var(--font-mono);color:${n.id==='Alta'?'var(--good)':'var(--critical)'}">${count}</div><div style="font-size:16px;color:var(--text-muted)">pacientes acumulados</div>${pctRowHtml(tipoPct)}`;
   }
   const st = snap.stations[n.id] || { esperando:[], sirviendo:[] };
   const res = snap.res[RESOURCE_OF[n.id]] || null;
@@ -1592,6 +1849,21 @@ function recomputeNodeHeights(snap){
   activeNodes().forEach(n=>{
     next[n.id] = measureCardHeight(n, computeNodeBodyHtml(n, snap));
   });
+  // Pedido explícito de Javier (iteración 24): las tarjetas de Sala de
+  // espera y de las cuatro estaciones de observación (Obs_Verde/Amarillo/
+  // Naranja/Rojo), todas en el bloque de Urgencias, deben ser tan altas
+  // verticalmente como la de Box de Urgencias — que, medido en los 4
+  // escenarios, es sistemáticamente la más alta del bloque (225px frente a
+  // 181px de Sala de espera y 151px de cada Obs_*, por llevar además la
+  // fila de % por tipo de paciente que las Obs_* no tienen). Se usa
+  // Math.max con la propia altura medida de cada una, nunca una asignación
+  // directa, para que esto nunca pueda recortar contenido si en el futuro
+  // alguna de ellas llegara a necesitar más alto que Box de Urgencias.
+  const IGUALAR_A_BOX = ['Sala_Espera_Urgencias','Obs_Verde','Obs_Amarillo','Obs_Naranja','Obs_Rojo'];
+  const hBox = next['Box_Urgencias'];
+  if(hBox){
+    IGUALAR_A_BOX.forEach(id=>{ if(next[id]!==undefined) next[id] = Math.max(next[id], hBox); });
+  }
   MEASURED_H = next;
 }
 
@@ -1600,18 +1872,42 @@ function recomputeNodeHeights(snap){
    ==================================================================== */
 let animData = null;
 const play = { playing:false, idx:0, speed:6, simT:undefined };
+// Ids de estación cuyo panel de detalle del gráfico de sectores (iteración
+// 21) está desplegado en este momento — se reinicia al generar una vista
+// nueva o cambiar de escenario (más abajo) para que no quede abierto un
+// panel de un contexto que ya no aplica.
+let EXPANDED_DEST = new Set();
+function toggleDestDetail(nodeId, ev){
+  if(ev) ev.stopPropagation();
+  if(EXPANDED_DEST.has(nodeId)) EXPANDED_DEST.delete(nodeId); else EXPANDED_DEST.add(nodeId);
+  // Repinta ya mismo el fotograma actual (en vez de esperar al siguiente
+  // tick de reproducción o a un cambio de instante) para que el panel
+  // aparezca/desaparezca al instante al pinchar, se esté reproduciendo la
+  // animación o esté en pausa.
+  if(animData) renderFrame(animData.snapshots[play.idx]);
+}
 
 function generarVista(){
   stopPlay();
+  EXPANDED_DEST = new Set();
   // Tope ampliado de 240h (10 días) a 720h (30 días), pedido explícito de
   // Javier (iteración 19). `dtMuestra` (más abajo) escala con `horas`, así
   // que el número de fotogramas muestreados se mantiene ~constante
-  // (≈1200) y el rendimiento no se degrada con ventanas más largas.
-  const horas = Math.max(6, Math.min(720, +document.getElementById('cfgHoras').value || 72));
+  // (≈1200) y el rendimiento no se degrada con ventanas más largas. El
+  // campo se lee en la unidad elegida (iteración 24) y se convierte a
+  // horas con `aHoras()` antes de aplicar el mismo tope de siempre.
+  const cfgHorasEl = document.getElementById('cfgHoras');
+  const horasEnUnidadRaw = cfgHorasEl.value==='' ? NaN : +cfgHorasEl.value;
+  const horasEnUnidad = isNaN(horasEnUnidadRaw) ? deHoras(72) : horasEnUnidadRaw;
+  const horas = Math.max(6, Math.min(720, aHoras(horasEnUnidad)));
   const seedStr = document.getElementById('cfgSeed').value.trim();
   const seed = seedStr===''? Math.floor(Math.random()*1e9) : (+seedStr||1);
   const dtMuestra = Math.max(0.02, horas/1200);
-  try{ animData = simularVentanaAnimada(cfg, horas, seed, dtMuestra, WARMUP_HORAS); }
+  // Período de calentamiento (iteración 24): se simula en silencio y el
+  // reloj de la vista animada arranca en 0 justo después (ver
+  // simularVentanaAnimada() y el comentario de CALENTAMIENTO_HORAS).
+  const calentamientoHoras = leerCalentamientoHoras();
+  try{ animData = simularVentanaAnimada(cfg, horas, seed, dtMuestra, calentamientoHoras); }
   catch(e){ console.error(e); alert('Error al simular: '+e.message); return; }
   let maxEsp = 0;
   for(const snap of animData.snapshots){
@@ -1627,6 +1923,17 @@ function generarVista(){
   play.idx = 0; play.simT = undefined;
   renderFrame(animData.snapshots[0]);
   updatePlayButtons();
+  // El aviso "pulsa Reproducir" (ver comentario junto a updatePlayHint())
+  // describe el primer fotograma como "hospital vacío", lo que ya no es
+  // cierto si hubo calentamiento (iteración 24): el hospital llega a ese
+  // instante ya en marcha, sólo que el reloj se reinicia a 0. Se reescribe
+  // aquí para que el texto coincida con lo que de verdad va a ver Javier.
+  const hintEl = document.getElementById('playHint');
+  if(hintEl){
+    hintEl.innerHTML = calentamientoHoras>0
+      ? `👉 Pulsa <b>«Reproducir»</b> para ver la animación. Este primer fotograma es el instante justo después del período de calentamiento (${redondeaUnidad(deHoras(calentamientoHoras))} ${unidadAbrev()}): el hospital ya está en marcha, pero el reloj y los % acumulados reinician a 0 en este punto, así que todos los medidores aparecen en gris y los envíos en 0% aunque ya haya pacientes dentro — no es un fallo.`
+      : `👉 Pulsa <b>«Reproducir»</b> para ver la animación. Este primer fotograma es el instante inicial (día 0, hospital vacío — sin período de calentamiento): por eso todos los medidores están todavía en gris y todos los envíos en 0%, no es un fallo.`;
+  }
 }
 function stepPlay(){ if(!animData) return; const snaps=animData.snapshots; if(play.idx>=snaps.length-1){ pausePlay(); return; } play.idx++; renderFrame(snaps[play.idx]); updatePlayHint(); }
 let lastTick = 0;
@@ -1697,9 +2004,19 @@ function filaComparativa(titulo, aggs, key, dec, sufijo, menorEsMejor){
 
 async function ejecutarInformeComparativo(){
   const replicas = Math.max(2, Math.min(100, Math.round(+document.getElementById('mcReplicas').value || 20)));
-  const dias = Math.max(10, Math.min(365, Math.round(+document.getElementById('mcDias').value || 90)));
+  // "Días por réplica" se lee en la unidad elegida (iteración 24) y se
+  // convierte a horas (`aHoras()`) y de ahí a días literales (/24), el
+  // formato que espera internamente `simular()`. El tope de siempre
+  // (10-365 días) se aplica ya en horas-equivalentes.
+  const mcDiasEl = document.getElementById('mcDias');
+  const diasEnUnidadRaw = mcDiasEl.value==='' ? NaN : +mcDiasEl.value;
+  const diasEnUnidad = isNaN(diasEnUnidadRaw) ? deHoras(90*24) : diasEnUnidadRaw;
+  const dias = Math.max(10, Math.min(365, aHoras(diasEnUnidad)/24));
   const seedStr = document.getElementById('mcSeed').value.trim();
   const seedBase = seedStr===''? Math.floor(Math.random()*1e6) : (+seedStr||1000);
+  // Período de calentamiento compartido (iteración 24): el informe trabaja
+  // sólo con los valores obtenidos tras este tiempo (ver CALENTAMIENTO_HORAS).
+  const calentamientoHoras = leerCalentamientoHoras();
 
   const btn = document.getElementById('btnMonteCarlo');
   btn.disabled = true;
@@ -1715,7 +2032,7 @@ async function ejecutarInformeComparativo(){
 
   for(const key of nombresEsc){
     const cfgEsc = ESCENARIOS[key].build();
-    resultados[key] = await ejecutarMonteCarloAsync(cfgEsc, { replicas, dias, warmupHoras:WARMUP_HORAS, seedBase }, (i)=>{
+    resultados[key] = await ejecutarMonteCarloAsync(cfgEsc, { replicas, dias, warmupHoras:calentamientoHoras, seedBase }, (i)=>{
       hechas = (nombresEsc.indexOf(key))*replicas + i;
       const pct = Math.round(100*hechas/totalReplicas);
       progFill.style.width = pct+'%';
@@ -1725,7 +2042,7 @@ async function ejecutarInformeComparativo(){
   }
 
   progText.textContent = `Completado: ${totalReplicas} réplicas (${replicas} × ${dias} días por escenario).`;
-  renderInformeComparativo(resultados, { replicas, dias });
+  renderInformeComparativo(resultados, { replicas, dias, calentamientoHoras });
   btn.disabled = false;
 }
 
@@ -1832,7 +2149,11 @@ function renderInformeComparativo(resultados, opts){
   amortHtml += '</tbody></table>';
 
   out.innerHTML = `
-    <p class="sideNote">Monte Carlo: ${opts.replicas} réplicas de ${opts.dias} días por escenario, sin período de calentamiento (se contabiliza desde el instante inicial). El intervalo mostrado (±) es el IC95% de la media ENTRE réplicas, no un error de medición de una corrida única. Las celdas resaltadas en verde/rojo marcan el mejor/peor escenario de esa fila (cuando hay diferencia apreciable).</p>
+    <p class="sideNote">Monte Carlo: ${opts.replicas} réplicas de ${opts.dias} días por escenario, ${
+      opts.calentamientoHoras>0
+        ? `tras un período de calentamiento de ${redondeaUnidad(deHoras(opts.calentamientoHoras))} ${unidadAbrev()} por réplica (los valores de ese período inicial se descartan; las métricas sólo cuentan lo ocurrido después)`
+        : 'sin período de calentamiento (se contabiliza desde el instante inicial)'
+    }. El intervalo mostrado (±) es el IC95% de la media ENTRE réplicas, no un error de medición de una corrida única. Las celdas resaltadas en verde/rojo marcan el mejor/peor escenario de esa fila (cuando hay diferencia apreciable).</p>
     ${tilesHtml}
     <div class="secTitle">Operativos y temporales</div>${operativos}
     <div class="secTitle">Recursos</div>${recursos}
@@ -1868,9 +2189,9 @@ function renderParamsFields(){
     html += paramField('param_uci_naranja', 'UCI · Naranja', cfg.UCI_NARANJA_CAPACIDAD);
     html += paramField('param_uci_base', 'UCI · Base', cfg.UCI_BASE_CAPACIDAD);
   }
-  html += paramField('param_limite_uci', 'Límite espera UCI (h)', cfg.LIMITE_ESPERA_UCI, 0.5);
+  html += paramField('param_limite_uci', `Límite espera UCI (${unidadAbrev()})`, redondeaUnidad(deHoras(cfg.LIMITE_ESPERA_UCI)), pasoFino());
   html += '</div>';
-  html += '<p class="hint" style="margin:14px 0 2px;font-weight:600">⏱ Tiempos de servicio (minutos)</p>';
+  html += `<p class="hint" style="margin:14px 0 2px;font-weight:600">⏱ Tiempos de servicio (${unidadNombre()})</p>`;
   html += renderTiemposFields();
   return html;
 }
@@ -1895,7 +2216,7 @@ function renderTiemposFields(){
       const labelEst = STATION_LABELS[est] || est;
       html += `<tr><th>${labelEst}</th>${
         TIPOS.map(t=> t in tiempos
-          ? `<td><input type="number" id="param_t_${est}_${t}" min="0" step="0.5" value="${+(tiempos[t]*60).toFixed(1)}"></td>`
+          ? `<td><input type="number" id="param_t_${est}_${t}" min="0" step="${pasoFino()}" value="${redondeaUnidad(deHoras(tiempos[t]))}"></td>`
           : `<td class="na">—</td>`
         ).join('')
       }</tr>`;
@@ -1910,7 +2231,7 @@ function aplicarTiempos(){
     TIPOS.forEach(t=>{
       if(!(t in tiempos)) return;
       const el = document.getElementById(`param_t_${est}_${t}`);
-      if(el && el.value!=='') tiempos[t] = Math.max(0, +el.value)/60;
+      if(el && el.value!=='') tiempos[t] = Math.max(0, aHoras(+el.value));
     });
   }
 }
@@ -1936,7 +2257,7 @@ function aplicarParametros(){
     cfg.UCI_TOTAL_CAPACIDAD = cfg.UCI_ROJO_CAPACIDAD + cfg.UCI_NARANJA_CAPACIDAD + cfg.UCI_BASE_CAPACIDAD;
   }
   const limEl = document.getElementById('param_limite_uci');
-  if(limEl && limEl.value!=='') cfg.LIMITE_ESPERA_UCI = Math.max(0, +limEl.value);
+  if(limEl && limEl.value!=='') cfg.LIMITE_ESPERA_UCI = Math.max(0, aHoras(+limEl.value));
   aplicarTiempos();
 
   stopPlay(); animData = null; updatePlayButtons();
@@ -1958,10 +2279,24 @@ function renderSidebar(){
       <p class="hint">Coste: ${costesTxt}</p>
     </div>
     <div class="card">
+      <h3>⏳ Unidad de tiempo y calentamiento</h3>
+      <div class="rowgrid">
+        <label>Unidad de tiempo del sistema
+          <select id="cfgUnidadTiempo">
+            <option value="seg"${UNIDAD_TIEMPO==='seg'?' selected':''}>Segundos</option>
+            <option value="min"${UNIDAD_TIEMPO==='min'?' selected':''}>Minutos</option>
+            <option value="hora"${UNIDAD_TIEMPO==='hora'?' selected':''}>Horas</option>
+            <option value="dia"${UNIDAD_TIEMPO==='dia'?' selected':''}>Días</option>
+          </select></label>
+        <label>Período de calentamiento (${unidadAbrev()}, 0 = sin calentamiento) <input type="number" id="cfgCalentamiento" min="0" step="${pasoFino()}" value="${redondeaUnidad(deHoras(CALENTAMIENTO_HORAS))}"></label>
+      </div>
+      <p class="sideNote">La unidad elegida se usa en todos los campos de tiempo de esta barra lateral: ventana a simular, período por réplica, límite de espera UCI y tiempos de servicio (el motor de simulación sigue calculando internamente en horas; sólo cambia cómo se leen y muestran los valores). El período de calentamiento es compartido entre el informe Monte Carlo y la vista animada: ambos descartan lo ocurrido durante ese tiempo inicial y, tras él, el informe cuenta sólo los valores posteriores y el reloj de la animación arranca de nuevo en 0. Por defecto es 0 (sin calentamiento), igual que hasta ahora.</p>
+    </div>
+    <div class="card">
       <h3>📊 Informe Monte Carlo comparativo</h3>
       <div class="rowgrid">
         <label>Réplicas por escenario <input type="number" id="mcReplicas" min="2" max="100" step="1" value="20"></label>
-        <label>Días por réplica <input type="number" id="mcDias" min="10" max="365" step="10" value="90"></label>
+        <label>Período por réplica (${unidadNombre()}) <input type="number" id="mcDias" min="${redondeaUnidad(deHoras(240))}" max="${redondeaUnidad(deHoras(8760))}" step="${redondeaUnidad(deHoras(24))}" value="${redondeaUnidad(deHoras(2160))}"></label>
         <label>Semilla base (vacío = aleatoria) <input type="text" id="mcSeed" placeholder="p. ej. 1000"></label>
       </div>
       <div class="btnrow" style="margin-top:8px"><button type="button" class="btn primary" id="btnMonteCarlo">Ejecutar Monte Carlo comparativo</button></div>
@@ -1969,21 +2304,18 @@ function renderSidebar(){
         <div class="progressTrack"><div class="progressFill" id="mcProgressFill"></div></div>
         <p class="hint" id="mcProgressText" style="margin-top:4px"></p>
       </div>
-      <p class="sideNote">Corre los 4 escenarios (Línea Base, A, B, C) con N réplicas independientes cada uno y agrega media ± IC95% entre réplicas. Con los valores por defecto (20×90d×4) suele tardar entre 30s y 1min; subir a 50×180d (la cifra exacta del enunciado) puede tardar varios minutos. Usa los parámetros del sistema vigentes en cada escenario en el momento de pulsar el botón.</p>
+      <p class="sideNote">Corre los 4 escenarios (Línea Base, A, B, C) con N réplicas independientes cada uno y agrega media ± IC95% entre réplicas. Con los valores por defecto (20×90d×4) suele tardar entre 30s y 1min; subir a 50×180d (la cifra exacta del enunciado) puede tardar varios minutos. Usa los parámetros del sistema vigentes en cada escenario en el momento de pulsar el botón. Si el período de calentamiento (tarjeta superior) es mayor que 0, cada réplica lo simula primero y las métricas sólo se calculan con lo ocurrido después.</p>
     </div>
     <div class="card">
       <h3>▶ Vista animada</h3>
       <div class="rowgrid">
-        <label>Ventana a simular (horas, máx. 720 = 30 días) <input type="number" id="cfgHoras" min="6" max="720" step="6" value="72"></label>
+        <label>Ventana a simular (${unidadNombre()}, máx. ${redondeaUnidad(deHoras(720))} ${unidadAbrev()} = 30 días) <input type="number" id="cfgHoras" min="${redondeaUnidad(deHoras(6))}" max="${redondeaUnidad(deHoras(720))}" step="${redondeaUnidad(deHoras(6))}" value="${redondeaUnidad(deHoras(72))}"></label>
         <label>Semilla (vacío = aleatoria) <input type="text" id="cfgSeed" placeholder="p. ej. 1"></label>
-        <label>Velocidad (h simuladas / s)
-          <select id="cfgSpeed">
-            <option value="1">1 h/s</option><option value="2">2 h/s</option><option value="3">3 h/s</option>
-            <option value="6" selected>6 h/s</option><option value="12">12 h/s</option><option value="24">24 h/s</option><option value="48">48 h/s</option>
-          </select></label>
+        <label>Velocidad (${unidadNombre()} simulad${UNIDAD_TIEMPO==='dia'?'os':(UNIDAD_TIEMPO==='hora'?'as':'os')} / s)
+          <select id="cfgSpeed">${speedOptionsHtml(6)}</select></label>
       </div>
       <div class="btnrow" style="margin-top:8px"><button type="button" class="btn primary" id="btnGenVista">Generar vista</button></div>
-      <p class="sideNote">El medidor de cada estación con capacidad limitada va de 0 al máximo de recursos asignado y se colorea en 4 niveles (verde&lt;30%, amarillo 30–60%, naranja 60–90%, rojo&gt;90%). Las estaciones están agrupadas por fase clínica (fondo de color pastel); se añade además, en toda estación salvo las de observación, el % de pacientes de cada tipo (Verde/Amarillo/Naranja/Rojo) que han pasado por ella, acumulado desde el inicio de la ventana y siempre con los 4 tipos aunque alguno esté a 0%; y, en todas, el % de pacientes derivados a cada estación siguiente concreta, una por línea (también acumulado desde el inicio de la ventana). Las estaciones de observación (Obs. Verde/Amarillo/Naranja/Rojo) no tienen capacidad limitada en el modelo, así que en su lugar muestran el número de pacientes que, en el instante mostrado, están en observación ahí mismo. En Sala de espera y Box de Urgencias ese desglose indica para qué estación está siendo atendido cada paciente mientras espera allí. La simulación arranca sin período de calentamiento: la ventana mostrada empieza con el hospital vacío.</p>
+      <p class="sideNote">El medidor de cada estación con capacidad limitada va de 0 al máximo de recursos asignado y se colorea en 4 niveles (verde&lt;30%, amarillo 30–60%, naranja 60–90%, rojo&gt;90%). Las estaciones están agrupadas por fase clínica (fondo de color pastel); se añade además, en toda estación salvo las de observación, el % de pacientes de cada tipo (Verde/Amarillo/Naranja/Rojo) que han pasado por ella, acumulado desde el inicio de la ventana y siempre con los 4 tipos aunque alguno esté a 0%; y, en todas, el % de pacientes derivados a cada estación siguiente concreta, una por línea (también acumulado desde el inicio de la ventana). Las estaciones de observación (Obs. Verde/Amarillo/Naranja/Rojo) no tienen capacidad limitada en el modelo, así que en su lugar muestran el número de pacientes que, en el instante mostrado, están en observación ahí mismo. En Sala de espera y Box de Urgencias ese desglose indica para qué estación está siendo atendido cada paciente mientras espera allí. Si el período de calentamiento (tarjeta superior) es 0, la ventana mostrada empieza con el hospital vacío; si es mayor que 0, el hospital se simula primero durante ese tiempo y el reloj de la animación arranca en 0 justo después, ya con el sistema en marcha.</p>
     </div>
     <div class="card">
       <h3>⚙️ Parámetros del sistema</h3>
@@ -1992,6 +2324,7 @@ function renderSidebar(){
       <p class="sideNote" id="paramsStatus">Capacidades y tiempos de servicio del escenario actual (${esc.nombre}). Se restablecen a sus valores por defecto si cambias de escenario. Afectan a la próxima vista animada o informe Monte Carlo que generes, no a los ya calculados.</p>
     </div>
   `;
+  document.getElementById('cfgUnidadTiempo').addEventListener('change', e=>{ UNIDAD_TIEMPO = e.target.value; renderSidebar(); });
   document.getElementById('cfgSpeed').addEventListener('change', e=>{ play.speed = Math.round(+e.target.value)||1; });
   document.getElementById('btnAplicarParams').addEventListener('click', aplicarParametros);
   document.getElementById('btnGenVista').addEventListener('click', generarVista);
@@ -2004,6 +2337,7 @@ function setEscenario(key){
   document.querySelectorAll('#escToggle button').forEach(b=> b.classList.toggle('active', b.dataset.e===key));
   document.getElementById('escTitleDiagrama').textContent = ESCENARIOS[key].nombre;
   animData = null;
+  EXPANDED_DEST = new Set();
   // Las alturas medidas son propias del escenario anterior (nº de destinos
   // distinto según PROB_DERIVACION de cada escenario): se descartan aquí y
   // el diagrama vuelve al alto "de reserva" por bloque hasta la próxima vez
@@ -2031,5 +2365,4 @@ renderSidebar();
 buildDiagram();
 </script>
 
-</body>
-</html>
+</body></html>
