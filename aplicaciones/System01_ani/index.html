@@ -15,6 +15,7 @@
   --good: #0ca30c; --warning: #fab219; --critical: #e66767;
   --verde:#5fbf5f; --amarillo:#d8c23a; --naranja:#e08a35; --rojo:#e15b5b;
   --mesa:#9c7a3c; --cama:#3987e5; --box:#b05fd1;
+  --espera-highlight:#ff9d3d;
   /* Paleta categórica para el gráfico de sectores de destinos (iteración 21):
      8 hues categóricas validadas con el validador de la skill de
      visualización de datos (lightness band, chroma floor, separación CVD
@@ -40,6 +41,7 @@
     --good:#0b7a0b; --warning:#92650a; --critical:#b23232;
     --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; --series-4:#eda100;
     --series-5:#e87ba4; --series-6:#6250d6; --series-otros:#87857d;
+    --espera-highlight:#a85200;
   }
 }
 :root[data-theme="light"]{
@@ -51,6 +53,7 @@
   --good:#0b7a0b; --warning:#92650a; --critical:#b23232;
   --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; --series-4:#eda100;
   --series-5:#e87ba4; --series-6:#6250d6; --series-otros:#87857d;
+  --espera-highlight:#a85200;
 }
 :root[data-theme="dark"]{
   color-scheme: dark;
@@ -61,6 +64,7 @@
   --border:rgba(255,255,255,0.16); --border-strong:rgba(255,255,255,0.38); --grid:#2c2c2a;
   --accent:#1c6cce; --accent-2:#d9972a; --accent-3:#199e70;
   --good:#0ca30c; --warning:#fab219; --critical:#e66767;
+  --espera-highlight:#ff9d3d;
 }
 *{box-sizing:border-box;}
 body{ background:var(--bg); color:var(--text); font-family:var(--font-body); font-size:16px; margin:0; padding-inline:16px; }
@@ -1147,15 +1151,25 @@ let MEASURED_H = {};
 // texto más grande en pantalla). Cada bloque sigue siendo siempre una ÚNICA
 // fila con tantas columnas como estaciones activas (`groupGrid()`, sin
 // cambios desde la iteración 10).
+// brow pasa a representar el PISO (planta) del diagrama, no un bloque
+// individual: varios bloques pueden compartir el mismo piso y se colocan
+// uno junto a otro (computeLayout() ya agrupaba por brow desde la
+// iteración 10, así que no necesitó cambios). Dentro de cada bloque,
+// rows/cols fijan un grid explícito de filas×columnas (iteración 27,
+// pedido de Javier — sustituye la fila única por bloque de la
+// iteración 10). "entrada" tiene una columna más (colsFastTrack) en
+// Fast-Track, porque ese escenario añade una 5ª estación (Diag_Rapido)
+// que no cabe en el grid de 2×2 de los otros 3 escenarios — alternativa
+// elegida explícitamente por Javier frente a añadir una 3ª fila.
 const GROUPS = [
-  { id:'entrada', nombre:'Admisión, triaje y primer filtro clínico', hue:210, brow:0, nodeH:NODE_H_ENTRADA, extended:true, items:[
+  { id:'entrada', nombre:'Admisión, triaje y primer filtro clínico', hue:210, brow:0, nodeH:NODE_H_ENTRADA, extended:true, rows:2, cols:2, colsFastTrack:3, items:[
     { id:'Admision' },
     { id:'Triaje' },
     { id:'Aislamiento' },
     { id:'Diag_Inicial' },
     { id:'Diag_Rapido', soloFastTrack:true },
   ]},
-  { id:'urgencias', nombre:'Espera y observación en Urgencias', hue:175, brow:1, nodeH:NODE_H_URGENCIAS, extended:true, items:[
+  { id:'urgencias', nombre:'Espera y observación en Urgencias', hue:175, brow:0, nodeH:NODE_H_URGENCIAS, extended:true, rows:2, cols:3, items:[
     { id:'Sala_Espera_Urgencias' },
     { id:'Obs_Verde' },
     { id:'Obs_Amarillo' },
@@ -1163,34 +1177,37 @@ const GROUPS = [
     { id:'Obs_Rojo' },
     { id:'Box_Urgencias' },
   ]},
-  { id:'diagnostico', nombre:'Diagnóstico y pruebas complementarias', hue:265, brow:2, nodeH:NODE_H_DIAGNOSTICO, extended:true, items:[
+  { id:'diagnostico', nombre:'Diagnóstico y pruebas complementarias', hue:265, brow:1, nodeH:NODE_H_DIAGNOSTICO, extended:true, rows:2, cols:2, items:[
     { id:'Pruebas_Basicas' },
     { id:'Diag_Preliminar' },
     { id:'Pruebas_Avanzadas' },
     { id:'Consulta_Especialista' },
   ]},
-  { id:'hospitalizacion', nombre:'Hospitalización y cuidados críticos', hue:330, brow:3, nodeH:NODE_H_HOSPITALIZACION, extended:true, items:[
+  { id:'hospitalizacion', nombre:'Hospitalización y cuidados críticos', hue:330, brow:1, nodeH:NODE_H_HOSPITALIZACION, extended:true, rows:3, cols:1, items:[
     { id:'Planta' },
     { id:'Quirofano' },
     { id:'UCI' },
   ]},
-  { id:'salida', nombre:'Recuperación y salida', hue:45, brow:4, nodeH:NODE_H_SALIDA, extended:true, items:[
+  { id:'salida', nombre:'Recuperación y salida', hue:45, brow:1, nodeH:NODE_H_SALIDA, extended:true, rows:2, cols:2, items:[
     { id:'Rehabilitacion' },
     { id:'Farmacia' },
     { id:'Alta', big:true },
     { id:'Fallece', big:true },
   ]},
 ];
+const GROUPS_BY_ID = {}; GROUPS.forEach(g=>{ GROUPS_BY_ID[g.id] = g; });
 // Reparte los "items" de un bloque (ya filtrados a los activos en el
-// escenario actual) en una ÚNICA fila, tantas columnas como estaciones
-// activas (pedido explícito de Javier, iteración 10 — sustituye la rejilla
-// de 2 columnas de la iteración 6). El orden de "items" en GROUPS ya es el
-// orden de columnas deseado de izquierda a derecha.
+// escenario actual) en el grid de filas×columnas FIJO declarado en el
+// propio bloque (g.rows/g.cols, iteración 27 — antes era siempre una
+// única fila, iteración 10). Relleno fila a fila, de izquierda a
+// derecha, en el orden de "items" ya curado (iteración 11).
 function groupGrid(g){
   const items = g.items.filter(it => !it.soloFastTrack || cfg.SERVIDORES_CAPACIDAD.Medicos_Rapidos!==undefined);
+  const esFastTrack = cfg.SERVIDORES_CAPACIDAD.Medicos_Rapidos!==undefined;
+  const cols = (esFastTrack && g.colsFastTrack) ? g.colsFastTrack : g.cols;
   const pos = {};
-  items.forEach((it,i)=>{ pos[it.id] = { gcol:i, grow:0 }; });
-  return { grows:1, cols: items.length, pos };
+  items.forEach((it,i)=>{ pos[it.id] = { gcol: i % cols, grow: Math.floor(i/cols) }; });
+  return { grows: g.rows, cols, pos };
 }
 function activeNodes(){
   const out = [];
@@ -1228,15 +1245,42 @@ const SALAS_ESPERA = new Set(['Sala_Espera_Urgencias','Box_Urgencias']);
 function groupWidth(g){ const { cols } = groupGrid(g); return GROUP_PAD*2 + cols*NODE_W + Math.max(cols-1,0)*GAP_X; }
 // La altura de fondo del bloque ya no asume que todas sus estaciones miden
 // lo mismo (iteración 20): cada estación puede tener ahora su propia altura
-// medida (MEASURED_H), así que el bloque debe ser tan alto como la estación
-// MÁS alta que contenga en este momento (como grows siempre vale 1 en el
-// diseño actual de "una sola fila por bloque", en la práctica es el máximo
-// de las estaciones activas del bloque).
-function groupMaxNodeH(g){
+// medida (MEASURED_H). Desde que un bloque puede tener varias filas propias
+// (iteración 27), cada fila se dimensiona de forma independiente — al
+// máximo medido de las estaciones de ESA fila, no del bloque entero — para
+// no desperdiciar alto en una fila con estaciones pequeñas sólo porque otra
+// fila del mismo bloque tiene una estación más grande.
+function groupRowHeights(g){
   const items = g.items.filter(it => !it.soloFastTrack || cfg.SERVIDORES_CAPACIDAD.Medicos_Rapidos!==undefined);
-  return Math.max(...items.map(it => MEASURED_H[it.id] || g.nodeH));
+  const { pos, grows } = groupGrid(g);
+  // Se parte de 0, no de g.nodeH (pedido explícito de Javier, iteración 28:
+  // "hacer más pequeñas las ventanas de los bloques para que se adapten...
+  // al grupo de estaciones que contienen"). Sembrar cada fila con el alto de
+  // reserva del bloque entero hacía que el Math.max de abajo lo ganara
+  // SIEMPRE que el contenido real medido fuera más pequeño que esa reserva
+  // —que es casi siempre, ya que g.nodeH es un "peor caso" pensado para la
+  // antigua disposición de una sola fila por bloque (iteración 27 la
+  // reparte ahora en 2-3 filas más cortas)— por lo que MEASURED_H quedaba
+  // ignorado y las ventanas no se encogían nunca por debajo de ese peor
+  // caso aunque las tarjetas reales fueran mucho más bajas. g.nodeH se
+  // conserva como alto de reserva POR ESTACIÓN (línea de abajo) para
+  // cualquier estación aún no medida, y como suelo de seguridad final si
+  // una fila quedara sin ninguna estación.
+  const perRow = new Array(grows).fill(0);
+  items.forEach(it=>{
+    const h = MEASURED_H[it.id] || g.nodeH;
+    const r = pos[it.id].grow;
+    perRow[r] = Math.max(perRow[r], h);
+  });
+  for(let r=0; r<grows; r++){ if(perRow[r]===0) perRow[r] = g.nodeH; }
+  return perRow;
 }
-function groupHeight(g){ const { grows } = groupGrid(g); return GROUP_TITLE_H + GROUP_PAD*2 + grows*groupMaxNodeH(g) + (grows-1)*GAP_Y; }
+function groupHeight(g){
+  const { grows } = groupGrid(g);
+  const perRow = groupRowHeights(g);
+  const sumH = perRow.reduce((a,b)=>a+b, 0);
+  return GROUP_TITLE_H + GROUP_PAD*2 + sumH + Math.max(grows-1,0)*GAP_Y;
+}
 function computeLayout(){
   const byRow = {};
   GROUPS.forEach(g=>{ (byRow[g.brow] = byRow[g.brow]||[]).push(g); });
@@ -1266,7 +1310,11 @@ function computeLayout(){
 }
 function nodeXY(n, groupPos){
   const gp = groupPos[n.grupo];
-  return { x: gp.x + GROUP_PAD + n.gcol*(NODE_W+GAP_X), y: gp.y + GROUP_TITLE_H + GROUP_PAD + n.grow*(n.nodeH+GAP_Y) };
+  const g = GROUPS_BY_ID[n.grupo];
+  const perRow = groupRowHeights(g);
+  let yOff = 0;
+  for(let r=0; r<n.grow; r++) yOff += perRow[r] + GAP_Y;
+  return { x: gp.x + GROUP_PAD + n.gcol*(NODE_W+GAP_X), y: gp.y + GROUP_TITLE_H + GROUP_PAD + yOff };
 }
 
 function edgesFromConfig(){
@@ -1335,10 +1383,11 @@ function compactNodeBody(nodeId, st, res, extra, showPct, tipoPct){
   } else if(res){
     const ratio = res.cap ? res.busy/res.cap : 0;
     const nivel = nivelOcupacion(ratio);
+    const esperaPct = res.cap ? Math.round((espera/res.cap)*100) : 0;
     top = `${gaugeArc(ratio, nivel)}
       <div style="display:flex;align-items:baseline;justify-content:center;gap:6px;margin-top:3px">
-        <span class="mono" style="font-size:24px;font-weight:700;color:var(--text)">${res.busy}/${res.cap}</span>
-        ${espera>0?`<span class="mono" style="font-size:17px;color:var(--text-muted)">+${espera} esp.</span>`:''}
+        <span class="mono" style="font-size:24px;font-weight:700;color:var(--text)">${Math.round(ratio*100)}%</span>
+        <span class="mono" style="font-size:24px;font-weight:700;color:var(--espera-highlight)">${esperaPct}%</span>
       </div>`;
   } else {
     top = `<div style="display:flex;align-items:baseline;gap:6px">
@@ -1574,17 +1623,42 @@ function buildDiagram(){
     if(!pos[a] || !pos[b]) return;
     const p1 = pos[a], p2 = pos[b];
     const esEspera = kind==='espera';
-    const mismaFila = info[a] && info[b] && info[a].brow === info[b].brow;
-    let path;
     const h1 = info[a].nodeH, h2 = info[b].nodeH;
+    const cy1 = p1.y + h1/2, cy2 = p2.y + h2/2;
+    const cx1 = p1.x + NODE_W/2, cx2 = p2.x + NODE_W/2;
+    // "Misma fila" se decide por ESTRUCTURA, no por proximidad geométrica
+    // (iteración 27): dentro de un mismo bloque, dos estaciones están en la
+    // misma fila sólo si comparten "grow" (filas de un bloque se apilan
+    // verticalmente, así que cruzar de fila es siempre un salto vertical,
+    // aunque las dos estaciones sigan perteneciendo al mismo piso); entre
+    // bloques distintos, "misma fila" significa mismo piso (brow) — van
+    // lado a lado aunque sus filas internas no estén alineadas en Y (los
+    // bloques de un piso pueden tener distinto nº de filas/alturas). Una
+    // comparación puramente geométrica (centros Y próximos) fallaba aquí:
+    // dos bloques del mismo piso con alturas de fila muy distintas podían
+    // quedar con centros lejanos y, si se trataban como "fila distinta",
+    // el conector vertical resultante se cruzaba hacia atrás.
+    const grupoA = info[a].grupo, grupoB = info[b].grupo;
+    const mismaFila = grupoA===grupoB ? (info[a].grow===info[b].grow) : (GROUPS_BY_ID[grupoA].brow===GROUPS_BY_ID[grupoB].brow);
+    let path;
     if(mismaFila){
-      // misma fila de bloques: conector horizontal lado derecho → lado izquierdo
-      const x1 = p1.x+NODE_W, y1 = p1.y+h1/2, x2 = p2.x, y2 = p2.y+h2/2;
+      // Conector horizontal: sale por el lado de origen más cercano al
+      // destino y entra por el lado de destino más cercano al origen —
+      // no se asume que el origen esté siempre a la izquierda (iteración
+      // 27: con varios bloques por piso, un "espera" puede ir de una
+      // estación más a la derecha a otra más a la izquierda).
+      const origenIzquierda = cx1 <= cx2;
+      const x1 = origenIzquierda ? p1.x+NODE_W : p1.x, y1 = cy1;
+      const x2 = origenIzquierda ? p2.x : p2.x+NODE_W, y2 = cy2;
       const midX = (x1+x2)/2;
       path = `M${x1},${y1} C${midX},${y1} ${midX},${y2} ${x2},${y2}`;
     } else {
-      // salta de una fila de bloques a otra: conector vertical abajo → arriba
-      const x1 = p1.x+NODE_W/2, y1 = p1.y+h1, x2 = p2.x+NODE_W/2, y2 = p2.y;
+      // Conector vertical: igual criterio — sale por el lado (arriba/abajo)
+      // más cercano al destino, no se asume que el origen esté siempre
+      // encima.
+      const origenArriba = cy1 <= cy2;
+      const x1 = cx1, y1 = origenArriba ? p1.y+h1 : p1.y;
+      const x2 = cx2, y2 = origenArriba ? p2.y : p2.y+h2;
       const midY = (y1+y2)/2;
       path = `M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`;
     }
@@ -1864,6 +1938,23 @@ function recomputeNodeHeights(snap){
   if(hBox){
     IGUALAR_A_BOX.forEach(id=>{ if(next[id]!==undefined) next[id] = Math.max(next[id], hBox); });
   }
+  MEASURED_H = next;
+}
+// Mide la altura "estructural" de cada tarjeta — sólo icono + nombre, sin
+// ningún dato de simulación — para usarla mientras todavía no hay una vista
+// animada generada (al cargar la página o justo al cambiar de escenario).
+// Antes de esto, en ese estado "sin datos" cada tarjeta ocupaba el alto de
+// reserva pensado para el peor caso de contenido (desglose de hasta 10
+// destinos + fila de % por tipo), con el cuerpo completamente vacío: las
+// ventanas de los bloques quedaban mucho más grandes de lo que su contenido
+// real necesitaba. Pedido explícito de Javier, iteración 28: "hacer más
+// pequeñas las ventanas de los bloques para que se adapten... al grupo de
+// estaciones que contienen" — aplica el mismo mecanismo de medición real
+// (measureCardHeight) que ya usa recomputeNodeHeights(), con un cuerpo
+// vacío en vez del contenido de un fotograma.
+function recomputeEmptyNodeHeights(){
+  const next = {};
+  activeNodes().forEach(n=>{ next[n.id] = measureCardHeight(n, ''); });
   MEASURED_H = next;
 }
 
@@ -2337,9 +2428,10 @@ function setEscenario(key){
   EXPANDED_DEST = new Set();
   // Las alturas medidas son propias del escenario anterior (nº de destinos
   // distinto según PROB_DERIVACION de cada escenario): se descartan aquí y
-  // el diagrama vuelve al alto "de reserva" por bloque hasta la próxima vez
-  // que se genere una vista, que las recalculará para el nuevo escenario.
-  MEASURED_H = {};
+  // se recalculan en su versión "estructural" (sin datos, iteración 28)
+  // para el nuevo escenario, hasta la próxima vez que se genere una vista,
+  // que las recalculará ya con datos reales.
+  recomputeEmptyNodeHeights();
   renderSidebar();
   buildDiagram();
   updatePlayButtons();
@@ -2359,6 +2451,7 @@ document.getElementById('themeBtn').addEventListener('click', ()=>{
 });
 
 renderSidebar();
+recomputeEmptyNodeHeights();
 buildDiagram();
 </script>
 
