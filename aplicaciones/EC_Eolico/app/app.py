@@ -35,7 +35,7 @@ DESCRIPCIONES = {
                          "Grave/Critico (menos baja definitiva y pérdida total). Licencia de 54.000 €/año.",
     "B · Respuesta rápida": "Equipo técnico dedicado en exclusiva a las órdenes Critico, con su propia inspección "
                             "técnica inicial. Coste de personal de 46.000 €/año.",
-    "C · Contención compartida": "Las 6 plazas de Contención de Emergencia pasan a una única bolsa con prioridad "
+    "C · Contención compartida": "Las 4 plazas de Contención de Emergencia pasan a una única bolsa con prioridad "
                                  "Critico > Grave > Leve/Programado. Formación con coste único de 5.000 €.",
 }
 NOMBRES_ESTACION = {(335, 59): "Invierno", (59, 151): "Primavera", (151, 243): "Verano", (243, 335): "Otoño"}
@@ -231,6 +231,8 @@ with tab_com:
         par["MARGEN_EXIGIDO"] = st.number_input("Margen exigido (%)", 0.0, 100.0, 100 * float(par["MARGEN_EXIGIDO"]), 0.5,
                                                 key=clave("mexig"),
                                                 help="Límite inferior del objetivo de la dirección del taller (15–20%).") / 100
+        par["PEN_DEMORA"] = st.number_input("Penalización por demora crítica (€ por orden Critico por encima de la latencia del SLA1)",
+                                            0.0, value=float(par.get("PEN_DEMORA", 0.0)), step=100.0, key=clave("pen_demora"))
     with c2:
         st.markdown("**Coste por procedimiento realizado (€)**")
         cs = editor(clave("coste_serv"), lambda: pd.DataFrame({"Estación": list(par["COSTE_SERVICIO"]),
@@ -726,7 +728,7 @@ with tab_res:
 
         with r_dat:
             st.markdown("Valores de cada réplica (una fila por réplica y escenario).")
-            largo = pd.concat([m["resumen"].assign(Escenario=n) for n, m in prot.items()]).reset_index()
+            largo = pd.concat([m["resumen"].copy().assign(Escenario=n) for n, m in prot.items()]).reset_index()
             st.dataframe(largo, use_container_width=True, height=350)
             buf = io.BytesIO()
             with pd.ExcelWriter(buf, engine="openpyxl") as xw:

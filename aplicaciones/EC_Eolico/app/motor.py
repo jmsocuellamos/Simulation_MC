@@ -39,10 +39,10 @@ TIPOS = ["Programado", "Leve", "Grave", "Critico"]
 
 # Estacionalidad meteorológica: (tasa_ordenes_dia, [pProgramado,pLeve,pGrave,pCritico])
 ESTACIONES_ANIO = {
-    (335, 59):  (1.00, [0.30, 0.25, 0.30, 0.15]),   # Invierno: temporales -> más averías graves/críticas
-    (59, 151):  (0.70, [0.55, 0.25, 0.15, 0.05]),   # Primavera: revisiones programadas tras el invierno
-    (151, 243): (0.55, [0.35, 0.35, 0.20, 0.10]),   # Verano: menor actividad, sobrecalentamientos eléctricos
-    (243, 335): (0.75, [0.40, 0.30, 0.20, 0.10]),   # Otoño: mantenimiento preventivo previo al invierno
+    (335, 59):  (1.50, [0.30, 0.25, 0.30, 0.15]),   # Invierno: temporales -> más averías graves/críticas
+    (59, 151):  (1.05, [0.55, 0.25, 0.15, 0.05]),   # Primavera: revisiones programadas tras el invierno
+    (151, 243): (0.825, [0.35, 0.35, 0.20, 0.10]),  # Verano: menor actividad, sobrecalentamientos eléctricos
+    (243, 335): (1.125, [0.40, 0.30, 0.20, 0.10]),  # Otoño: mantenimiento preventivo previo al invierno
 }
 
 
@@ -363,7 +363,7 @@ def construir_config_base():
 
     cfg.SERVIDORES_CAPACIDAD = {
         "Recepcion": 1,
-        "Equipo_Tecnico": 2,                    # atiende Inspeccion_Tecnica y Valoracion_Preliminar
+        "Equipo_Tecnico": 1,                    # atiende Inspeccion_Tecnica y Valoracion_Preliminar
         "Diagnostico_Electrico": 1,
         "Diagnostico_END": 1,                   # único banco de Ensayos No Destructivos -> cuello de botella deliberado
         "Consulta_Ingeniero_Fiabilidad": 1,
@@ -376,11 +376,11 @@ def construir_config_base():
     # 90-95 de ocupación observada (no sólo de la media: los tiempos de
     # reparación tienen varianza alta, y dimensionar sólo por la media
     # produce inestabilidad -colas que crecen sin límite- a largo plazo).
-    cfg.BAHIA_URGENTE_CAPACIDAD = 3
+    cfg.BAHIA_URGENTE_CAPACIDAD = 12
     cfg.BAHIAS_CAPACIDAD = {
-        "Espera_Repuestos": 10,
+        "Espera_Repuestos": 20,
         "Banco_Ensayo_Sobrecarga": 1,
-        "Bahia_Reparacion": 10,
+        "Bahia_Reparacion": 20,
         "Bahia_Reconstruccion_PostIncidente": 3,
     }
     cfg.BAHIA_ALIAS = {"Bahia_Reparacion_PostIncidente": "Bahia_Reparacion"}
@@ -391,24 +391,24 @@ def construir_config_base():
     cfg.BAHIA_URGENTE_CAPTURA = {"Critico": "Recepcion", "Grave": "Inspeccion_Tecnica"}
 
     cfg.CONTENCION_MODE = "partitioned"     # "partitioned" (línea base) o "pooled" (Escenario C)
-    cfg.CONTENCION_CRITICO_CAPACIDAD = 3
-    cfg.CONTENCION_GRAVE_CAPACIDAD = 2
+    cfg.CONTENCION_CRITICO_CAPACIDAD = 2
+    cfg.CONTENCION_GRAVE_CAPACIDAD = 1
     cfg.CONTENCION_BASE_CAPACIDAD = 1
     cfg.CONTENCION_TOTAL_CAPACIDAD = (cfg.CONTENCION_CRITICO_CAPACIDAD
                                        + cfg.CONTENCION_GRAVE_CAPACIDAD
-                                       + cfg.CONTENCION_BASE_CAPACIDAD)  # 6
-    cfg.LIMITE_ESPERA_CONTENCION = 1.5   # días
+                                       + cfg.CONTENCION_BASE_CAPACIDAD)  # 4
+    cfg.LIMITE_ESPERA_CONTENCION = 1.0   # días
 
     cfg.TIEMPOS_SERVICIO = {
         "Recepcion":                     {t: 0.02 for t in TIPOS},
-        "Inspeccion_Tecnica":            {t: 0.10 for t in TIPOS},
+        "Inspeccion_Tecnica":            {t: 0.25 for t in TIPOS},
         "Espera_Repuestos": {
             "Programado": 5.0, "Leve": 7.0, "Grave": 10.0, "Critico": 4.0,
         },
         "Diagnostico_Electrico":         {t: 0.15 for t in TIPOS},
-        "Diagnostico_END":               {t: 1.5 for t in TIPOS},
+        "Diagnostico_END":               {t: 2.5 for t in TIPOS},
         "Consulta_Ingeniero_Fiabilidad": {t: 0.25 for t in TIPOS},
-        "Valoracion_Preliminar":         {t: 0.15 for t in TIPOS},
+        "Valoracion_Preliminar":         {"Programado": 0.25, "Leve": 0.25, "Grave": 0.30, "Critico": 0.30},
         "Banco_Ensayo_Sobrecarga":       {"Grave": 0.30, "Critico": 0.30},
         "Bahia_Reparacion": {
             "Programado": 3.0, "Leve": 6.0, "Grave": 15.0, "Critico": 20.0,
@@ -417,7 +417,7 @@ def construir_config_base():
             "Programado": 2.0, "Leve": 3.0, "Grave": 5.0, "Critico": 7.0,
         },
         "Contencion_Emergencia": {
-            "Programado": 2.0, "Leve": 2.0, "Grave": 3.0, "Critico": 4.0,
+            "Programado": 2.0, "Leve": 2.0, "Grave": 4.0, "Critico": 5.0,
         },
         "Bahia_Reconstruccion_PostIncidente": {t: 10.0 for t in TIPOS},
         "Puesta_En_Marcha":              {t: 0.5 for t in TIPOS},
@@ -544,12 +544,12 @@ def construir_config_ia_predictiva():
     #    Grave/Critico.
     cfg.PROB_DERIVACION = copy.deepcopy(cfg.PROB_DERIVACION)
     cfg.PROB_DERIVACION["Valoracion_Preliminar"]["Grave"] = {
-        "Bahia_Reparacion": 0.45, "Espera_Repuestos": 0.15, "Monitorizacion_Grave": 0.20,
-        "Baja_Definitiva": 0.15, "Perdida_Total": 0.02, "Consulta_Ingeniero_Fiabilidad": 0.03,
+        "Bahia_Reparacion": 0.50, "Espera_Repuestos": 0.15, "Monitorizacion_Grave": 0.20,
+        "Baja_Definitiva": 0.10, "Perdida_Total": 0.02, "Consulta_Ingeniero_Fiabilidad": 0.03,
     }
     cfg.PROB_DERIVACION["Valoracion_Preliminar"]["Critico"] = {
-        "Contencion_Emergencia": 0.25, "Bahia_Reparacion": 0.28, "Espera_Repuestos": 0.10,
-        "Monitorizacion_Critico": 0.15, "Baja_Definitiva": 0.15, "Perdida_Total": 0.02,
+        "Contencion_Emergencia": 0.25, "Bahia_Reparacion": 0.33, "Espera_Repuestos": 0.10,
+        "Monitorizacion_Critico": 0.15, "Baja_Definitiva": 0.10, "Perdida_Total": 0.02,
         "Banco_Ensayo_Sobrecarga": 0.05,
     }
 
@@ -595,7 +595,7 @@ def construir_config_contencion_dinamica():
     cfg = construir_config_base()
     cfg.nombre = "Escenario C - Gestión Dinámica de Contención de Emergencia"
     cfg.CONTENCION_MODE = "pooled"   # único cambio real: pool único con prioridad por gravedad
-    # cfg.CONTENCION_TOTAL_CAPACIDAD se mantiene IGUAL que en la línea base (6
+    # cfg.CONTENCION_TOTAL_CAPACIDAD se mantiene IGUAL que en la línea base (4
     # plazas): no se añade ninguna plaza nueva, sólo se reorganiza su gestión.
     cfg.COSTES_FIJOS = {"reorganizacion_unica": 5_000}   # coste único, no anual
     return cfg

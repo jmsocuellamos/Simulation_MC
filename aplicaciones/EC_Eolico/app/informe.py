@@ -267,7 +267,8 @@ def generar_informe(protocolos, ref, ajustes, comunes, titulo="Taller de manteni
               formato=lambda f, c, v: eur(v))
     costes = pd.concat([pd.Series({f"{k} (€/procedimiento)": v for k, v in param["COSTE_SERVICIO"].items()}),
                         pd.Series({f"{k} (€/día)": v for k, v in param["COSTE_DIA"].items()})]).to_frame("Importe")
-    inf.tabla(costes, "Costes variables de operación", nombre_indice="Concepto", formato=lambda f, c, v: eur(v))
+    costes = pd.concat([costes, pd.Series({"Penalización por demora crítica Critico (€)": param.get("PEN_DEMORA", 0)}).to_frame("Importe")])
+    inf.tabla(costes, "Costes variables de operación y penalización por demora", nombre_indice="Concepto", formato=lambda f, c, v: eur(v))
     inf.tabla(pd.DataFrame({"Umbral": {
         "SLA1 · Latencia máx. hasta Inspección Técnica (Critico)": f"{num(param['SLA_LATENCIA_D'] * 24, 1)} horas en ≥{pct(param['SLA_LATENCIA_CUMPL'], 0)} de órdenes",
         "SLA2 · Ratio de espera Programado/Leve": f"< {pct(param['SLA_RATIO_ESPERA'], 0)}",
