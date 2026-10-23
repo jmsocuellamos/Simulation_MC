@@ -15,21 +15,22 @@ from motor import TIPOS, simular
 
 PARAM = {
     # Reembolso por alta (€) según perfil
-    "REEMBOLSO": {"Verde": 420, "Amarillo": 1250, "Naranja": 6100, "Rojo": 15200},
+    "REEMBOLSO": {"Verde": 450, "Amarillo": 1350, "Naranja": 6600, "Rojo": 16400},
     # Coste por servicio/procedimiento realizado (€)
-    "COSTE_SERVICIO": {"Pruebas_Basicas": 40, "Pruebas_Avanzadas": 220,
+    "COSTE_SERVICIO": {"Pruebas_Basicas": 80, "Pruebas_Avanzadas": 450,
                        "Consulta_Especialista": 95, "Quirofano": 3500},
     # Coste por día de estancia (€/día)
     "COSTE_DIA": {"Planta": 550, "Planta_PostUCI": 550, "UCI": 2100, "Rehabilitacion": 380},
     # Penalizaciones
     "PEN_FALLECE": 3000,
     "PEN_SIN_UCI": 10000,      # adicional a la anterior
+    "PEN_DEMORA": 200,         # por paciente Naranja/Rojo con latencia > SLA_LATENCIA_H
     # Tramos de margen exigido según tasa de altas: (umbral, margen)
-    "TRAMOS_MARGEN": [(0.90, 0.15), (0.80, 0.10), (0.75, 0.075)],
-    "MARGEN_MINIMO": 0.05,
+    "TRAMOS_MARGEN": [(0.92, 0.15), (0.88, 0.12), (0.85, 0.10)],
+    "MARGEN_MINIMO": 0.08,
     # SLAs
-    "SLA_LATENCIA_H": 15 / 60,          # 15 minutos hasta Diag_Inicial (Naranja/Rojo)
-    "SLA_LATENCIA_CUMPL": 0.95,         # se exige que el 95% de los pacientes lo cumpla
+    "SLA_LATENCIA_H": 30 / 60,          # 30 minutos hasta Diag_Inicial (Naranja/Rojo)
+    "SLA_LATENCIA_CUMPL": 0.85,         # se exige que el 85% de los pacientes lo cumpla
     "SLA_RATIO_ESPERA": 0.25,           # Verde/Amarillo
     "SLA_OCUP_UCI": 0.90,
     "SLA_SIN_UCI": 0.02,                # sobre pacientes Naranja/Rojo
@@ -58,6 +59,27 @@ def franja_de_hora(h):
     for nombre, ini, fin in FRANJAS:
         if (ini > fin and (h >= ini or h < fin)) or (ini < fin and ini <= h < fin):
             return nombre
+
+
+def ver(df, dec=4):
+    """Redondea y sustituye los valores no definidos (NaN) por «—» para mostrar las tablas.
+    Un «—» indica que el valor no aplica (p. ej., un perfil que no pasa por una estación)."""
+    if isinstance(df, pd.Series):
+        df = df.to_frame()
+    out = df.copy()
+    num = out.select_dtypes("number").columns
+    out[num] = out[num].round(dec)
+    for c in out.columns.difference(num):   # columnas mixtas (números y textos)
+        out[c] = out[c].map(lambda v: round(v, dec) if isinstance(v, float) else v)
+    return out.astype(object).where(out.notna(), "—")
+
+
+def _div(a, b):
+    """División segura: 0 si a = 0 y b = 0; NaN solo si b = 0 y a ≠ 0."""
+    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        r = np.where(b != 0, a / np.where(b != 0, b, 1), np.where(a == 0, 0.0, np.nan))
+    return r
 
 
 def margen_exigido(tasa_alta, param=PARAM):
@@ -192,8 +214,10 @@ def tabla_pacientes(d, param=PARAM):
     coste = ok["Station_in"].map(param["COSTE_SERVICIO"]).fillna(0) \
         + ok["Station_in"].map(param["COSTE_DIA"]).fillna(0) * ok["T_server"] / 24
     pac["Coste_var"] = coste.groupby(ok["Id_pat"]).sum().reindex(pac.index).fillna(0)
+    demora = pac["Pat_type"].isin(["Naranja", "Rojo"]) & (pac["Latencia_DI"].fillna(0) > param["SLA_LATENCIA_H"])
+    pac["Demora_critica"] = demora
     pac["Penalizacion"] = np.where(pac["Desenlace"].eq("Fallece"), param["PEN_FALLECE"], 0) \
-        + np.where(pac["Sin_UCI"], param["PEN_SIN_UCI"], 0)
+        + np.where(pac["Sin_UCI"], param["PEN_SIN_UCI"], 0) + np.where(demora, param.get("PEN_DEMORA", 0), 0)
     pac["Ingreso"] = np.where(pac["Desenlace"].eq("Alta"), pac["Pat_type"].map(param["REEMBOLSO"]), 0)
     return pac
 
@@ -400,38 +424,44 @@ def kpis_economicos(pac_fin, cfg, dias_ventana, param=PARAM):
 
 
 def evaluar_slas(pac_fin, seg, cfg, t0, t1, econ_glob, param=PARAM):
-    """Evalúa los cinco SLAs de la Sección A.08. Devuelve un DataFrame con valor, umbral y cumplimiento."""
+    """Evalúa los cinco SLAs de la Sección A.08 (el SLA2 se evalúa por separado para Verde y Amarillo).
+    Devuelve un DataFrame con la métrica, su valor, el umbral, si se cumple («Sí»/«No») y un detalle."""
     filas = []
+    lim_min = param["SLA_LATENCIA_H"] * 60
     # 1) Latencia Admisión -> Diag_Inicial (Naranja/Rojo)
     nr = pac_fin[pac_fin["Pat_type"].isin(["Naranja", "Rojo"])]
     lat = nr["Latencia_DI"].dropna()
-    pct = (lat <= param["SLA_LATENCIA_H"]).mean()
-    filas.append(("SLA1 Latencia DI ≤15 min (Naranja/Rojo)", "% pacientes ≤15 min", pct,
-                  f"≥ {param['SLA_LATENCIA_CUMPL']:.0%}", pct >= param["SLA_LATENCIA_CUMPL"]))
-    for t in ["Naranja", "Rojo"]:
-        l = nr.loc[nr["Pat_type"] == t, "Latencia_DI"].dropna()
-        filas.append((f"   · {t}: latencia media (min) / % ≤15 min", "min", l.mean() * 60,
-                      f"{(l <= param['SLA_LATENCIA_H']).mean():.1%}", np.nan))
+    pct = (lat <= param["SLA_LATENCIA_H"]).mean() if len(lat) else 0.0
+    det = " · ".join(f"{t}: media {nr.loc[nr['Pat_type'] == t, 'Latencia_DI'].mean() * 60:.1f} min, "
+                     f"{(nr.loc[nr['Pat_type'] == t, 'Latencia_DI'] <= param['SLA_LATENCIA_H']).mean():.1%} ≤ {lim_min:.0f} min"
+                     for t in ["Naranja", "Rojo"])
+    filas.append((f"SLA1 Latencia DI ≤ {lim_min:.0f} min (Naranja/Rojo)", f"% pacientes ≤ {lim_min:.0f} min", pct,
+                  f"≥ {param['SLA_LATENCIA_CUMPL']:.0%}", pct >= param["SLA_LATENCIA_CUMPL"], det))
     # 2) Ratio de espera < 25% (Verde y Amarillo)
     for t in ["Verde", "Amarillo"]:
         x = pac_fin[pac_fin["Pat_type"] == t]
         r = x["Ratio_espera"].mean()
         filas.append((f"SLA2 Ratio espera < 25% ({t})", "T_q/T_sys medio", r,
-                      f"< {param['SLA_RATIO_ESPERA']:.0%}", r < param["SLA_RATIO_ESPERA"]))
+                      f"< {param['SLA_RATIO_ESPERA']:.0%}", r < param["SLA_RATIO_ESPERA"],
+                      f"T_q medio {x['T_q'].mean():.2f} h de {x['T_sys'].mean():.2f} h en el sistema"))
     # 3) Ocupación estructural de UCI ≤ 90%
     rec_uci = [r for r in capacidades(cfg) if r.startswith("UCI")]
     occ = ocupacion_diaria(seg, rec_uci, cfg.UCI_TOTAL_CAPACIDAD, t0, t1)
     filas.append(("SLA3 Ocupación media UCI ≤ 90%", "ocupación media", occ.mean(),
-                  f"≤ {param['SLA_OCUP_UCI']:.0%}", occ.mean() <= param["SLA_OCUP_UCI"]))
-    filas.append(("   · % días con ocupación UCI > 90%", "% días", (occ > param["SLA_OCUP_UCI"]).mean(), "info", np.nan))
+                  f"≤ {param['SLA_OCUP_UCI']:.0%}", occ.mean() <= param["SLA_OCUP_UCI"],
+                  f"{(occ > param['SLA_OCUP_UCI']).mean():.1%} de los días por encima del 90%"))
     # 4) Mortalidad evitable Sin_UCI < 2% de Naranja/Rojo
     m = nr["Sin_UCI"].mean()
     filas.append(("SLA4 Muertes Sin_UCI < 2% (Naranja/Rojo)", "tasa", m,
-                  f"< {param['SLA_SIN_UCI']:.0%}", m < param["SLA_SIN_UCI"]))
+                  f"< {param['SLA_SIN_UCI']:.0%}", m < param["SLA_SIN_UCI"],
+                  f"{int(nr['Sin_UCI'].sum())} fallecimientos por falta de cama de UCI"))
     # 5) Margen operativo neto ≥ margen exigido
     filas.append(("SLA5 Margen neto ≥ margen exigido", "margen neto", econ_glob["Margen_neto"],
-                  f"≥ {econ_glob['Margen_exigido']:.1%}", econ_glob["Margen_neto"] >= econ_glob["Margen_exigido"]))
-    return pd.DataFrame(filas, columns=["SLA", "Métrica", "Valor", "Umbral", "Cumple"]).set_index("SLA")
+                  f"≥ {econ_glob['Margen_exigido']:.1%}", econ_glob["Margen_neto"] >= econ_glob["Margen_exigido"],
+                  f"tasa de altas {(pac_fin['Desenlace'] == 'Alta').mean():.1%}"))
+    out = pd.DataFrame(filas, columns=["SLA", "Métrica", "Valor", "Umbral", "Cumple", "Detalle"]).set_index("SLA")
+    out["Cumple"] = out["Cumple"].map({True: "Sí", False: "No"})
+    return out
 
 
 def calcular_kpis(df, cfg, dias=None, param=PARAM):
@@ -477,17 +507,20 @@ def calcular_kpis(df, cfg, dias=None, param=PARAM):
     for k, pref in claves_sla.items():
         fila = sla.loc[sla.index.str.startswith(pref)].iloc[0]
         res[f"SLA_valor_{k}"] = fila["Valor"]
-        res[f"Cumple_{k}"] = bool(fila["Cumple"])
+        res[f"Cumple_{k}"] = fila["Cumple"] == "Sí"
     res["Ocup_media_UCI"] = res["SLA_valor_SLA3"]
     # Acceso a UCI por perfil (espera de cama y fallos por falta de cama sobre las peticiones)
     uci = d[d["Station_in"].eq("UCI") & (d["T_in"] >= t0) & (d["T_in"] < t1)]
     for perfil in ["Amarillo", "Naranja", "Rojo"]:
         u = uci[uci["Pat_type"] == perfil]
         res[f"Peticiones_UCI_dia_{perfil}"] = len(u) / dias_v
-        res[f"Espera_UCI_media_{perfil}"] = u["T_wait"].mean() if len(u) else np.nan
-        res[f"Espera_UCI_P95_{perfil}"] = u["T_wait"].quantile(0.95) if len(u) else np.nan
-        res[f"Pct_peticiones_UCI_fallidas_{perfil}"] = u["Sin_UCI"].mean() if len(u) else np.nan
-    res["Pct_dias_UCI_90"] = sla.loc["   · % días con ocupación UCI > 90%", "Valor"]
+        # si en la réplica no hay peticiones de ese perfil, no hay espera ni fallos: se registra 0
+        res[f"Espera_UCI_media_{perfil}"] = u["T_wait"].mean() if len(u) else 0.0
+        res[f"Espera_UCI_P95_{perfil}"] = u["T_wait"].quantile(0.95) if len(u) else 0.0
+        res[f"Pct_peticiones_UCI_fallidas_{perfil}"] = u["Sin_UCI"].mean() if len(u) else 0.0
+    rec_uci = [r for r in capacidades(cfg) if r.startswith("UCI")]
+    res["Pct_dias_UCI_90"] = (ocupacion_diaria(seg, rec_uci, cfg.UCI_TOTAL_CAPACIDAD, t0, t1) > param["SLA_OCUP_UCI"]).mean()
+    res["Pct_NR_con_demora"] = pac_fin.loc[nr, "Demora_critica"].mean()
 
     return {"traza": d, "pacientes": pac, "pacientes_fin": pac_fin, "operativos": op,
             "estaciones": est, "recursos": rec, "segmentos": seg, "clinicos": cli,
@@ -602,7 +635,7 @@ def tabla_media_mc(mc, tabla):
 def slas_mc(mc):
     """Para cada SLA: valor medio de la métrica, IC95 y % de réplicas que lo cumplen."""
     r = mc["resumen"]
-    nombres = {"SLA1": "Latencia DI ≤15 min (N/R): % pacientes que cumplen (≥95%)",
+    nombres = {"SLA1": "Latencia DI ≤ 30 min (N/R): % pacientes que cumplen (≥85%)",
                "SLA2_Verde": "Ratio espera Verde (<25%)",
                "SLA2_Amarillo": "Ratio espera Amarillo (<25%)",
                "SLA3": "Ocupación media UCI (≤90%)",
@@ -634,9 +667,11 @@ def comparar_escenarios(mc_base, mc_esc, kpis, alpha=0.05):
     pval = {}
     for k in kpis:
         x = dif[k].dropna()
-        pval[k] = stats.ttest_1samp(x, 0).pvalue if len(x) > 1 and x.std() > 0 else np.nan
+        # sin variación entre réplicas: diferencia nula (p = 1) o constante (p = 0)
+        pval[k] = (stats.ttest_1samp(x, 0).pvalue if len(x) > 1 and x.std() > 0
+                   else (1.0 if (len(x) == 0 or abs(x.mean()) < 1e-12) else 0.0))
     out = pd.DataFrame({"Base": b.mean(), "Escenario": e.mean(), "Δ": dif.mean(),
-                        "Δ%": dif.mean() / b.mean().abs().replace(0, np.nan),
+                        "Δ%": _div(dif.mean(), b.mean().abs()),
                         "IC95_Δ_inf": dif.mean() - tq * se, "IC95_Δ_sup": dif.mean() + tq * se,
                         "p_valor": pd.Series(pval)})
     out["Significativo"] = out["p_valor"] < alpha
@@ -660,8 +695,9 @@ def viabilidad_economica(mc_base, mc_esc, alpha=0.05):
         "Coste fijo anual (€/año)": anual,
         "Coste fijo único (€)": unico,
         "Resultado neto anual (€/año)": m * 365 - anual,
-        "Cobertura del coste anual (Δ/coste)": (m * 365 / anual) if anual else np.nan,
-        "Periodo de amortización del coste único (días)": (unico / m) if (unico and m > 0) else np.nan,
+        "Cobertura del coste anual (Δ/coste)": (m * 365 / anual) if anual else "no aplica (sin coste anual)",
+        "Periodo de amortización del coste único (días)": ((unico / m) if m > 0 else "no se amortiza") if unico
+        else "no aplica (sin coste único)",
         "Margen operativo base": b["Margen_operativo"].mean(),
         "Margen operativo escenario (bruto)": e["Margen_operativo"].mean(),
         "Margen neto escenario (tras coste fijo)": e["Margen_neto"].mean(),
@@ -678,8 +714,8 @@ KPIS_CLAVE = (
     + [f"T_q_media_{t}" for t in TIPOS + ["Global"]]
     + [f"Ratio_espera_medio_{t}" for t in TIPOS]
     + ["Latencia_DI_media_NR_min", "SLA_valor_SLA1"]
-    + [f"Tasa_mortalidad_{t}" for t in TIPOS + ["Global"]]
-    + ["Tasa_alta_Global", "Tasa_mort_Sin_UCI_Global", "Mort_Sin_UCI_NR",
+    + [f"Tasa_mortalidad_{t}" for t in ["Amarillo", "Naranja", "Rojo", "Global"]]   # Verde: 0 por protocolo
+    + ["Tasa_alta_Global", "Tasa_mort_Sin_UCI_Global", "Mort_Sin_UCI_NR", "Pct_NR_con_demora",
        "Tasa_hospitalizacion_Global", "Tasa_UCI_Global", "Tasa_UCI_desde_Urgencias",
        "Tasa_UCI_desde_Quirofano", "Tasa_UCI_desde_Planta"]
     + ["Util_Medicos", "Util_Pruebas_Avanzadas", "Util_Box_Urgencias", "Util_Quirofano",
@@ -708,7 +744,7 @@ ETIQUETAS_KPI = {
     "T_sys_media_Global": "T. medio en el sistema · Global (h)",
     "T_q_media_Global": "T. medio en cola · Global (h)",
     "Latencia_DI_media_NR_min": "Latencia hasta Diag. Inicial N/R (min)",
-    "SLA_valor_SLA1": "% N/R atendidos en ≤15 min",
+    "SLA_valor_SLA1": "% N/R atendidos en ≤30 min",
     "Tasa_mortalidad_Verde": "Mortalidad · Verde",
     "Tasa_mortalidad_Amarillo": "Mortalidad · Amarillo",
     "Tasa_mortalidad_Naranja": "Mortalidad · Naranja",
@@ -776,6 +812,8 @@ def tabla_slas(protocolos):
 
 
 def num(x, d=2):
+    if isinstance(x, str):
+        return x
     if x is None or (isinstance(x, float) and np.isnan(x)):
         return "—"
     s = f"{x:,.{d}f}"
@@ -783,15 +821,21 @@ def num(x, d=2):
 
 
 def pct(x, d=1):
+    if isinstance(x, str):
+        return x
     return "—" if x is None or pd.isna(x) else num(100 * x, d) + " %"
 
 
 def eur(x, d=0):
+    if isinstance(x, str):
+        return x
     return "—" if x is None or pd.isna(x) else num(x, d) + " €"
 
 
 def fmt_kpi(k, v):
     """Formatea un valor según el tipo de KPI."""
+    if isinstance(v, str):
+        return v
     if pd.isna(v):
         return "—"
     if k.startswith(("Tasa_", "Util_", "Ratio_", "Margen", "Ocup", "Pct_", "Mort_", "SLA_valor_SLA1", "Cumple", "%")):

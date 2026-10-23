@@ -359,15 +359,15 @@ def construir_config_base():
     cfg.nombre = "Línea Base (protocolo actual)"
 
     cfg.SERVIDORES_CAPACIDAD = {
-        "Admision": 3, "Triaje": 4, "Aislamiento": 6, "Medicos": 7,
-        "Pruebas_Basicas": 4, "Pruebas_Avanzadas": 4,
+        "Admision": 2, "Triaje": 2, "Aislamiento": 6, "Medicos": 3,
+        "Pruebas_Basicas": 4, "Pruebas_Avanzadas": 3,
         "Consulta_Especialista": 3, "Farmacia": 3,
     }
 
     cfg.BOX_CAPACIDAD = 55
     cfg.CAMAS_CAPACIDAD = {
-        "Planta": 120,
-        "Quirofano": 3,
+        "Planta": 130,
+        "Quirofano": 4,
         "Rehabilitacion": 43,
     }
     cfg.CAMA_ALIAS = {"Planta_PostUCI": "Planta"}
@@ -375,21 +375,21 @@ def construir_config_base():
     cfg.BOX_CAPTURA = {"Rojo": "Admision", "Naranja": "Diag_Inicial"}
 
     cfg.UCI_MODE = "partitioned"       # "partitioned" (línea base) o "pooled" (Escenario C)
-    cfg.UCI_ROJO_CAPACIDAD = 45
-    cfg.UCI_NARANJA_CAPACIDAD = 30
-    cfg.UCI_BASE_CAPACIDAD = 4
-    cfg.UCI_TOTAL_CAPACIDAD = cfg.UCI_ROJO_CAPACIDAD + cfg.UCI_NARANJA_CAPACIDAD + cfg.UCI_BASE_CAPACIDAD  # 79
+    cfg.UCI_ROJO_CAPACIDAD = 34
+    cfg.UCI_NARANJA_CAPACIDAD = 23
+    cfg.UCI_BASE_CAPACIDAD = 8
+    cfg.UCI_TOTAL_CAPACIDAD = cfg.UCI_ROJO_CAPACIDAD + cfg.UCI_NARANJA_CAPACIDAD + cfg.UCI_BASE_CAPACIDAD  # 65
     cfg.LIMITE_ESPERA_UCI = 12.0        # horas
 
     cfg.TIEMPOS_SERVICIO = {
         "Admision":              {"Verde": 5/60,  "Amarillo": 5/60,  "Naranja": 4/60,  "Rojo": 2/60},
         "Triaje":                {"Verde": 10/60, "Amarillo": 8/60,  "Naranja": 6/60,  "Rojo": 4/60},
         "Aislamiento":           {"Verde": 20/60, "Amarillo": 20/60, "Naranja": 20/60, "Rojo": 20/60},
-        "Diag_Inicial":          {"Verde": 10/60, "Amarillo": 10/60, "Naranja": 10/60, "Rojo": 10/60},
+        "Diag_Inicial":          {"Verde": 15/60, "Amarillo": 15/60, "Naranja": 15/60, "Rojo": 15/60},
         "Pruebas_Basicas":       {"Verde": 15/60, "Amarillo": 15/60, "Naranja": 15/60, "Rojo": 15/60},
         "Pruebas_Avanzadas":     {"Verde": 45/60, "Amarillo": 45/60, "Naranja": 60/60, "Rojo": 60/60},
         "Consulta_Especialista": {"Verde": 30/60, "Amarillo": 30/60, "Naranja": 30/60, "Rojo": 30/60},
-        "Diag_Preliminar":       {"Verde": 10/60, "Amarillo": 10/60, "Naranja": 15/60, "Rojo": 20/60},
+        "Diag_Preliminar":       {"Verde": 15/60, "Amarillo": 20/60, "Naranja": 25/60, "Rojo": 30/60},
         "Farmacia":              {"Verde": 8/60,  "Amarillo": 8/60,  "Naranja": 8/60,  "Rojo": 8/60},
         "Quirofano":             {"Naranja": 2.5, "Rojo": 3.5},
         "Planta":                {"Amarillo": 24.0, "Naranja": 48.0, "Rojo": 72.0},
@@ -506,7 +506,7 @@ def construir_config_ia():
     }
 
     # 3) Coste del escenario
-    cfg.COSTES_FIJOS = {"licencia_ia_anual": 480_000}
+    cfg.COSTES_FIJOS = {"licencia_ia_anual": 1_600_000}
     return cfg
 
 
@@ -543,7 +543,7 @@ def construir_config_fasttrack():
     }
 
     # 5) Coste del escenario
-    cfg.COSTES_FIJOS = {"personal_fasttrack_anual": 310_000}
+    cfg.COSTES_FIJOS = {"personal_fasttrack_anual": 1_100_000}
     return cfg
 
 
@@ -552,9 +552,9 @@ def construir_config_bedpool():
     cfg = construir_config_base()
     cfg.nombre = "Escenario C - Gestión Dinámica de Camas UCI"
     cfg.UCI_MODE = "pooled"   # único cambio real: pool único con prioridad por gravedad
-    # cfg.UCI_TOTAL_CAPACIDAD se mantiene IGUAL que en la línea base (79 camas):
+    # cfg.UCI_TOTAL_CAPACIDAD se mantiene IGUAL que en la línea base (65 camas):
     # no se añade ninguna cama nueva, sólo se reorganiza su gestión.
-    cfg.COSTES_FIJOS = {"reorganizacion_unica": 45_000}   # coste único, no anual
+    cfg.COSTES_FIJOS = {"reorganizacion_unica": 150_000}   # coste único, no anual
     return cfg
 
 ESCENARIOS_POR_DEFECTO = {

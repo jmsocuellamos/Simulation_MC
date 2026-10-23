@@ -264,7 +264,8 @@ def generar_informe(protocolos, ref, ajustes, comunes, titulo="Red de colas hosp
     costes = pd.concat([pd.Series({f"{k} (€/servicio)": v for k, v in param["COSTE_SERVICIO"].items()}),
                         pd.Series({f"{k} (€/día)": v for k, v in param["COSTE_DIA"].items()}),
                         pd.Series({"Penalización por fallecimiento (€)": param["PEN_FALLECE"],
-                                   "Penalización adicional Sin_UCI (€)": param["PEN_SIN_UCI"]})]).to_frame("Importe")
+                                   "Penalización adicional Sin_UCI (€)": param["PEN_SIN_UCI"],
+                                   "Penalización por demora crítica N/R (€)": param.get("PEN_DEMORA", 0)})]).to_frame("Importe")
     inf.tabla(costes, "Costes variables y penalizaciones", nombre_indice="Concepto", formato=lambda f, c, v: eur(v))
     tramos = pd.DataFrame([{"Tasa de altas mayor que": pct(u, 0), "Margen exigido": pct(m, 1)} for u, m in param["TRAMOS_MARGEN"]]
                           + [{"Tasa de altas mayor que": "resto", "Margen exigido": pct(param["MARGEN_MINIMO"], 1)}])

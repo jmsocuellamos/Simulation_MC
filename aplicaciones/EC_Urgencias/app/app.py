@@ -31,11 +31,11 @@ EN_NAVEGADOR = sys.platform == "emscripten"
 DESCRIPCIONES = {
     "Línea base": "Protocolo actualmente vigente.",
     "A · IA": "Asistente de diagnóstico por IA: −30% de tiempo en Diagnóstico Inicial, −25% en Diagnóstico "
-              "Preliminar y menos Pruebas Avanzadas para Verde/Amarillo/Naranja. Licencia de 480.000 €/año.",
+              "Preliminar y menos Pruebas Avanzadas para Verde/Amarillo/Naranja. Licencia y soporte de 1.600.000 €/año.",
     "B · Fast-Track": "Circuito rápido con 3 facultativos propios para el 70% de los Verde y el 30% de los Amarillo. "
-                      "Coste de personal de 310.000 €/año.",
-    "C · UCI compartida": "Las 79 camas de UCI pasan a una única bolsa con prioridad Rojo > Naranja > Amarillo. "
-                          "Formación con coste único de 45.000 €.",
+                      "Personal dedicado 24 h: 1.100.000 €/año.",
+    "C · UCI compartida": "Las 65 camas de UCI pasan a una única bolsa con prioridad Rojo > Naranja > Amarillo. "
+                          "Formación y adaptación del sistema de camas: coste único de 150.000 €.",
 }
 
 
@@ -217,6 +217,8 @@ with tab_com:
         par["PEN_FALLECE"] = st.number_input("Por fallecimiento", 0.0, value=float(par["PEN_FALLECE"]), step=500.0, key=clave("pen1"))
         par["PEN_SIN_UCI"] = st.number_input("Adicional si es por falta de cama UCI", 0.0, value=float(par["PEN_SIN_UCI"]),
                                              step=500.0, key=clave("pen2"))
+        par["PEN_DEMORA"] = st.number_input("Por demora crítica (Naranja/Rojo por encima de la latencia del SLA1)", 0.0,
+                                            value=float(par.get("PEN_DEMORA", 0.0)), step=50.0, key=clave("pen3"))
     with c2:
         st.markdown("**Coste por servicio o procedimiento (€)**")
         cs = editor(clave("coste_serv"), lambda: pd.DataFrame({"Estación": list(par["COSTE_SERVICIO"]),
@@ -718,7 +720,7 @@ with tab_res:
 
         with r_dat:
             st.markdown("Valores de cada réplica (una fila por réplica y escenario).")
-            largo = pd.concat([m["resumen"].assign(Escenario=n) for n, m in prot.items()]).reset_index()
+            largo = pd.concat([m["resumen"].copy().assign(Escenario=n) for n, m in prot.items()]).reset_index()
             st.dataframe(largo, use_container_width=True, height=350)
             buf = io.BytesIO()
             with pd.ExcelWriter(buf, engine="openpyxl") as xw:
