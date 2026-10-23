@@ -30,18 +30,21 @@ PARAM = {
                        "Evaluacion_Veterinaria_Inicial_RL": 25, "Evaluacion_Preliminar_RL": 25,
                        "Revision_Ingreso": 10, "Admision": 5, "Preparacion_Suelta": 60},
     # Coste por día de estancia (€/día)
-    "COSTE_DIA": {"Cuarentena": 15, "Modulo_Cria": 8, "Modulo_Cria_PostUCI": 8, "UCI_Veterinaria": 120,
-                  "Recuperacion_PostCritica": 40},
-    # Margen operativo objetivo del patronato (15-20%): se exige el límite inferior
-    "MARGEN_EXIGIDO": 0.15,
-    "MARGEN_OBJETIVO_SUP": 0.20,
+    "COSTE_DIA": {"Cuarentena": 18, "Modulo_Cria": 8, "Modulo_Cria_PostUCI": 8, "UCI_Veterinaria": 130,
+                  "Recuperacion_PostCritica": 50},
+    # Penalizaciones adicionales (Sección A.05)
+    "PEN_SIN_UCI": 5000,                # fallecimiento por falta de plaza de UCI (adicional)
+    "PEN_DEMORA": 300,                  # RescateCritico con latencia hasta la EVI > SLA_LATENCIA_D
+    # Margen operativo objetivo del patronato (12-15%): se exige el límite inferior
+    "MARGEN_EXIGIDO": 0.12,
+    "MARGEN_OBJETIVO_SUP": 0.15,
     # SLAs
     "SLA_LATENCIA_D": 0.25,             # 6 horas hasta Evaluación Veterinaria Inicial (RescateCritico)
-    "SLA_LATENCIA_CUMPL": 0.95,         # se exige que el 95% de los RescateCritico lo cumpla
-    "SLA_RATIO_ESPERA": 0.25,           # Fundador/Cautivo
+    "SLA_LATENCIA_CUMPL": 0.90,         # se exige que el 90% de los RescateCritico lo cumpla
+    "SLA_RATIO_ESPERA": 0.05,           # Fundador/Cautivo
     "SLA_OCUP_UCI": 0.90,
     "SLA_SIN_UCI": 0.02,                # sobre RescateLeve/RescateCritico
-    "SLA_LIBERACION": 0.55,             # tasa de liberación global mínima
+    "SLA_LIBERACION": 0.60,             # tasa de liberación global mínima
     # Ventanas de análisis (días)
     "T_WARMUP": 365,
     "T_COOLDOWN": 730,
@@ -67,6 +70,27 @@ RECINTO = "Recinto_Recuperacion"
 
 
 ESTACIONES_DEL_ANIO = [("Invierno", 335, 59), ("Primavera", 59, 151), ("Verano", 151, 243), ("Otoño", 243, 335)]
+
+
+def ver(df, dec=4):
+    """Redondea y sustituye los valores no definidos (NaN) por «—» para mostrar las tablas.
+    Un «—» indica que el valor no aplica (p. ej., un perfil que no pasa por una estación)."""
+    if isinstance(df, pd.Series):
+        df = df.to_frame()
+    out = df.copy()
+    num = out.select_dtypes("number").columns
+    out[num] = out[num].round(dec)
+    for c in out.columns.difference(num):   # columnas mixtas (números y textos)
+        out[c] = out[c].map(lambda v: round(v, dec) if isinstance(v, float) else v)
+    return out.astype(object).where(out.notna(), "—")
+
+
+def _div(a, b):
+    """División segura: 0 si a = 0 y b = 0; NaN solo si b = 0 y a ≠ 0."""
+    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        r = np.where(b != 0, a / np.where(b != 0, b, 1), np.where(a == 0, 0.0, np.nan))
+    return r
 
 
 def estacion_del_anio(dia):
@@ -113,7 +137,8 @@ def tasa_ingresos_estacion(df, dias=None):
     tab["Tasa_teórica"] = tab.index.map(TASAS_TEORICAS)
     mix = pd.crosstab(adm["Estacion_anio"], adm["Perfil"], normalize="index").reindex(columns=TIPOS)
     tab = tab.join(mix.add_prefix("%")).reindex([n for n, _, _ in ESTACIONES_DEL_ANIO])
-    total = pd.Series({"Ingresos": len(adm), "Días": dias, "Tasa_obs (ind/día)": len(adm) / dias})
+    total = pd.Series({"Ingresos": len(adm), "Días": dias, "Tasa_obs (ind/día)": len(adm) / dias,
+                       "Tasa_teórica": sum(TASAS_TEORICAS[n] * ((fin - ini) % 365) for n, ini, fin in ESTACIONES_DEL_ANIO) / 365})
     total = pd.concat([total, adm["Perfil"].value_counts(normalize=True).reindex(TIPOS).add_prefix("%")])
     out = pd.concat([tab, pd.DataFrame([total], index=["Total"])])
     out["Ingresos/año"] = out["Ingresos"] / anios
@@ -196,7 +221,11 @@ def tabla_individuos(d, param=PARAM):
     coste = ok["Station_in"].map(param["COSTE_SERVICIO"]).fillna(0) \
         + ok["Station_in"].map(param["COSTE_DIA"]).fillna(0) * ok["T_server"]
     ind["Coste_var"] = coste.groupby(ok["Id_ind"]).sum().reindex(ind.index).fillna(0)
-    ind["Penalizacion"] = np.where(ind["Desenlace"].eq("Fallece"), ind["Perfil"].map(param["PEN_FALLECE"]), 0)
+    # Demora en atención crítica: RescateCritico con latencia hasta la EVI superior al SLA
+    ind["Demora_critica"] = ind["Perfil"].isin(PERFILES_SLA_LATENCIA) & (ind["Latencia_EVI"].fillna(0) > param["SLA_LATENCIA_D"])
+    ind["Penalizacion"] = np.where(ind["Desenlace"].eq("Fallece"), ind["Perfil"].map(param["PEN_FALLECE"]), 0) \
+        + np.where(ind["Sin_UCI"], param["PEN_SIN_UCI"], 0) \
+        + np.where(ind["Demora_critica"], param["PEN_DEMORA"], 0)
     ind["Ingreso"] = 0.0
     for des, tabla in param["SUBVENCION"].items():
         m = ind["Desenlace"].eq(des)
@@ -404,42 +433,52 @@ def kpis_economicos(ind_fin, cfg, dias_ventana, param=PARAM):
 
 
 def evaluar_slas(ind_fin, seg, cfg, t0, t1, econ_glob, param=PARAM):
-    """Evalúa los seis SLAs de la Sección A.08. Devuelve un DataFrame con valor, umbral y cumplimiento."""
+    """Evalúa los seis SLAs de la Sección A.08 (el SLA2 se evalúa por separado para Fundador y Cautivo).
+    Devuelve un DataFrame con la métrica, su valor, el umbral, si se cumple («Sí»/«No») y un detalle."""
     filas = []
-    # 1) Latencia Admisión -> Evaluación Veterinaria Inicial (RescateCritico) ≤ 0,25 días
+    lim = param["SLA_LATENCIA_D"]
+    # 1) Latencia Admisión -> Evaluación Veterinaria Inicial (RescateCritico)
     rc = ind_fin[ind_fin["Perfil"].isin(PERFILES_SLA_LATENCIA)]
     lat = rc["Latencia_EVI"].dropna()
-    pct_ok = (lat <= param["SLA_LATENCIA_D"]).mean() if len(lat) else np.nan
-    filas.append(("SLA1 Latencia EVI ≤ 0,25 d (RescateCritico)", "% individuos ≤ 0,25 d", pct_ok,
-                  f"≥ {param['SLA_LATENCIA_CUMPL']:.0%}", bool(pct_ok >= param["SLA_LATENCIA_CUMPL"]) if len(lat) else np.nan))
-    filas.append(("   · latencia media (días)", "días", lat.mean(), "info", np.nan))
-    # 2) Ratio de espera < 25% (Fundador y Cautivo)
+    pct_ok = (lat <= lim).mean() if len(lat) else 0.0
+    filas.append((f"SLA1 Latencia EVI ≤ {lim:.2f} d (RescateCritico)", f"% individuos ≤ {lim:.2f} d", pct_ok,
+                  f"≥ {param['SLA_LATENCIA_CUMPL']:.0%}", pct_ok >= param["SLA_LATENCIA_CUMPL"],
+                  f"latencia media {lat.mean() if len(lat) else 0:.3f} d · P95 {lat.quantile(0.95) if len(lat) else 0:.3f} d"))
+    # 2) Ratio de espera (Fundador y Cautivo)
     for t in PERFILES_SLA_ESPERA:
-        r = ind_fin.loc[ind_fin["Perfil"] == t, "Ratio_espera"].mean()
-        filas.append((f"SLA2 Ratio espera < 25% ({t})", "T_q/T_sys medio", r,
-                      f"< {param['SLA_RATIO_ESPERA']:.0%}", bool(r < param["SLA_RATIO_ESPERA"])))
+        x = ind_fin[ind_fin["Perfil"] == t]
+        r = x["Ratio_espera"].mean() if len(x) else 0.0
+        filas.append((f"SLA2 Ratio espera ({t})", "T_q/T_sys medio", r,
+                      f"< {param['SLA_RATIO_ESPERA']:.0%}", r < param["SLA_RATIO_ESPERA"],
+                      f"T_q medio {x['T_q'].mean() if len(x) else 0:.1f} d de {x['T_sys'].mean() if len(x) else 0:.1f} d en el sistema"))
     # 3) Ocupación estructural de UCI ≤ 90%
     rec_uci = [r for r in capacidades(cfg) if r.startswith("UCI")]
     occ = ocupacion_periodica(seg, rec_uci, cfg.UCI_TOTAL_CAPACIDAD, t0, t1)
-    filas.append(("SLA3 Ocupación media UCI ≤ 90%", "ocupación media", occ.mean(),
-                  f"≤ {param['SLA_OCUP_UCI']:.0%}", bool(occ.mean() <= param["SLA_OCUP_UCI"])))
-    filas.append(("   · % meses con ocupación UCI > 90%", "% meses", (occ > param["SLA_OCUP_UCI"]).mean(), "info", np.nan))
-    # 4) Mortalidad evitable Sin_UCI < 2% de RescateLeve/RescateCritico
-    m = ind_fin.loc[ind_fin["Perfil"].isin(PERFILES_RESCATE), "Sin_UCI"].mean()
-    filas.append(("SLA4 Muertes Sin_UCI < 2% (rescates)", "tasa", m, f"< {param['SLA_SIN_UCI']:.0%}",
-                  bool(m < param["SLA_SIN_UCI"])))
-    # 5) Tasa de liberación global ≥ 55%
-    lib = (ind_fin["Desenlace"] == "Liberado").mean()
-    filas.append(("SLA5 Tasa de liberación ≥ 55%", "tasa", lib, f"≥ {param['SLA_LIBERACION']:.0%}",
-                  bool(lib >= param["SLA_LIBERACION"])))
+    filas.append((f"SLA3 Ocupación media UCI ≤ {param['SLA_OCUP_UCI']:.0%}", "ocupación media", occ.mean(),
+                  f"≤ {param['SLA_OCUP_UCI']:.0%}", occ.mean() <= param["SLA_OCUP_UCI"],
+                  f"{(occ > param['SLA_OCUP_UCI']).mean():.1%} de los meses por encima del {param['SLA_OCUP_UCI']:.0%}"))
+    # 4) Mortalidad evitable Sin_UCI en RescateLeve/RescateCritico
+    resc = ind_fin[ind_fin["Perfil"].isin(PERFILES_RESCATE)]
+    m = resc["Sin_UCI"].mean() if len(resc) else 0.0
+    filas.append((f"SLA4 Muertes Sin_UCI < {param['SLA_SIN_UCI']:.0%} (rescates)", "tasa", m,
+                  f"< {param['SLA_SIN_UCI']:.0%}", m < param["SLA_SIN_UCI"],
+                  f"{int(resc['Sin_UCI'].sum())} fallecimientos por falta de plaza de UCI"))
+    # 5) Tasa de liberación global
+    lib = (ind_fin["Desenlace"] == "Liberado").mean() if len(ind_fin) else 0.0
+    filas.append((f"SLA5 Tasa de liberación ≥ {param['SLA_LIBERACION']:.0%}", "tasa", lib,
+                  f"≥ {param['SLA_LIBERACION']:.0%}", lib >= param["SLA_LIBERACION"],
+                  f"{int((ind_fin['Desenlace'] == 'Liberado').sum())} liberados de {len(ind_fin)} individuos finalizados"))
     # 6) Margen operativo neto ≥ margen exigido
     filas.append(("SLA6 Margen neto ≥ margen exigido", "margen neto", econ_glob["Margen_neto"],
-                  f"≥ {econ_glob['Margen_exigido']:.0%}", bool(econ_glob["Margen_neto"] >= econ_glob["Margen_exigido"])))
-    return pd.DataFrame(filas, columns=["SLA", "Métrica", "Valor", "Umbral", "Cumple"]).set_index("SLA")
+                  f"≥ {econ_glob['Margen_exigido']:.0%}", econ_glob["Margen_neto"] >= econ_glob["Margen_exigido"],
+                  f"margen operativo antes de coste fijo {econ_glob['Margen_operativo']:.1%}"))
+    out = pd.DataFrame(filas, columns=["SLA", "Métrica", "Valor", "Umbral", "Cumple", "Detalle"]).set_index("SLA")
+    out["Cumple"] = out["Cumple"].map({True: "Sí", False: "No"})
+    return out
 
 
-CLAVES_SLA = {"SLA1": "SLA1", "SLA2_Fundador": "SLA2 Ratio espera < 25% (Fundador)",
-              "SLA2_Cautivo": "SLA2 Ratio espera < 25% (Cautivo)", "SLA3": "SLA3", "SLA4": "SLA4",
+CLAVES_SLA = {"SLA1": "SLA1", "SLA2_Fundador": "SLA2 Ratio espera (Fundador)",
+              "SLA2_Cautivo": "SLA2 Ratio espera (Cautivo)", "SLA3": "SLA3", "SLA4": "SLA4",
               "SLA5": "SLA5", "SLA6": "SLA6"}
 
 
@@ -481,20 +520,23 @@ def calcular_kpis(df, cfg, dias=None, param=PARAM):
     for k, pref in CLAVES_SLA.items():
         fila = sla.loc[sla.index.str.startswith(pref)].iloc[0]
         res[f"SLA_valor_{k}"] = fila["Valor"]
-        res[f"Cumple_{k}"] = bool(fila["Cumple"]) if not pd.isna(fila["Cumple"]) else False
+        res[f"Cumple_{k}"] = fila["Cumple"] == "Sí"
     res["Ocup_media_UCI"] = res["SLA_valor_SLA3"]
-    res["Pct_meses_UCI_90"] = sla.loc["   · % meses con ocupación UCI > 90%", "Valor"]
+    rec_uci = [r for r in capacidades(cfg) if r.startswith("UCI")]
+    res["Pct_meses_UCI_90"] = (ocupacion_periodica(seg, rec_uci, cfg.UCI_TOTAL_CAPACIDAD, t0, t1) > param["SLA_OCUP_UCI"]).mean()
+    res["Pct_RC_con_demora"] = ind_fin.loc[rc, "Demora_critica"].mean() if rc.any() else 0.0
     # Acceso a la UCI por perfil (espera de plaza y fallos sobre las peticiones)
     uci = d[d["Station_in"].eq(UCI) & (d["T_in"] >= t0) & (d["T_in"] < t1)]
     for perfil in TIPOS:
         u = uci[uci["Perfil"] == perfil]
         res[f"Peticiones_UCI_anio_{perfil}"] = len(u) / dias_v * 365
-        res[f"Espera_UCI_media_{perfil}"] = u["T_wait"].mean() if len(u) else np.nan
-        res[f"Espera_UCI_P95_{perfil}"] = u["T_wait"].quantile(0.95) if len(u) else np.nan
-        res[f"Pct_peticiones_UCI_fallidas_{perfil}"] = u["Sin_UCI"].mean() if len(u) else np.nan
+        # si en la réplica no hay peticiones de ese perfil, no hay espera ni fallos: se registra 0
+        res[f"Espera_UCI_media_{perfil}"] = u["T_wait"].mean() if len(u) else 0.0
+        res[f"Espera_UCI_P95_{perfil}"] = u["T_wait"].quantile(0.95) if len(u) else 0.0
+        res[f"Pct_peticiones_UCI_fallidas_{perfil}"] = u["Sin_UCI"].mean() if len(u) else 0.0
     # Uso del secuenciador genético (recurso escaso)
     pg = d[d["Station_in"].eq("Pruebas_Geneticas_Avanzadas") & (d["T_in"] >= t0) & (d["T_in"] < t1) & ~d["Fin"]]
-    res["Espera_media_Pruebas_Geneticas"] = pg["T_wait"].mean() if len(pg) else np.nan
+    res["Espera_media_Pruebas_Geneticas"] = pg["T_wait"].mean() if len(pg) else 0.0
 
     return {"traza": d, "individuos": ind, "individuos_fin": ind_fin, "operativos": op,
             "estaciones": est, "recursos": rec, "segmentos": seg, "biologicos": bio,
@@ -536,13 +578,14 @@ def tabla_media_mc(mc, tabla):
 def slas_mc(mc):
     """Para cada SLA: valor medio de la métrica, IC95 y % de réplicas que lo cumplen."""
     r = mc["resumen"]
-    nombres = {"SLA1": "Latencia EVI ≤ 0,25 d (RescateCritico): % que cumplen (≥95%)",
-               "SLA2_Fundador": "Ratio espera Fundador (<25%)",
-               "SLA2_Cautivo": "Ratio espera Cautivo (<25%)",
-               "SLA3": "Ocupación media UCI Veterinaria (≤90%)",
-               "SLA4": "Mortalidad Sin_UCI en rescates (<2%)",
-               "SLA5": "Tasa de liberación global (≥55%)",
-               "SLA6": "Margen neto ≥ margen exigido (15%)"}
+    p = PARAM
+    nombres = {"SLA1": f"Latencia EVI ≤ {p['SLA_LATENCIA_D']:.2f} d (RescateCritico): % que cumplen (≥{p['SLA_LATENCIA_CUMPL']:.0%})",
+               "SLA2_Fundador": f"Ratio espera Fundador (<{p['SLA_RATIO_ESPERA']:.0%})",
+               "SLA2_Cautivo": f"Ratio espera Cautivo (<{p['SLA_RATIO_ESPERA']:.0%})",
+               "SLA3": f"Ocupación media UCI Veterinaria (≤{p['SLA_OCUP_UCI']:.0%})",
+               "SLA4": f"Mortalidad Sin_UCI en rescates (<{p['SLA_SIN_UCI']:.0%})",
+               "SLA5": f"Tasa de liberación global (≥{p['SLA_LIBERACION']:.0%})",
+               "SLA6": f"Margen neto ≥ margen exigido ({p['MARGEN_EXIGIDO']:.0%})"}
     filas = []
     for k, txt in nombres.items():
         v = r[f"SLA_valor_{k}"].astype(float)
@@ -569,9 +612,11 @@ def comparar_escenarios(mc_base, mc_esc, kpis, alpha=0.05):
     pval = {}
     for k in kpis:
         x = dif[k].dropna()
-        pval[k] = stats.ttest_1samp(x, 0).pvalue if len(x) > 1 and x.std() > 0 else np.nan
+        # sin variación entre réplicas: diferencia nula (p = 1) o constante (p = 0)
+        pval[k] = (stats.ttest_1samp(x, 0).pvalue if len(x) > 1 and x.std() > 0
+                   else (1.0 if (len(x) == 0 or abs(x.mean()) < 1e-12) else 0.0))
     out = pd.DataFrame({"Base": b.mean(), "Escenario": e.mean(), "Δ": dif.mean(),
-                        "Δ%": dif.mean() / b.mean().abs().replace(0, np.nan),
+                        "Δ%": _div(dif.mean(), b.mean().abs()),
                         "IC95_Δ_inf": dif.mean() - tq * se, "IC95_Δ_sup": dif.mean() + tq * se,
                         "p_valor": pd.Series(pval)})
     out["Significativo"] = out["p_valor"] < alpha
@@ -594,8 +639,9 @@ def viabilidad_economica(mc_base, mc_esc, alpha=0.05):
         "Coste fijo anual (€/año)": anual,
         "Coste fijo único (€)": unico,
         "Resultado neto anual (€/año)": m - anual,
-        "Cobertura del coste anual (Δ/coste)": (m / anual) if anual else np.nan,
-        "Periodo de amortización del coste único (años)": (unico / m) if (unico and m > 0) else np.nan,
+        "Cobertura del coste anual (Δ/coste)": (m / anual) if anual else "no aplica (sin coste anual)",
+        "Periodo de amortización del coste único (años)": ((unico / m) if m > 0 else "no se amortiza") if unico
+        else "no aplica (sin coste único)",
         "Margen operativo base": b["Margen_operativo"].mean(),
         "Margen operativo escenario (bruto)": e["Margen_operativo"].mean(),
         "Margen neto escenario (tras coste fijo)": e["Margen_neto"].mean(),
@@ -611,7 +657,7 @@ KPIS_CLAVE = (
     + [f"T_sys_media_{t}" for t in TIPOS + ["Global"]]
     + [f"T_q_media_{t}" for t in TIPOS + ["Global"]]
     + [f"Ratio_espera_medio_{t}" for t in TIPOS]
-    + ["Latencia_EVI_media_RC_d", "SLA_valor_SLA1"]
+    + ["Latencia_EVI_media_RC_d", "SLA_valor_SLA1", "Pct_RC_con_demora"]
     + [f"Tasa_liberacion_{t}" for t in TIPOS + ["Global"]]
     + [f"Tasa_mortalidad_{t}" for t in TIPOS + ["Global"]]
     + [f"Tasa_cautividad_{t}" for t in TIPOS + ["Global"]]
@@ -705,7 +751,7 @@ def sentido_kpi(k):
         return +1
     if k.startswith(("T_sys", "T_q", "Ratio_espera", "Latencia", "Tasa_mortalidad", "Tasa_mort_Sin_UCI",
                      "Mort_Sin_UCI", "Tasa_cautividad", "Coste", "Bloqueo", "Espera_", "Pct_peticiones_UCI_fallidas",
-                     "Pct_meses_UCI_90", "Lq_")):
+                     "Pct_meses_UCI_90", "Pct_RC_con_demora", "Lq_")):
         return -1
     return 0
 
@@ -718,7 +764,8 @@ ETIQUETAS_KPI = {
     "T_sys_media_Global": "T. medio en el sistema · Global (días)",
     "T_q_media_Global": "T. medio en cola · Global (días)",
     "Latencia_EVI_media_RC_d": "Latencia hasta Eval. Vet. Inicial · RescateCritico (días)",
-    "SLA_valor_SLA1": "% RescateCritico atendidos en ≤ 0,25 días",
+    "Pct_RC_con_demora": "% RescateCritico con demora crítica (> latencia SLA1)",
+    "SLA_valor_SLA1": "% RescateCritico atendidos en ≤ 0,25 días (6 h)",
     "Tasa_liberacion_Fundador": "Liberación · Fundador",
     "Tasa_liberacion_Cautivo": "Liberación · Cautivo",
     "Tasa_liberacion_RescateLeve": "Liberación · RescateLeve",
@@ -793,6 +840,8 @@ def tabla_slas(protocolos):
 
 
 def num(x, d=2):
+    if isinstance(x, str):
+        return x
     if x is None or (isinstance(x, float) and np.isnan(x)):
         return "—"
     s = f"{x:,.{d}f}"
@@ -800,15 +849,21 @@ def num(x, d=2):
 
 
 def pct(x, d=1):
+    if isinstance(x, str):
+        return x
     return "—" if x is None or pd.isna(x) else num(100 * x, d) + " %"
 
 
 def eur(x, d=0):
+    if isinstance(x, str):
+        return x
     return "—" if x is None or pd.isna(x) else num(x, d) + " €"
 
 
 def fmt_kpi(k, v):
     """Formatea un valor según el tipo de KPI."""
+    if isinstance(v, str):
+        return v
     if pd.isna(v):
         return "—"
     if k.startswith(("Tasa_", "Util_", "Ratio_", "Margen", "Ocup", "Pct_", "Mort_", "SLA_valor_SLA1", "Cumple", "%")):

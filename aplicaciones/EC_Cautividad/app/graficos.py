@@ -69,6 +69,10 @@ def fig_comparativo(protocolos, kpis, ncols=3, titulo=None):
     fig, axes = plt.subplots(nrows, ncols, figsize=(5 * ncols, 3.6 * nrows), squeeze=False)
     pal = _paleta(list(protocolos))
     for ax, k in zip(axes.flat, kpis):
+        if largo[k].notna().sum() == 0:
+            ax.text(0.5, 0.5, "sin datos", ha="center", va="center", transform=ax.transAxes, color="grey")
+            ax.set_title(ETIQUETAS_KPI.get(k, k), fontsize=9); ax.set_xticks([]); ax.set_yticks([])
+            continue
         sns.boxplot(data=largo, x="Escenario", y=k, ax=ax, hue="Escenario", legend=False, palette=pal)
         ax.set_title(ETIQUETAS_KPI.get(k, k), fontsize=9); ax.set_xlabel(""); ax.set_ylabel("")
         ax.tick_params(axis="x", labelsize=7, rotation=30 if len(protocolos) > 3 else 0)
@@ -134,6 +138,10 @@ def fig_histogramas(mc, kpis, ncols=4):
     nrows = max(1, math.ceil(len(kpis) / ncols))
     fig, axes = plt.subplots(nrows, ncols, figsize=(4.2 * ncols, 3 * nrows), squeeze=False)
     for ax, k in zip(axes.flat, kpis):
+        if mc["resumen"][k].notna().sum() == 0:
+            ax.text(0.5, 0.5, "sin datos", ha="center", va="center", transform=ax.transAxes, color="grey")
+            ax.set_title(ETIQUETAS_KPI.get(k, k), fontsize=9); ax.set_xticks([]); ax.set_yticks([])
+            continue
         sns.histplot(mc["resumen"][k].astype(float), ax=ax, color="steelblue", bins=15)
         ax.axvline(mc["resumen"][k].mean(), color="red", lw=1.5)
         ax.set_title(ETIQUETAS_KPI.get(k, k), fontsize=9); ax.set_xlabel(""); ax.set_ylabel("")

@@ -32,9 +32,9 @@ DESCRIPCIONES = {
     "Línea base": "Protocolo actualmente vigente.",
     "A · IA genómica": "Genotipado asistido por IA: −65% de tiempo en Pruebas Genéticas Avanzadas, −40% en Consulta "
                        "con el Genetista y mejores emparejamientos para Fundador/Cautivo (menos cautividad "
-                       "permanente). Licencia de 62.000 €/año.",
+                       "permanente y menos prórrogas en el Módulo de Cría). Licencia de 12.000 €/año.",
     "B · Rescate rápido": "Equipo veterinario dedicado en exclusiva a los RescateLeve, con sus propias valoraciones "
-                          "inicial y preliminar. Coste de personal de 38.000 €/año.",
+                          "inicial y preliminar (en la mitad de tiempo). Coste de personal de 12.000 €/año.",
     "C · UCI compartida": "Las 5 plazas de UCI Veterinaria pasan a una única bolsa con prioridad RescateCritico > "
                           "RescateLeve > Fundador/Cautivo. Formación con coste único de 4.500 €.",
 }
@@ -230,7 +230,12 @@ with tab_com:
         st.markdown("**Margen operativo**")
         par["MARGEN_EXIGIDO"] = st.number_input("Margen exigido (%)", 0.0, 100.0, 100 * float(par["MARGEN_EXIGIDO"]), 0.5,
                                                 key=clave("mexig"),
-                                                help="Límite inferior del objetivo del patronato (15–20%).") / 100
+                                                help="Límite inferior del objetivo del patronato (12–15%).") / 100
+        st.markdown("**Penalizaciones adicionales (€)**")
+        par["PEN_SIN_UCI"] = st.number_input("Fallecimiento por falta de plaza de UCI (adicional)", 0.0,
+                                             value=float(par.get("PEN_SIN_UCI", 0.0)), step=500.0, key=clave("pen_sinuci"))
+        par["PEN_DEMORA"] = st.number_input("Demora crítica (RescateCritico por encima de la latencia del SLA1)", 0.0,
+                                            value=float(par.get("PEN_DEMORA", 0.0)), step=50.0, key=clave("pen_demora"))
     with c2:
         st.markdown("**Coste por procedimiento realizado (€)**")
         cs = editor(clave("coste_serv"), lambda: pd.DataFrame({"Estación": list(par["COSTE_SERVICIO"]),
@@ -726,7 +731,7 @@ with tab_res:
 
         with r_dat:
             st.markdown("Valores de cada réplica (una fila por réplica y escenario).")
-            largo = pd.concat([m["resumen"].assign(Escenario=n) for n, m in prot.items()]).reset_index()
+            largo = pd.concat([m["resumen"].copy().assign(Escenario=n) for n, m in prot.items()]).reset_index()
             st.dataframe(largo, use_container_width=True, height=350)
             buf = io.BytesIO()
             with pd.ExcelWriter(buf, engine="openpyxl") as xw:

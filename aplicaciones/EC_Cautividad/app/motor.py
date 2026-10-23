@@ -39,10 +39,10 @@ class Config:
 TIPOS = ["Fundador", "Cautivo", "RescateLeve", "RescateCritico"]
 
 ESTACIONES_ANIO = {
-    (335, 59):  (0.08, [0.20, 0.10, 0.40, 0.30]),   # Invierno: baja actividad, traslados planificados
-    (59, 151):  (0.20, [0.05, 0.55, 0.30, 0.10]),   # Primavera: temporada de partos en cautividad
-    (151, 243): (0.22, [0.05, 0.10, 0.35, 0.50]),   # Verano: incendios, sequía -> más rescates críticos
-    (243, 335): (0.18, [0.10, 0.10, 0.40, 0.40]),   # Otoño: caza, atropellos -> más rescates
+    (335, 59):  (0.16, [0.20, 0.10, 0.40, 0.30]),   # Invierno: baja actividad, traslados planificados
+    (59, 151):  (0.40, [0.05, 0.55, 0.30, 0.10]),   # Primavera: temporada de partos en cautividad
+    (151, 243): (0.44, [0.05, 0.10, 0.35, 0.50]),   # Verano: incendios, sequía -> más rescates críticos
+    (243, 335): (0.36, [0.10, 0.10, 0.40, 0.40]),   # Otoño: caza, atropellos -> más rescates
 }
 
 
@@ -363,7 +363,7 @@ def construir_config_base():
     cfg.SERVIDORES_CAPACIDAD = {
         "Admision": 1,
         "Revision_Ingreso": 1,
-        "Equipo_Veterinario": 2,           # atiende Evaluacion_Veterinaria_Inicial y Evaluacion_Preliminar
+        "Equipo_Veterinario": 1,           # atiende Evaluacion_Veterinaria_Inicial y Evaluacion_Preliminar
         "Analitica_Basica": 1,
         "Pruebas_Geneticas_Avanzadas": 1,  # único secuenciador/analista genético -> cuello de botella deliberado
         "Consulta_Genetista": 1,
@@ -377,11 +377,11 @@ def construir_config_base():
     # de la media: los tiempos de estancia en el Módulo de Cría tienen
     # varianza muy alta, y dimensionar solo por la media produce
     # inestabilidad -colas que crecen sin límite- a largo plazo).
-    cfg.RECINTO_CAPACIDAD = 3
+    cfg.RECINTO_CAPACIDAD = 10
     cfg.JAULAS_CAPACIDAD = {
-        "Cuarentena": 5,
+        "Cuarentena": 8,
         "Cirugia_Veterinaria": 1,
-        "Modulo_Cria": 22,
+        "Modulo_Cria": 40,
         "Recuperacion_PostCritica": 3,
     }
     cfg.JAULA_ALIAS = {"Modulo_Cria_PostUCI": "Modulo_Cria"}
@@ -404,11 +404,11 @@ def construir_config_base():
         "Cuarentena": {
             "Fundador": 21.0, "Cautivo": 14.0, "RescateLeve": 10.0, "RescateCritico": 10.0,
         },
-        "Evaluacion_Veterinaria_Inicial": {t: 0.15 for t in TIPOS},
+        "Evaluacion_Veterinaria_Inicial": {"Fundador": 0.25, "Cautivo": 0.25, "RescateLeve": 0.60, "RescateCritico": 0.30},
         "Analitica_Basica":              {t: 0.10 for t in TIPOS},
-        "Pruebas_Geneticas_Avanzadas":   {t: 3.0 for t in TIPOS},
+        "Pruebas_Geneticas_Avanzadas":   {t: 8.0 for t in TIPOS},
         "Consulta_Genetista":            {t: 0.30 for t in TIPOS},
-        "Evaluacion_Preliminar":         {t: 0.20 for t in TIPOS},
+        "Evaluacion_Preliminar":         {"Fundador": 0.30, "Cautivo": 0.30, "RescateLeve": 0.60, "RescateCritico": 0.30},
         "Cirugia_Veterinaria":           {"RescateLeve": 0.15, "RescateCritico": 0.25},
         "Modulo_Cria": {
             "Fundador": 400.0, "Cautivo": 300.0, "RescateLeve": 250.0, "RescateCritico": 200.0,
@@ -533,7 +533,7 @@ def construir_config_ia_genetica():
     #    análisis genético y agiliza la lectura del genetista.
     cfg.TIEMPOS_SERVICIO = copy.deepcopy(cfg.TIEMPOS_SERVICIO)
     for tipo in cfg.TIEMPOS_SERVICIO["Pruebas_Geneticas_Avanzadas"]:
-        cfg.TIEMPOS_SERVICIO["Pruebas_Geneticas_Avanzadas"][tipo] *= 0.35   # 3.0d -> ~1.05d
+        cfg.TIEMPOS_SERVICIO["Pruebas_Geneticas_Avanzadas"][tipo] *= 0.35   # 8.0d -> 2.8d
     for tipo in cfg.TIEMPOS_SERVICIO["Consulta_Genetista"]:
         cfg.TIEMPOS_SERVICIO["Consulta_Genetista"][tipo] *= 0.60
 
@@ -544,16 +544,16 @@ def construir_config_ia_genetica():
         "Modulo_Cria": 0.80, "Preparacion_Suelta": 0.20,
     }
     cfg.PROB_DERIVACION["Modulo_Cria"]["Fundador"] = {
-        "Preparacion_Suelta": 0.40, "Modulo_Cria": 0.35, "UCI_Veterinaria": 0.08,
-        "Cautividad_Permanente": 0.12, "Fallece": 0.05,
+        "Preparacion_Suelta": 0.50, "Modulo_Cria": 0.32, "UCI_Veterinaria": 0.08,
+        "Cautividad_Permanente": 0.05, "Fallece": 0.05,
     }
     cfg.PROB_DERIVACION["Modulo_Cria"]["Cautivo"] = {
-        "Preparacion_Suelta": 0.59, "Modulo_Cria": 0.20, "UCI_Veterinaria": 0.10,
-        "Cautividad_Permanente": 0.06, "Fallece": 0.05,
+        "Preparacion_Suelta": 0.68, "Modulo_Cria": 0.15, "UCI_Veterinaria": 0.10,
+        "Cautividad_Permanente": 0.02, "Fallece": 0.05,
     }
 
     # 3) Coste del escenario
-    cfg.COSTES_FIJOS = {"licencia_ia_genomica_anual": 62_000}
+    cfg.COSTES_FIJOS = {"licencia_ia_genomica_anual": 12_000}
     return cfg
 
 
@@ -574,8 +574,9 @@ def construir_config_rescate_rapido():
     cfg.POOL_ESTACION["Evaluacion_Preliminar_RL"] = "Equipo_Rescate_Rapido"
 
     cfg.TIEMPOS_SERVICIO = copy.deepcopy(cfg.TIEMPOS_SERVICIO)
-    cfg.TIEMPOS_SERVICIO["Evaluacion_Veterinaria_Inicial_RL"] = {"RescateLeve": 0.12}
-    cfg.TIEMPOS_SERVICIO["Evaluacion_Preliminar_RL"] = {"RescateLeve": 0.15}
+    # protocolo específico de rescate leve: aproximadamente la mitad del tiempo del circuito general
+    cfg.TIEMPOS_SERVICIO["Evaluacion_Veterinaria_Inicial_RL"] = {"RescateLeve": 0.30}
+    cfg.TIEMPOS_SERVICIO["Evaluacion_Preliminar_RL"] = {"RescateLeve": 0.35}
 
     # 3) El RescateLeve captura el Recinto de Recuperación en su nueva estación de entrada
     cfg.RECINTO_CAPTURA = dict(cfg.RECINTO_CAPTURA)
@@ -601,7 +602,7 @@ def construir_config_rescate_rapido():
     }
 
     # 5) Coste del escenario
-    cfg.COSTES_FIJOS = {"personal_rescate_rapido_anual": 38_000}
+    cfg.COSTES_FIJOS = {"personal_rescate_rapido_anual": 12_000}
     return cfg
 
 

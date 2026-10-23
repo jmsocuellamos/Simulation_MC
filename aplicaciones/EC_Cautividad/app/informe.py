@@ -267,7 +267,9 @@ def generar_informe(protocolos, ref, ajustes, comunes, titulo="Centro de cría e
               formato=lambda f, c, v: eur(v))
     costes = pd.concat([pd.Series({f"{k} (€/procedimiento)": v for k, v in param["COSTE_SERVICIO"].items()}),
                         pd.Series({f"{k} (€/día)": v for k, v in param["COSTE_DIA"].items()})]).to_frame("Importe")
-    inf.tabla(costes, "Costes variables de operación", nombre_indice="Concepto", formato=lambda f, c, v: eur(v))
+    costes = pd.concat([costes, pd.Series({"Penalización adicional Sin_UCI (€)": param.get("PEN_SIN_UCI", 0),
+                                           "Penalización por demora crítica RescateCritico (€)": param.get("PEN_DEMORA", 0)}).to_frame("Importe")])
+    inf.tabla(costes, "Costes variables de operación y penalizaciones adicionales", nombre_indice="Concepto", formato=lambda f, c, v: eur(v))
     inf.tabla(pd.DataFrame({"Umbral": {
         "SLA1 · Latencia máx. hasta Eval. Vet. Inicial (RescateCritico)": f"{num(param['SLA_LATENCIA_D'], 2)} días en ≥{pct(param['SLA_LATENCIA_CUMPL'], 0)} de individuos",
         "SLA2 · Ratio de espera Fundador/Cautivo": f"< {pct(param['SLA_RATIO_ESPERA'], 0)}",
