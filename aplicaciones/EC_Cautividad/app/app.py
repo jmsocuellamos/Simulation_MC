@@ -215,38 +215,50 @@ with tab_com:
         st.success(f"Periodos correctos · ingreso medio de {media:.3f} individuos/día ({media * 365:.0f} al año).")
 
     st.markdown("#### 💶 Parámetros económicos")
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns([3, 2])
     with c1:
-        st.markdown("**Subvención por desenlace y penalización por fallecimiento (€)**")
-        sub = editor(clave("subvencion"), lambda: pd.DataFrame({
+        st.markdown("**Subvención por desenlace y penalización por fallecimiento (€ por individuo)**")
+        sub = editor(clave("subvencion_v2"), lambda: pd.DataFrame({
             "Perfil": TIPOS,
-            "Liberado (€)": [par["SUBVENCION"]["Liberado"][t] for t in TIPOS],
-            "Cautividad permanente (€)": [par["SUBVENCION"]["Cautividad_Permanente"][t] for t in TIPOS],
-            "Penalización si fallece (€)": [par["PEN_FALLECE"][t] for t in TIPOS]}),
-            hide_index=True, use_container_width=True, disabled=["Perfil"])
-        par["SUBVENCION"] = {"Liberado": {r["Perfil"]: _f(r["Liberado (€)"], 0.0) for _, r in sub.iterrows()},
-                             "Cautividad_Permanente": {r["Perfil"]: _f(r["Cautividad permanente (€)"], 0.0) for _, r in sub.iterrows()}}
-        par["PEN_FALLECE"] = {r["Perfil"]: _f(r["Penalización si fallece (€)"], 0.0) for _, r in sub.iterrows()}
-        st.markdown("**Margen operativo**")
-        par["MARGEN_EXIGIDO"] = st.number_input("Margen exigido (%)", 0.0, 100.0, 100 * float(par["MARGEN_EXIGIDO"]), 0.5,
-                                                key=clave("mexig"),
-                                                help="Límite inferior del objetivo del patronato (12–15%).") / 100
-        st.markdown("**Penalizaciones adicionales (€)**")
-        par["PEN_SIN_UCI"] = st.number_input("Fallecimiento por falta de plaza de UCI (adicional)", 0.0,
-                                             value=float(par.get("PEN_SIN_UCI", 0.0)), step=500.0, key=clave("pen_sinuci"))
-        par["PEN_DEMORA"] = st.number_input("Demora crítica (RescateCritico por encima de la latencia del SLA1)", 0.0,
-                                            value=float(par.get("PEN_DEMORA", 0.0)), step=50.0, key=clave("pen_demora"))
+            "Liberado": [float(par["SUBVENCION"]["Liberado"][t]) for t in TIPOS],
+            "Cautividad permanente": [float(par["SUBVENCION"]["Cautividad_Permanente"][t]) for t in TIPOS],
+            "Fallece": [float(par["PEN_FALLECE"][t]) for t in TIPOS]}),
+            hide_index=True, use_container_width=True, disabled=["Perfil"],
+            column_config={
+                "Perfil": st.column_config.TextColumn("Perfil", width="medium"),
+                "Liberado": st.column_config.NumberColumn("Liberado (€)", min_value=0.0, step=50.0, format="%.0f", help="Subvención si el individuo es liberado."),
+                "Cautividad permanente": st.column_config.NumberColumn("Cautividad permanente (€)", min_value=0.0, step=50.0, format="%.0f", help="Subvención si el individuo pasa a cautividad permanente."),
+                "Fallece": st.column_config.NumberColumn("Fallece (€)", min_value=0.0, step=100.0, format="%.0f", help="Penalización por fallecimiento."),
+            })
+        par["SUBVENCION"] = {"Liberado": {r["Perfil"]: _f(r["Liberado"], 0.0) for _, r in sub.iterrows()},
+                       "Cautividad_Permanente": {r["Perfil"]: _f(r["Cautividad permanente"], 0.0) for _, r in sub.iterrows()}}
+        par["PEN_FALLECE"] = {r["Perfil"]: _f(r["Fallece"], 0.0) for _, r in sub.iterrows()}
     with c2:
+        st.markdown("**Margen operativo y penalizaciones adicionales**")
+        par["MARGEN_EXIGIDO"] = st.number_input("Margen exigido (%)", 0.0, 100.0, 100 * float(par["MARGEN_EXIGIDO"]), 0.5,
+                                                key=clave("mexig"), help="Límite inferior del objetivo del patronato (12–15%).") / 100
+        par["PEN_SIN_UCI"] = st.number_input("Fallecimiento por falta de plaza de UCI (€, adicional)", 0.0,
+                                             value=float(par.get("PEN_SIN_UCI", 0.0)), step=500.0, key=clave("pen_sinuci"))
+        par["PEN_DEMORA"] = st.number_input("Penalización por demora (€ por individuo)", 0.0,
+                                            value=float(par.get("PEN_DEMORA", 0.0)), step=50.0, key=clave("pen_demora"),
+                                            help="Se aplica a cada RescateCritico cuya espera hasta la Evaluación Veterinaria "
+                                                 "Inicial supera la latencia máxima del SLA1.")
+    c1, c2 = st.columns(2)
+    with c1:
         st.markdown("**Coste por procedimiento realizado (€)**")
         cs = editor(clave("coste_serv"), lambda: pd.DataFrame({"Estación": list(par["COSTE_SERVICIO"]),
                                                                 "Coste (€)": list(par["COSTE_SERVICIO"].values())}),
-                    hide_index=True, use_container_width=True, num_rows="dynamic")
+                    hide_index=True, use_container_width=True, num_rows="dynamic",
+                    column_config={"Estación": st.column_config.TextColumn("Estación", width="large"),
+                                   "Coste (€)": st.column_config.NumberColumn("Coste (€)", min_value=0.0, format="%.0f")})
         par["COSTE_SERVICIO"] = {r["Estación"]: _f(r["Coste (€)"], 0.0) for _, r in cs.iterrows() if r["Estación"]}
-    with c3:
+    with c2:
         st.markdown("**Coste por día de estancia (€/día)**")
         cd = editor(clave("coste_dia"), lambda: pd.DataFrame({"Estación": list(par["COSTE_DIA"]),
                                                                "Coste (€/día)": list(par["COSTE_DIA"].values())}),
-                    hide_index=True, use_container_width=True, num_rows="dynamic")
+                    hide_index=True, use_container_width=True, num_rows="dynamic",
+                    column_config={"Estación": st.column_config.TextColumn("Estación", width="large"),
+                                   "Coste (€/día)": st.column_config.NumberColumn("Coste (€/día)", min_value=0.0, format="%.0f")})
         par["COSTE_DIA"] = {r["Estación"]: _f(r["Coste (€/día)"], 0.0) for _, r in cd.iterrows() if r["Estación"]}
 
     st.markdown("#### 🏆 Acuerdos de nivel de servicio (SLAs)")
@@ -390,15 +402,12 @@ def editar_escenario(nombre):
     with t_tiem:
         st.caption("Tiempo nominal de servicio por estación y perfil. El motor genera cada tiempo como "
                    "U(0,75; 1,25) × valor nominal. Deja la celda vacía si el perfil no pasa por esa estación.")
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("**Estaciones de atención (horas)**")
-            ta = editor(k("t_min"), lambda: tabla_tiempos(d, horas=False), num_rows="dynamic", hide_index=True,
-                        use_container_width=True)
-        with c2:
-            st.markdown("**Estancias, jaulas y observación (días)**")
-            th = editor(k("t_h"), lambda: tabla_tiempos(d, horas=True), num_rows="dynamic", hide_index=True,
-                        use_container_width=True)
+        st.markdown("**Estaciones de atención (horas)**")
+        ta = editor(k("t_min"), lambda: tabla_tiempos(d, horas=False), num_rows="dynamic", hide_index=True, use_container_width=True,
+                    column_config={"Estación": st.column_config.TextColumn("Estación", width="large"), **{t: st.column_config.NumberColumn(t, min_value=0.0, format="%.2f") for t in TIPOS}})
+        st.markdown("**Estancias, jaulas y observación (días)**")
+        th = editor(k("t_h"), lambda: tabla_tiempos(d, horas=True), num_rows="dynamic", hide_index=True, use_container_width=True,
+                    column_config={"Estación": st.column_config.TextColumn("Estación", width="large"), **{t: st.column_config.NumberColumn(t, min_value=0.0, format="%.2f") for t in TIPOS}})
         tiempos = {}
         for tabla, factor in ((ta, 1 / 24), (th, 1.0)):
             for _, r in tabla.iterrows():
