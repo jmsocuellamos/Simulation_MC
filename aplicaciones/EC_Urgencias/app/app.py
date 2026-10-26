@@ -207,29 +207,22 @@ with tab_com:
         st.success(f"Franjas correctas · llegada media de {media:.2f} pacientes/hora ({media * 24:.0f} al día).")
 
     st.markdown("#### 💶 Parámetros económicos")
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3 = st.columns([2, 3, 3])
     with c1:
         st.markdown("**Reembolso por alta (€)**")
-        reem = editor(clave("reembolso"), lambda: pd.DataFrame({"Perfil": TIPOS, "Reembolso (€)": [par["REEMBOLSO"][t] for t in TIPOS]}),
-                      hide_index=True, use_container_width=True, disabled=["Perfil"])
-        par["REEMBOLSO"] = {r["Perfil"]: _f(r["Reembolso (€)"], 0.0) for _, r in reem.iterrows()}
-        st.markdown("**Penalizaciones (€)**")
+        reem = editor(clave("reembolso_v2"), lambda: pd.DataFrame({"Perfil": TIPOS, "Reembolso": [float(par["REEMBOLSO"][t]) for t in TIPOS]}),
+                      hide_index=True, use_container_width=True, disabled=["Perfil"],
+                      column_config={"Perfil": st.column_config.TextColumn("Perfil", width="small"),
+                                     "Reembolso": st.column_config.NumberColumn("Reembolso (€)", min_value=0.0, step=50.0, format="%.0f")})
+        par["REEMBOLSO"] = {r["Perfil"]: _f(r["Reembolso"], 0.0) for _, r in reem.iterrows()}
+    with c2:
+        st.markdown("**Penalizaciones (€ por paciente)**")
         par["PEN_FALLECE"] = st.number_input("Por fallecimiento", 0.0, value=float(par["PEN_FALLECE"]), step=500.0, key=clave("pen1"))
         par["PEN_SIN_UCI"] = st.number_input("Adicional si es por falta de cama UCI", 0.0, value=float(par["PEN_SIN_UCI"]),
                                              step=500.0, key=clave("pen2"))
-        par["PEN_DEMORA"] = st.number_input("Por demora crítica (Naranja/Rojo por encima de la latencia del SLA1)", 0.0,
-                                            value=float(par.get("PEN_DEMORA", 0.0)), step=50.0, key=clave("pen3"))
-    with c2:
-        st.markdown("**Coste por servicio o procedimiento (€)**")
-        cs = editor(clave("coste_serv"), lambda: pd.DataFrame({"Estación": list(par["COSTE_SERVICIO"]),
-                                                                "Coste (€)": list(par["COSTE_SERVICIO"].values())}),
-                    hide_index=True, use_container_width=True, num_rows="dynamic")
-        par["COSTE_SERVICIO"] = {r["Estación"]: _f(r["Coste (€)"], 0.0) for _, r in cs.iterrows() if r["Estación"]}
-        st.markdown("**Coste por día de estancia (€/día)**")
-        cd = editor(clave("coste_dia"), lambda: pd.DataFrame({"Estación": list(par["COSTE_DIA"]),
-                                                               "Coste (€/día)": list(par["COSTE_DIA"].values())}),
-                    hide_index=True, use_container_width=True, num_rows="dynamic")
-        par["COSTE_DIA"] = {r["Estación"]: _f(r["Coste (€/día)"], 0.0) for _, r in cd.iterrows() if r["Estación"]}
+        par["PEN_DEMORA"] = st.number_input("Por demora crítica", 0.0, value=float(par.get("PEN_DEMORA", 0.0)), step=50.0,
+                                            key=clave("pen3"), help="Se aplica a cada paciente Naranja/Rojo cuya espera hasta "
+                                                                    "el Diagnóstico Inicial supera la latencia máxima del SLA1.")
     with c3:
         st.markdown("**Margen exigido según la tasa de altas**")
         tr = editor(clave("tramos"), lambda: pd.DataFrame({"Tasa de altas > (%)": [100 * u for u, _ in par["TRAMOS_MARGEN"]],
@@ -239,6 +232,23 @@ with tab_com:
         par["TRAMOS_MARGEN"] = sorted([[float(a) / 100, float(b) / 100] for a, b in zip(tr.iloc[:, 0], tr.iloc[:, 1])], reverse=True)
         par["MARGEN_MINIMO"] = st.number_input("Margen exigido en el resto de casos (%)", 0.0, 100.0,
                                                100 * float(par["MARGEN_MINIMO"]), 0.5, key=clave("mmin")) / 100
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("**Coste por procedimiento realizado (€)**")
+        cs = editor(clave("coste_serv"), lambda: pd.DataFrame({"Estación": list(par["COSTE_SERVICIO"]),
+                                                                "Coste (€)": list(par["COSTE_SERVICIO"].values())}),
+                    hide_index=True, use_container_width=True, num_rows="dynamic",
+                    column_config={"Estación": st.column_config.TextColumn("Estación", width="large"),
+                                   "Coste (€)": st.column_config.NumberColumn("Coste (€)", min_value=0.0, format="%.0f")})
+        par["COSTE_SERVICIO"] = {r["Estación"]: _f(r["Coste (€)"], 0.0) for _, r in cs.iterrows() if r["Estación"]}
+    with c2:
+        st.markdown("**Coste por día de estancia (€/día)**")
+        cd = editor(clave("coste_dia"), lambda: pd.DataFrame({"Estación": list(par["COSTE_DIA"]),
+                                                               "Coste (€/día)": list(par["COSTE_DIA"].values())}),
+                    hide_index=True, use_container_width=True, num_rows="dynamic",
+                    column_config={"Estación": st.column_config.TextColumn("Estación", width="large"),
+                                   "Coste (€/día)": st.column_config.NumberColumn("Coste (€/día)", min_value=0.0, format="%.0f")})
+        par["COSTE_DIA"] = {r["Estación"]: _f(r["Coste (€/día)"], 0.0) for _, r in cd.iterrows() if r["Estación"]}
 
     st.markdown("#### 🏆 Acuerdos de nivel de servicio (SLAs)")
     c1, c2, c3, c4, c5 = st.columns(5)
@@ -378,15 +388,12 @@ def editar_escenario(nombre):
     with t_tiem:
         st.caption("Tiempo nominal de servicio por estación y perfil. El motor genera cada tiempo como "
                    "U(0,75; 1,25) × valor nominal. Deja la celda vacía si el perfil no pasa por esa estación.")
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("**Estaciones de atención (minutos)**")
-            ta = editor(k("t_min"), lambda: tabla_tiempos(d, horas=False), num_rows="dynamic", hide_index=True,
-                        use_container_width=True)
-        with c2:
-            st.markdown("**Estancias y observación (horas)**")
-            th = editor(k("t_h"), lambda: tabla_tiempos(d, horas=True), num_rows="dynamic", hide_index=True,
-                        use_container_width=True)
+        st.markdown("**Estaciones de atención (minutos)**")
+        ta = editor(k("t_min"), lambda: tabla_tiempos(d, horas=False), num_rows="dynamic", hide_index=True, use_container_width=True,
+                    column_config={"Estación": st.column_config.TextColumn("Estación", width="large"), **{t: st.column_config.NumberColumn(t, min_value=0.0, format="%.2f") for t in TIPOS}})
+        st.markdown("**Estancias y observación (horas)**")
+        th = editor(k("t_h"), lambda: tabla_tiempos(d, horas=True), num_rows="dynamic", hide_index=True, use_container_width=True,
+                    column_config={"Estación": st.column_config.TextColumn("Estación", width="large"), **{t: st.column_config.NumberColumn(t, min_value=0.0, format="%.2f") for t in TIPOS}})
         tiempos = {}
         for tabla, factor in ((ta, 1 / 60), (th, 1.0)):
             for _, r in tabla.iterrows():
