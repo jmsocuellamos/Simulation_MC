@@ -215,35 +215,52 @@ with tab_com:
         st.success(f"Periodos correctos · ingreso medio de {media:.3f} expedientes/día ({media * 365:.0f} al año).")
 
     st.markdown("#### 💶 Parámetros económicos")
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns([3, 2])
     with c1:
-        st.markdown("**Honorarios por desenlace y coste de oportunidad por insolvencia total (€)**")
-        sub = editor(clave("honorarios"), lambda: pd.DataFrame({
+        st.markdown("**Honorarios por desenlace y coste de oportunidad por insolvencia total (€ por expediente)**")
+        sub = editor(clave("honorarios_v2"), lambda: pd.DataFrame({
             "Perfil": TIPOS,
-            "Regularizado (€)": [par["HONORARIOS"]["Regularizado"][t] for t in TIPOS],
-            "Liquidación ordenada (€)": [par["HONORARIOS"]["Liquidacion_Ordenada"][t] for t in TIPOS],
-            "Coste de oportunidad por insolvencia (€)": [par["PEN_INSOLVENCIA"][t] for t in TIPOS]}),
-            hide_index=True, use_container_width=True, disabled=["Perfil"])
-        par["HONORARIOS"] = {"Regularizado": {r["Perfil"]: _f(r["Regularizado (€)"], 0.0) for _, r in sub.iterrows()},
-                             "Liquidacion_Ordenada": {r["Perfil"]: _f(r["Liquidación ordenada (€)"], 0.0) for _, r in sub.iterrows()}}
-        par["PEN_INSOLVENCIA"] = {r["Perfil"]: _f(r["Coste de oportunidad por insolvencia (€)"], 0.0) for _, r in sub.iterrows()}
-        st.markdown("**Margen operativo**")
+            "Regularizado": [float(par["HONORARIOS"]["Regularizado"][t]) for t in TIPOS],
+            "Liquidación ordenada": [float(par["HONORARIOS"]["Liquidacion_Ordenada"][t]) for t in TIPOS],
+            "Insolvencia total": [float(par["PEN_INSOLVENCIA"][t]) for t in TIPOS]}),
+            hide_index=True, use_container_width=True, disabled=["Perfil"],
+            column_config={
+                "Perfil": st.column_config.TextColumn("Perfil", width="medium"),
+                "Regularizado": st.column_config.NumberColumn("Regularizado (€)", min_value=0.0, step=50.0, format="%.0f",
+                                                              help="Honorarios de éxito si el expediente termina regularizado."),
+                "Liquidación ordenada": st.column_config.NumberColumn("Liquidación ordenada (€)", min_value=0.0, step=50.0, format="%.0f",
+                                                                      help="Honorarios si el expediente termina en liquidación ordenada."),
+                "Insolvencia total": st.column_config.NumberColumn("Insolvencia total (€)", min_value=0.0, step=100.0, format="%.0f",
+                                                                   help="Coste de oportunidad que asume la consultora si el expediente termina en insolvencia total."),
+            })
+        par["HONORARIOS"] = {"Regularizado": {r["Perfil"]: _f(r["Regularizado"], 0.0) for _, r in sub.iterrows()},
+                             "Liquidacion_Ordenada": {r["Perfil"]: _f(r["Liquidación ordenada"], 0.0) for _, r in sub.iterrows()}}
+        par["PEN_INSOLVENCIA"] = {r["Perfil"]: _f(r["Insolvencia total"], 0.0) for _, r in sub.iterrows()}
+    with c2:
+        st.markdown("**Margen operativo y penalización por demora**")
         par["MARGEN_EXIGIDO"] = st.number_input("Margen exigido (%)", 0.0, 100.0, 100 * float(par["MARGEN_EXIGIDO"]), 0.5,
                                                 key=clave("mexig"),
                                                 help="Límite inferior del objetivo de la dirección de la consultora (15–20%).") / 100
-        par["PEN_DEMORA"] = st.number_input("Penalización por demora (€ por expediente Riesgo_Concursal por encima de la latencia del SLA1)",
-                                            0.0, value=float(par.get("PEN_DEMORA", 0.0)), step=100.0, key=clave("pen_demora"))
-    with c2:
+        par["PEN_DEMORA"] = st.number_input("Penalización por demora (€ por expediente)", 0.0,
+                                            value=float(par.get("PEN_DEMORA", 0.0)), step=100.0, key=clave("pen_demora"),
+                                            help="Se aplica a cada expediente Riesgo_Concursal cuya espera hasta el "
+                                                 "Diagnóstico Financiero supera la latencia máxima del SLA1.")
+    c1, c2 = st.columns(2)
+    with c1:
         st.markdown("**Coste por procedimiento realizado (€)**")
         cs = editor(clave("coste_serv"), lambda: pd.DataFrame({"Estación": list(par["COSTE_SERVICIO"]),
                                                                 "Coste (€)": list(par["COSTE_SERVICIO"].values())}),
-                    hide_index=True, use_container_width=True, num_rows="dynamic")
+                    hide_index=True, use_container_width=True, num_rows="dynamic",
+                    column_config={"Estación": st.column_config.TextColumn("Estación", width="large"),
+                                   "Coste (€)": st.column_config.NumberColumn("Coste (€)", min_value=0.0, format="%.0f")})
         par["COSTE_SERVICIO"] = {r["Estación"]: _f(r["Coste (€)"], 0.0) for _, r in cs.iterrows() if r["Estación"]}
-    with c3:
+    with c2:
         st.markdown("**Coste por día de estancia (€/día)**")
         cd = editor(clave("coste_dia"), lambda: pd.DataFrame({"Estación": list(par["COSTE_DIA"]),
                                                                "Coste (€/día)": list(par["COSTE_DIA"].values())}),
-                    hide_index=True, use_container_width=True, num_rows="dynamic")
+                    hide_index=True, use_container_width=True, num_rows="dynamic",
+                    column_config={"Estación": st.column_config.TextColumn("Estación", width="large"),
+                                   "Coste (€/día)": st.column_config.NumberColumn("Coste (€/día)", min_value=0.0, format="%.0f")})
         par["COSTE_DIA"] = {r["Estación"]: _f(r["Coste (€/día)"], 0.0) for _, r in cd.iterrows() if r["Estación"]}
 
     st.markdown("#### 🏆 Acuerdos de nivel de servicio (SLAs)")
